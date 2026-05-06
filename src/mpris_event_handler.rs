@@ -748,12 +748,12 @@ impl MprisPlayerService {
             return;
         }
         if let Some(spirc) = &self.spirc {
-            let current_track_id = self.metadata.mpris.track_id.as_ref().and_then(|track_id| {
-                track_id
-                    .to_id()
-                    .ok()
-                    .map(|id| format!("/org/librespot/track/{id}"))
-            });
+            let current_track_id = self
+                .metadata
+                .mpris
+                .track_id
+                .as_ref()
+                .map(|track_id| format!("/org/librespot/track/{}", track_id.to_id()));
             if current_track_id.as_deref() == Some(track_id.as_str()) {
                 let _ = spirc.set_position_ms((position / 1000) as u32);
             } else {
