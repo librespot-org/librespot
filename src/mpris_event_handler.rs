@@ -1277,6 +1277,8 @@ impl MprisTask {
                 let meta = &mut iface.metadata;
                 *meta = Metadata::default();
 
+                meta.xesam = audio_item.unique_fields.into();
+
                 meta.mpris.track_id = Some(audio_item.track_id);
                 meta.xesam.title = Some(audio_item.name);
 
@@ -1291,8 +1293,6 @@ impl MprisTask {
                 }
 
                 meta.mpris.length = Some(audio_item.duration_ms as i64 * 1000);
-
-                meta.xesam = audio_item.unique_fields.into();
 
                 iface.metadata_changed(iface_ref.signal_emitter()).await?;
             }
