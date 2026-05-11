@@ -816,15 +816,12 @@ impl SpircTask {
                     SpircPlayStatus::Playing {
                         ref mut nominal_start_time,
                         ..
-                    } => {
-                        if (*nominal_start_time - new_nominal_start_time).abs() > 100 {
-                            *nominal_start_time = new_nominal_start_time;
-                            self.connect_state
-                                .update_position(position_ms, self.now_ms());
-                        } else {
-                            return Ok(());
-                        }
+                    } if (*nominal_start_time - new_nominal_start_time).abs() > 100 => {
+                        *nominal_start_time = new_nominal_start_time;
+                        self.connect_state
+                            .update_position(position_ms, self.now_ms());
                     }
+                    SpircPlayStatus::Playing { .. } => return Ok(()),
                     SpircPlayStatus::LoadingPlay { .. } | SpircPlayStatus::LoadingPause { .. } => {
                         self.connect_state
                             .update_position(position_ms, self.now_ms());
