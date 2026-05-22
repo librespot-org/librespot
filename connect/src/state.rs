@@ -126,6 +126,12 @@ pub(super) struct ConnectState {
 
     /// the context from which we play, is used to top up prev and next tracks
     context: Option<StateContext>,
+    /// Last non-empty context uri, preserved across `reset_context(Completely)`
+    /// so it can be re-resolved when the device is re-activated after an
+    /// inactive transition (e.g. a transient dealer drop while paused).
+    /// Without this, resume hits `NoContext` ("context is not available")
+    /// because the context and its uri were wiped on `became_inactive`.
+    recovery_context_uri: Option<String>,
     /// seed extracted in [ConnectState::handle_initial_transfer] and used in [ConnectState::finish_transfer]
     transfer_shuffle: Option<ShuffleState>,
 

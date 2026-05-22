@@ -1314,6 +1314,27 @@ impl SpircTask {
 
     fn handle_activate(&mut self) {
         self.connect_state.set_active(true);
+
+        // If we're re-activating without a loaded context (it was wiped by a
+        // `became_inactive` -> `reset_context(Completely)` during a transient
+        // dealer drop while paused), re-resolve the preserved context uri so
+        // resume doesn't fail with NoContext ("context is not available").
+        if self
+            .connect_state
+            .get_context(ContextType::Default)
+            .is_err()
+        {
+            if let Some(uri) = self.connect_state.take_recovery_context_uri() {
+                debug!("re-activating with no context; re-resolving recovered context <{uri}>");
+                self.context_resolver.add(ResolveContext::from_uri(
+                    uri.clone(),
+                    uri,
+                    ContextType::Default,
+                    ContextAction::Replace,
+                ));
+            }
+        }
+
         self.player
             .emit_session_connected_event(self.session.connection_id(), self.session.username());
         self.player.emit_session_client_changed_event(

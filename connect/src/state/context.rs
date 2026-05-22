@@ -95,6 +95,13 @@ impl ConnectState {
         &self.player().context_uri
     }
 
+    /// Take the preserved recovery context uri (see `recovery_context_uri`
+    /// field). Returns it once and clears it so we don't repeatedly try to
+    /// recover the same context.
+    pub fn take_recovery_context_uri(&mut self) -> Option<String> {
+        self.recovery_context_uri.take()
+    }
+
     fn different_context_uri(&self, uri: &str) -> bool {
         // search identifier is always different
         self.context_uri() != uri || uri.starts_with(SEARCH_IDENTIFIER)
@@ -116,6 +123,15 @@ impl ConnectState {
             ResetContext::Completely => {
                 self.context = None;
                 self.autoplay_context = None;
+
+                // Preserve the current context uri so it can be re-resolved
+                // when the device is re-activated (e.g. resume after a
+                // transient dealer drop). Only overwrite when non-empty so a
+                // burst of resets doesn't clobber it with an empty value.
+                let current_uri = self.player().context_uri.clone();
+                if !current_uri.is_empty() {
+                    self.recovery_context_uri = Some(current_uri);
+                }
 
                 let player = self.player_mut();
                 player.context_uri.clear();
