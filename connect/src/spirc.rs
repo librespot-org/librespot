@@ -477,7 +477,6 @@ impl SpircTask {
                     connection_id_update,
                     match |connection_id| if let Err(why) = self.handle_connection_id_update(connection_id).await {
                         error!("failed handling connection id update: {why}");
-                        break;
                     }
                 },
                 // main dealer update of any remote device updates
