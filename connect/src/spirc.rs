@@ -6,7 +6,7 @@ use crate::{
         authentication::Credentials,
         dealer::{
             manager::{BoxedStream, BoxedStreamResult, Reply, RequestReply},
-            protocol::{Command, FallbackWrapper, Message, Request},
+            protocol::{Command, FallbackWrapper, Message, Request, SetSleepTimerCommand},
         },
         session::UserAttributes,
         spclient::TransferRequest,
@@ -42,7 +42,10 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use thiserror::Error;
-use tokio::{sync::mpsc, time::sleep};
+use tokio::{
+    sync::mpsc,
+    time::{Instant, sleep, sleep_until},
+};
 
 #[derive(Debug, Error)]
 enum SpircError {
@@ -110,6 +113,10 @@ struct SpircTask {
     /// when set to true, it will update the volume after [UPDATE_STATE_DELAY],
     /// when no other future resolves, otherwise resets the delay
     update_state: bool,
+
+    /// absolute deadline at which the sleep timer pauses playback, or `None`
+    /// when no timer is armed. Set via the `set_sleep_timer` endpoint.
+    sleep_timer_deadline: Option<Instant>,
 
     spirc_id: usize,
 }
@@ -260,6 +267,7 @@ impl Spirc {
             transfer_state: None,
             update_volume: false,
             update_state: false,
+            sleep_timer_deadline: None,
 
             spirc_id,
         };
@@ -558,6 +566,15 @@ impl SpircTask {
                     if let Err(why) = self.notify().await {
                         error!("error updating connect state for volume update: {why}")
                     }
+                },
+                // the sleep timer fires once when its deadline is reached, pausing playback.
+                // `sleep_until` targets an absolute instant, so recreating the future on every
+                // loop iteration does not push the deadline back.
+                _ = async { sleep_until(self.sleep_timer_deadline.unwrap()).await }, if self.sleep_timer_deadline.is_some() => {
+                    info!("sleep timer expired, pausing playback");
+                    self.sleep_timer_deadline = None;
+                    self.handle_pause();
+                    self.update_state = true;
                 },
                 // context resolver handling, the idea/reason behind it the following:
                 //
@@ -1158,6 +1175,7 @@ impl SpircTask {
                 self.load_track(true, 0)?
             }
             Resume(_) => self.handle_play(),
+            SetSleepTimer(command) => self.handle_set_sleep_timer(command),
         }
 
         self.update_state = true;
@@ -1572,6 +1590,41 @@ impl SpircTask {
             }
             _ => (),
         }
+    }
+
+    fn handle_set_sleep_timer(&mut self, command: SetSleepTimerCommand) {
+        let timer = command.timer_type;
+        self.sleep_timer_deadline = match timer.kind.as_str() {
+            "duration" => match timer.duration_s {
+                // a zero or missing duration is interpreted as a cancellation/disarm
+                Some(0) | None => {
+                    info!("sleep timer cancelled");
+                    None
+                }
+                Some(duration_s) => {
+                    info!("sleep timer armed for {duration_s}s");
+                    Some(Instant::now() + Duration::from_secs(duration_s))
+                }
+            },
+            "timestamp" => match timer.timestamp {
+                Some(timestamp_ms) => {
+                    // an absolute Unix time in ms; convert it to a relative delay against
+                    // our Spotify-corrected clock. A past deadline pauses on the next
+                    // loop iteration.
+                    let remaining_ms = (timestamp_ms - self.now_ms()).max(0) as u64;
+                    info!("sleep timer armed for {remaining_ms}ms (timestamp {timestamp_ms})");
+                    Some(Instant::now() + Duration::from_millis(remaining_ms))
+                }
+                None => {
+                    warn!("set_sleep_timer of type \"timestamp\" without a usable value, ignoring");
+                    return;
+                }
+            },
+            other => {
+                warn!("unsupported sleep timer type \"{other}\", ignoring");
+                return;
+            }
+        };
     }
 
     fn handle_seek(&mut self, position_ms: u32) {
