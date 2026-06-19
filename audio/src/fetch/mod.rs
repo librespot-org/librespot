@@ -467,10 +467,14 @@ impl AudioFileStreaming {
                 .and_then(|x| x.map_err(Error::from));
 
             match streamer_result {
-                Ok(r) => {
+                Ok(r) if r.status() == StatusCode::PARTIAL_CONTENT => {
                     response_streamer_url = Some((r, streamer, url));
                     break;
                 }
+                Ok(r) => warn!(
+                    "Fetching {url} returned {} (expected 206 Partial Content), trying next",
+                    r.status()
+                ),
                 Err(e) => warn!("Fetching {url} failed with error {e:?}, trying next"),
             }
         }
