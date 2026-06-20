@@ -292,6 +292,17 @@ impl DiscoveryServer {
 
         let listener = match TcpListener::bind(address) {
             Ok(listener) => listener,
+            Err(_e) if !cfg!(windows) => {
+                warn!("IPv6 dual-stack bind failed ({_e}), falling back to IPv4");
+                let v4_address = SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), *port);
+                match TcpListener::bind(v4_address) {
+                    Ok(listener) => listener,
+                    Err(e) => {
+                        warn!("Discovery server failed to start: {e}");
+                        return Err(e.into());
+                    }
+                }
+            }
             Err(e) => {
                 warn!("Discovery server failed to start: {e}");
                 return Err(e.into());
