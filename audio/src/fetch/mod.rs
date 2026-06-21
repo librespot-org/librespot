@@ -488,12 +488,6 @@ impl AudioFileStreaming {
 
         trace!("Streaming from {url}");
 
-        let code = response.status();
-        if code != StatusCode::PARTIAL_CONTENT {
-            debug!("Opening audio file expected partial content but got: {code}");
-            return Err(AudioFileError::StatusCode(code).into());
-        }
-
         let header_value = response
             .headers()
             .get(CONTENT_RANGE)
