@@ -467,10 +467,14 @@ impl AudioFileStreaming {
                 .and_then(|x| x.map_err(Error::from));
 
             match streamer_result {
-                Ok(r) => {
+                Ok(r) if r.status() == StatusCode::PARTIAL_CONTENT => {
                     response_streamer_url = Some((r, streamer, url));
                     break;
                 }
+                Ok(r) => warn!(
+                    "Fetching {url} returned {} (expected 206 Partial Content), trying next",
+                    r.status()
+                ),
                 Err(e) => warn!("Fetching {url} failed with error {e:?}, trying next"),
             }
         }
@@ -483,12 +487,6 @@ impl AudioFileStreaming {
         };
 
         trace!("Streaming from {url}");
-
-        let code = response.status();
-        if code != StatusCode::PARTIAL_CONTENT {
-            debug!("Opening audio file expected partial content but got: {code}");
-            return Err(AudioFileError::StatusCode(code).into());
-        }
 
         let header_value = response
             .headers()
