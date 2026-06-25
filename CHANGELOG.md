@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - [connect] Add method `add_to_queue` to `Spirc` to add tracks, episodes, albums and playlists to the queue
+- [connect] Add support for the `set_sleep_timer` Spotify Connect endpoint, pausing playback when the timer expires
+- [core] Add `SetSleepTimer` variant to the `Command` enum, along with the `SetSleepTimerCommand` and `SleepTimer` types (breaking)
 - [playback] Add `SetQueue` player event, emitting when the queue changes (context loaded, track added to queue, or queue set via Spotify Connect). Gated behind `ConnectConfig::emit_set_queue_events`
 
 ### Changed

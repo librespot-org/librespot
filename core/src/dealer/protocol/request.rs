@@ -39,6 +39,7 @@ pub enum Command {
     // commands that don't send any context (at least not usually...)
     SkipPrev(GenericCommand),
     Resume(GenericCommand),
+    SetSleepTimer(SetSleepTimerCommand),
     // catch unknown commands, so that we can implement them later
     #[serde(untagged)]
     Unknown(Value),
@@ -69,6 +70,7 @@ impl Display for Command {
                 SkipNext(_) => "skip_next",
                 SkipPrev(_) => "skip_prev",
                 Resume(_) => "resume",
+                SetSleepTimer(_) => "set_sleep_timer",
                 Unknown(json) => {
                     json.as_object()
                         .and_then(|obj| obj.get("endpoint").map(|v| v.as_str()))
@@ -163,6 +165,32 @@ pub struct UpdateContextCommand {
 #[derive(Clone, Debug, Deserialize)]
 pub struct GenericCommand {
     pub logging_params: LoggingParams,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct SetSleepTimerCommand {
+    pub timer_type: SleepTimer,
+    pub logging_params: LoggingParams,
+}
+
+/// The `timer_type` object of a `set_sleep_timer` command, e.g.
+/// `{ "type": "duration", "duration_s": 3600 }`.
+///
+/// The `type` discriminator is kept as a raw string (rather than a tagged
+/// enum) so that unsupported or future timer types are reported by name
+/// instead of being silently collapsed into a catch-all variant.
+#[derive(Clone, Debug, Deserialize)]
+pub struct SleepTimer {
+    #[serde(rename = "type")]
+    pub kind: String,
+    /// Countdown length in seconds, present for the `duration` type.
+    #[serde(default)]
+    pub duration_s: Option<u64>,
+    /// Absolute deadline as a Unix timestamp in milliseconds, present for the
+    /// `timestamp` type. The exact field shape is unconfirmed against a real
+    /// client, so it is optional to degrade gracefully.
+    #[serde(default)]
+    pub timestamp: Option<i64>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
