@@ -2,6 +2,7 @@ use data_encoding::HEXLOWER;
 use futures_util::StreamExt;
 #[cfg(feature = "alsa-backend")]
 use librespot::playback::mixer::alsamixer::AlsaMixer;
+use librespot::playback::mixer::external::ExternalMixer;
 use librespot::{
     connect::{ConnectConfig, Spirc},
     core::{
@@ -341,9 +342,13 @@ async fn get_setup() -> Setup {
     // Options that have different descriptions
     // depending on what backends were enabled at build time.
     #[cfg(feature = "alsa-backend")]
-    const MIXER_TYPE_DESC: &str = "Mixer to use {alsa|softvol}. Defaults to softvol.";
+    const MIXER_TYPE_DESC: &str = "Mixer to use {alsa|external|softvol}. Defaults to softvol.";
     #[cfg(not(feature = "alsa-backend"))]
-    const MIXER_TYPE_DESC: &str = "Not supported by the included audio backend(s).";
+    const MIXER_TYPE_DESC: &str = "Mixer to use {external|softvol}. Defaults to softvol.";
+    #[cfg(feature = "alsa-backend")]
+    const MIXER_TYPE_VALUES: &str = "alsa, external, softvol";
+    #[cfg(not(feature = "alsa-backend"))]
+    const MIXER_TYPE_VALUES: &str = "external, softvol";
     #[cfg(any(
         feature = "alsa-backend",
         feature = "rodio-backend",
@@ -903,22 +908,21 @@ async fn get_setup() -> Setup {
         }
     }
 
-    #[cfg(feature = "alsa-backend")]
     let mixer_type = opt_str(MIXER_TYPE);
-    #[cfg(not(feature = "alsa-backend"))]
-    let mixer_type: Option<String> = None;
 
     let mixer = mixer::find(mixer_type.as_deref()).unwrap_or_else(|| {
         invalid_error_msg(
             MIXER_TYPE,
             MIXER_TYPE_SHORT,
             &opt_str(MIXER_TYPE).unwrap_or_default(),
-            "alsa, softvol",
+            MIXER_TYPE_VALUES,
             "softvol",
         );
 
         exit(1);
     });
+
+    let is_external_mixer = matches!(mixer_type.as_deref(), Some(ExternalMixer::NAME));
 
     let is_alsa_mixer = match mixer_type.as_deref() {
         #[cfg(feature = "alsa-backend")]
@@ -1524,7 +1528,8 @@ async fn get_setup() -> Setup {
         let name = name.unwrap_or(connect_default_config.name);
         let device_type = device_type.unwrap_or(connect_default_config.device_type);
         let initial_volume = initial_volume.unwrap_or(connect_default_config.initial_volume);
-        let disable_volume = matches!(mixer_config.volume_ctrl, VolumeCtrl::Fixed);
+        let disable_volume =
+            matches!(mixer_config.volume_ctrl, VolumeCtrl::Fixed) && !is_external_mixer;
         let volume_steps = volume_steps.unwrap_or(connect_default_config.volume_steps);
 
         ConnectConfig {

@@ -34,6 +34,9 @@ impl VolumeGetter for NoOpVolume {
 pub mod softmixer;
 use self::softmixer::SoftMixer;
 
+pub mod external;
+use self::external::ExternalMixer;
+
 #[cfg(feature = "alsa-backend")]
 pub mod alsamixer;
 #[cfg(feature = "alsa-backend")]
@@ -66,6 +69,7 @@ fn mk_sink<M: Mixer + 'static>(config: MixerConfig) -> Result<Arc<dyn Mixer>, Er
 
 pub const MIXERS: &[(&str, MixerFn)] = &[
     (SoftMixer::NAME, mk_sink::<SoftMixer>), // default goes first
+    (ExternalMixer::NAME, mk_sink::<ExternalMixer>),
     #[cfg(feature = "alsa-backend")]
     (AlsaMixer::NAME, mk_sink::<AlsaMixer>),
 ];
@@ -78,5 +82,15 @@ pub fn find(name: Option<&str>) -> Option<MixerFn> {
             .map(|mixer| mixer.1)
     } else {
         MIXERS.first().map(|mixer| mixer.1)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{external::ExternalMixer, find};
+
+    #[test]
+    fn finds_external_mixer() {
+        assert!(find(Some(ExternalMixer::NAME)).is_some());
     }
 }

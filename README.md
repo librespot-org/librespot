@@ -90,6 +90,12 @@ target/release/librespot -n "Librespot" -b 320 -c ./cache --enable-volume-normal
 ```
 The above command will create a receiver named ```Librespot```, with bitrate set to 320 kbps, initial volume at 75%, with volume normalisation enabled, and the device displayed in the app as an Audio/Video Receiver. A folder named ```cache``` will be created/used in the current directory, and be used to cache audio data and credentials.
 
+For setups where volume is controlled outside librespot, such as a Raspberry Pi connected to a receiver over Toslink, use the external mixer:
+```shell
+target/release/librespot --mixer external --initial-volume 100 --onevent ./event-handler
+```
+This keeps Spotify Connect volume events enabled for the event handler while leaving playback audio unattenuated.
+
 A full list of runtime options is available [here](https://github.com/librespot-org/librespot/wiki/Options).
 
 _Please Note: When using the cache feature, an authentication blob is stored for your account in the cache directory. For security purposes, we recommend that you set directory permissions on the cache directory to `700`._
