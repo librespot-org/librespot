@@ -51,22 +51,7 @@ enum ExternalVolumeQueryError {
 
 impl Mixer for ExternalMixer {
     fn open(config: MixerConfig) -> Result<Self, Error> {
-        let volume_query = config
-            .external_volume_query
-            .map(ExternalVolumeQuery::new)
-            .transpose()
-            .map_err(Error::invalid_argument)?;
-
-        if volume_query.is_some() {
-            info!("Mixing with external volume control and volume query");
-        } else {
-            info!("Mixing with external volume control");
-        }
-
-        Ok(Self {
-            volume: AtomicU16::new(u16::MAX / 2),
-            volume_query,
-        })
+        Ok(Self::open_with_config(config, None))
     }
 
     fn volume(&self) -> u16 {
@@ -95,6 +80,29 @@ impl Mixer for ExternalMixer {
 
 impl ExternalMixer {
     pub const NAME: &'static str = "external";
+
+    pub fn open_with_volume_query(
+        config: MixerConfig,
+        volume_query: String,
+    ) -> Result<Self, Error> {
+        let volume_query =
+            ExternalVolumeQuery::new(volume_query).map_err(Error::invalid_argument)?;
+
+        Ok(Self::open_with_config(config, Some(volume_query)))
+    }
+
+    fn open_with_config(_config: MixerConfig, volume_query: Option<ExternalVolumeQuery>) -> Self {
+        if volume_query.is_some() {
+            info!("Mixing with external volume control and volume query");
+        } else {
+            info!("Mixing with external volume control");
+        }
+
+        Self {
+            volume: AtomicU16::new(u16::MAX / 2),
+            volume_query,
+        }
+    }
 }
 
 impl ExternalVolumeQuery {
@@ -237,10 +245,10 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn external_mixer_query_success_updates_cached_volume() {
-        let mixer = ExternalMixer::open(MixerConfig {
-            external_volume_query: Some("/bin/sh -c 'printf 4242'".to_owned()),
-            ..MixerConfig::default()
-        })
+        let mixer = ExternalMixer::open_with_volume_query(
+            MixerConfig::default(),
+            "/bin/sh -c 'printf 4242'".to_owned(),
+        )
         .unwrap();
 
         assert_eq!(mixer.refresh_volume(), Some(4242));
@@ -251,10 +259,10 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn external_mixer_query_failure_preserves_cached_volume() {
-        let mixer = ExternalMixer::open(MixerConfig {
-            external_volume_query: Some("/bin/sh -c 'exit 1'".to_owned()),
-            ..MixerConfig::default()
-        })
+        let mixer = ExternalMixer::open_with_volume_query(
+            MixerConfig::default(),
+            "/bin/sh -c 'exit 1'".to_owned(),
+        )
         .unwrap();
 
         mixer.set_volume(1234);

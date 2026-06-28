@@ -52,7 +52,6 @@ pub struct MixerConfig {
     pub control: String,
     pub index: u32,
     pub volume_ctrl: VolumeCtrl,
-    pub external_volume_query: Option<String>,
 }
 
 impl Default for MixerConfig {
@@ -62,7 +61,6 @@ impl Default for MixerConfig {
             control: String::from("PCM"),
             index: 0,
             volume_ctrl: VolumeCtrl::default(),
-            external_volume_query: None,
         }
     }
 }

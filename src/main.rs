@@ -16,7 +16,7 @@ use librespot::{
             AudioFormat, Bitrate, NormalisationMethod, NormalisationType, PlayerConfig, VolumeCtrl,
         },
         dither,
-        mixer::{self, MixerConfig, MixerFn},
+        mixer::{self, Mixer, MixerConfig, MixerFn},
         player::{Player, coefficient_to_duration, duration_to_coefficient},
     },
 };
@@ -214,6 +214,7 @@ struct Setup {
     session_config: SessionConfig,
     connect_config: ConnectConfig,
     mixer_config: MixerConfig,
+    external_volume_query: Option<String>,
     credentials: Option<Credentials>,
     enable_oauth: bool,
     oauth_port: Option<u16>,
@@ -1150,7 +1151,6 @@ async fn get_setup() -> Setup {
             control,
             index,
             volume_ctrl,
-            external_volume_query,
         }
     };
 
@@ -1882,6 +1882,7 @@ async fn get_setup() -> Setup {
         session_config,
         connect_config,
         mixer_config,
+        external_volume_query,
         credentials,
         enable_oauth,
         oauth_port,
@@ -2008,11 +2009,21 @@ async fn main() {
     }
 
     let mixer_config = setup.mixer_config.clone();
-    let mixer = match (setup.mixer)(mixer_config) {
-        Ok(mixer) => mixer,
-        Err(why) => {
-            error!("{why}");
-            exit(1)
+    let mixer = if let Some(volume_query) = setup.external_volume_query.clone() {
+        match ExternalMixer::open_with_volume_query(mixer_config, volume_query) {
+            Ok(mixer) => std::sync::Arc::new(mixer) as std::sync::Arc<dyn Mixer>,
+            Err(why) => {
+                error!("{why}");
+                exit(1)
+            }
+        }
+    } else {
+        match (setup.mixer)(mixer_config) {
+            Ok(mixer) => mixer,
+            Err(why) => {
+                error!("{why}");
+                exit(1)
+            }
         }
     };
     let player_config = setup.player_config.clone();
