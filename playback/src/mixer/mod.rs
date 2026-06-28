@@ -15,6 +15,10 @@ pub trait Mixer: Send + Sync {
     fn volume(&self) -> u16;
     fn set_volume(&self, volume: u16);
 
+    fn refresh_volume(&self) -> Option<u16> {
+        None
+    }
+
     fn get_soft_volume(&self) -> Box<dyn VolumeGetter + Send> {
         Box::new(NoOpVolume)
     }
@@ -48,6 +52,7 @@ pub struct MixerConfig {
     pub control: String,
     pub index: u32,
     pub volume_ctrl: VolumeCtrl,
+    pub external_volume_query: Option<String>,
 }
 
 impl Default for MixerConfig {
@@ -57,6 +62,7 @@ impl Default for MixerConfig {
             control: String::from("PCM"),
             index: 0,
             volume_ctrl: VolumeCtrl::default(),
+            external_volume_query: None,
         }
     }
 }

@@ -12,10 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [connect] Add method `add_to_queue` to `Spirc` to add tracks, episodes, albums and playlists to the queue
 - [playback] Add `SetQueue` player event, emitting when the queue changes (context loaded, track added to queue, or queue set via Spotify Connect). Gated behind `ConnectConfig::emit_set_queue_events`
 - [playback] Add `external` mixer for externally controlled volume: Spotify volume events stay enabled while playback output remains unattenuated
+- [playback] Add `--external-volume-query` / `LIBRESPOT_EXTERNAL_VOLUME_QUERY` to refresh the `external` mixer volume from an external controller
 
 ### Changed
 
 - [core] Made `SpotifyId::to_base62`, `SpotifyId::to_base16`, `FileId::to_base16`, `SpotifyUri::to_id`, `SpotifyUri::to_uri` infallible (breaking)
+- [playback] Add `external_volume_query` to `MixerConfig` (breaking)
 
 ### Fixed
 

@@ -251,6 +251,7 @@ async fn get_setup() -> Setup {
     const EMIT_SINK_EVENTS: &str = "emit-sink-events";
     const ENABLE_OAUTH: &str = "enable-oauth";
     const ENABLE_VOLUME_NORMALISATION: &str = "enable-volume-normalisation";
+    const EXTERNAL_VOLUME_QUERY: &str = "external-volume-query";
     const FORMAT: &str = "format";
     const HELP: &str = "help";
     const INITIAL_VOLUME: &str = "initial-volume";
@@ -318,6 +319,7 @@ async fn get_setup() -> Setup {
     const PASSTHROUGH_SHORT: &str = "P";
     const PASSWORD_SHORT: &str = "p";
     const EMIT_SINK_EVENTS_SHORT: &str = "Q";
+    const EXTERNAL_VOLUME_QUERY_SHORT: &str = ""; // no short flag
     const QUIET_SHORT: &str = "q";
     const INITIAL_VOLUME_SHORT: &str = "R";
     const ALSA_MIXER_DEVICE_SHORT: &str = "S";
@@ -559,6 +561,12 @@ async fn get_setup() -> Setup {
         MIXER_TYPE,
         MIXER_TYPE_DESC,
         "MIXER",
+    )
+    .optopt(
+        EXTERNAL_VOLUME_QUERY_SHORT,
+        EXTERNAL_VOLUME_QUERY,
+        "Command to query current external volume when using `--mixer external`. Must print one raw volume integer from 0 to 65535 within 1 second.",
+        "COMMAND",
     )
     .optopt(
         DEVICE_SHORT,
@@ -863,7 +871,8 @@ async fn get_setup() -> Setup {
         };
 
     let empty_string_error_msg = |long: &str, short: &str| {
-        error!("`--{long}` / `-{short}` can not be an empty string");
+        let flag = format_flag(long, short);
+        error!("{flag} can not be an empty string");
         exit(1);
     };
 
@@ -939,6 +948,22 @@ async fn get_setup() -> Setup {
             }
         }
     }
+
+    let external_volume_query = if is_external_mixer {
+        opt_str(EXTERNAL_VOLUME_QUERY).map(|query| {
+            if query.is_empty() {
+                empty_string_error_msg(EXTERNAL_VOLUME_QUERY, EXTERNAL_VOLUME_QUERY_SHORT);
+            }
+
+            query
+        })
+    } else {
+        if opt_present(EXTERNAL_VOLUME_QUERY) {
+            warn!("External volume query has no effect if not using the external mixer.");
+        }
+
+        None
+    };
 
     let mixer_config = {
         let mixer_default_config = MixerConfig::default();
@@ -1125,6 +1150,7 @@ async fn get_setup() -> Setup {
             control,
             index,
             volume_ctrl,
+            external_volume_query,
         }
     };
 

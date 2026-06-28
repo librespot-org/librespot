@@ -95,6 +95,11 @@ For setups where volume is controlled outside librespot, such as a Raspberry Pi 
 target/release/librespot --mixer external --initial-volume 100 --onevent ./event-handler
 ```
 This keeps Spotify Connect volume events enabled for the event handler while leaving playback audio unattenuated.
+If the external controller can report its current volume, use `--external-volume-query` to initialize and resync Spotify's volume slider from that state:
+```shell
+target/release/librespot --mixer external --external-volume-query "/usr/local/bin/current-volume" --onevent ./event-handler
+```
+The query command must print one raw volume value from `0` to `65535`.
 
 A full list of runtime options is available [here](https://github.com/librespot-org/librespot/wiki/Options).
 
