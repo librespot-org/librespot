@@ -17,7 +17,7 @@ use crate::{
         player::{Player, PlayerEvent, PlayerEventChannel, QueueTrack},
     },
     protocol::{
-        connect::{Cluster, ClusterUpdate, LogoutCommand, SetVolumeCommand},
+        connect::{Cluster, ClusterUpdate, DeviceInfo, LogoutCommand, SetVolumeCommand},
         context::Context,
         explicit_content_pubsub::UserAttributesUpdate,
         player::ProvidedTrack,
@@ -36,6 +36,7 @@ use futures_util::StreamExt;
 use librespot_protocol::context_page::ContextPage;
 use protobuf::MessageField;
 use std::{
+    collections::HashMap,
     future::Future,
     mem,
     sync::Arc,
@@ -111,6 +112,11 @@ struct SpircTask {
     /// when set to true, it will update the volume after [UPDATE_STATE_DELAY],
     /// when no other future resolves, otherwise resets the delay
     update_state: bool,
+
+    /// DIAG: maps device_id (GUID) -> friendly label, populated from cluster
+    /// updates. Used only to identify which controller sends commands/transfers
+    /// in the logs.
+    device_directory: HashMap<String, String>,
 
     spirc_id: usize,
 }
@@ -291,6 +297,8 @@ impl Spirc {
             transfer_state: None,
             update_volume: false,
             update_state: false,
+
+            device_directory: HashMap::new(),
 
             spirc_id,
         };
@@ -989,6 +997,16 @@ impl SpircTask {
 
         self.connect_established = true;
 
+        self.diag_update_device_directory(&cluster.device);
+        info!(
+            "DIAG registered: active_device=<{}> ({}), cluster_session=<{}>, our_session=<{}>, transfer_data={} bytes",
+            cluster.active_device_id,
+            self.diag_device_label(&cluster.active_device_id),
+            cluster.player_state.session_id,
+            self.session.session_id(),
+            cluster.transfer_data.len(),
+        );
+
         let same_session = cluster.player_state.session_id == self.session.session_id()
             || cluster.player_state.session_id.is_empty();
         if !cluster.active_device_id.is_empty() || !same_session {
@@ -1076,6 +1094,12 @@ impl SpircTask {
         );
 
         if let Some(cluster) = cluster_update.cluster.take() {
+            self.diag_update_device_directory(&cluster.device);
+            info!(
+                "DIAG cluster update: reason={reason:?}, active_device=<{}> ({}), changed=[{device_ids}]",
+                cluster.active_device_id,
+                self.diag_device_label(&cluster.active_device_id),
+            );
             let became_inactive = self.connect_state.is_active()
                 && cluster.active_device_id != self.session.device_id();
             if became_inactive {
@@ -1095,15 +1119,43 @@ impl SpircTask {
         Ok(())
     }
 
+    /// DIAG: record device_id -> friendly label from a cluster's device map,
+    /// so we can identify which controller sends commands/transfers.
+    fn diag_update_device_directory(&mut self, devices: &HashMap<String, DeviceInfo>) {
+        for (id, info) in devices {
+            let label = format!(
+                "{} [{} {} / {:?}]",
+                info.name,
+                info.brand,
+                info.model,
+                info.device_type.enum_value_or_default(),
+            );
+            self.device_directory.insert(id.clone(), label);
+        }
+    }
+
+    /// DIAG: resolve a device GUID to its friendly label, if known.
+    fn diag_device_label(&self, device_id: &str) -> String {
+        if device_id.is_empty() {
+            return "none".to_string();
+        }
+        match self.device_directory.get(device_id) {
+            Some(label) => label.clone(),
+            None => "unknown device".to_string(),
+        }
+    }
+
     async fn handle_connect_state_request(
         &mut self,
         (request, sender): RequestReply,
     ) -> Result<(), Error> {
         self.connect_state.set_last_command(request.clone());
 
-        debug!(
-            "handling: '{}' from {}",
-            request.command, request.sent_by_device_id
+        info!(
+            "DIAG connect-state command '{}' from {} ({})",
+            request.command,
+            request.sent_by_device_id,
+            self.diag_device_label(&request.sent_by_device_id),
         );
 
         let response = match self.handle_request(request).await {
@@ -1331,6 +1383,19 @@ impl SpircTask {
         };
 
         let is_playing = !transfer.playback.is_paused();
+
+        info!(
+            "DIAG transfer: will_start_playing={}, raw_is_paused={:?}, position_ms={}, autoplay={}, load_from_context_uri={}, ctx_uri={:?}, current_track=<{}>, feature_identifier={:?}, origin_device_identifier={:?}",
+            is_playing,
+            transfer.playback.is_paused,
+            position,
+            autoplay,
+            load_from_context_uri,
+            ctx_uri,
+            self.connect_state.current_track(|t| t.uri.clone()),
+            transfer.current_session.play_origin.feature_identifier,
+            transfer.current_session.play_origin.device_identifier,
+        );
 
         if self.connect_state.current_track(|t| t.is_autoplay()) || autoplay {
             if let Some(ctx_uri) = ctx_uri {
