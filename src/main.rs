@@ -2157,7 +2157,9 @@ async fn main() {
         }
 
         if let Some(spirc_task) = spirc_task {
-            shutdown_tasks.spawn(async { let _ = spirc_task.await; });
+            shutdown_tasks.spawn(async {
+                let _ = spirc_task.await;
+            });
         }
     }
 
