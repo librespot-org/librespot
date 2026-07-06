@@ -730,6 +730,13 @@ impl SpircTask {
                     self.play_status
                 );
             }
+            // Close the dealer of the session we're abandoning: its run task
+            // would otherwise keep reconnecting — and keep the old Session
+            // alive — forever. Do it in the background, since a graceful close
+            // can take a while on a dead connection and must not delay the
+            // restart.
+            let session = self.session.clone();
+            tokio::spawn(async move { session.dealer().close().await });
             return Some(SavedPlaybackState {
                 connect_state: mem::take(&mut self.connect_state),
                 play_status: mem::replace(&mut self.play_status, SpircPlayStatus::Stopped),
