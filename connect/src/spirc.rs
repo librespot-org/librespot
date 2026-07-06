@@ -127,10 +127,11 @@ struct SpircTask {
     /// successfully register.
     reconnect_grace_until: Option<Instant>,
 
-    /// When we last successfully put our connect state (registered). Used to
-    /// avoid arming the reconnect watchdog when a connection_id push already
-    /// re-registered us for the same reconnect.
-    last_registration_at: Option<Instant>,
+    /// The dealer reconnect generation under which we last successfully put
+    /// our connect state (registered). Compared against the current generation
+    /// when a reconnect signal arrives, to tell whether a connection_id push
+    /// already re-registered us for that reconnect.
+    registered_reconnect_gen: u64,
 
     spirc_id: usize,
 }
@@ -170,10 +171,6 @@ const UPDATE_STATE_DELAY: Duration = Duration::from_millis(200);
 // re-register this device before forcing a spirc restart to recover. The push
 // normally arrives within ~1-2s; this only fires if it never does.
 const RECONNECT_REREGISTER_GRACE: Duration = Duration::from_secs(30);
-// If we (re-)registered within this window before a reconnect signal, assume
-// the reconnect's connection_id push already re-registered us (push handled
-// before the reconnect watch fired) and skip arming the watchdog.
-const RECENT_REGISTRATION_WINDOW: Duration = Duration::from_secs(5);
 
 /// The spotify connect handle
 pub struct Spirc {
@@ -324,7 +321,7 @@ impl Spirc {
             device_directory: HashMap::new(),
 
             reconnect_grace_until: None,
-            last_registration_at: None,
+            registered_reconnect_gen: 0,
 
             spirc_id,
         };
@@ -679,17 +676,16 @@ impl SpircTask {
                 // handlers. A new connection_id will arrive via
                 // connection_id_update and re-register our device state.
                 Ok(()) = reconnect_rx.changed() => {
-                    info!("Dealer reconnected; awaiting new connection_id.");
-                    let recently_registered = self
-                        .last_registration_at
-                        .map(|t| t.elapsed() < RECENT_REGISTRATION_WINDOW)
-                        .unwrap_or(false);
-                    if recently_registered {
-                        // A fresh connection_id push already re-registered us for
-                        // this reconnect (it was handled before this signal), so
-                        // there's nothing to recover.
+                    let reconnect_gen = *reconnect_rx.borrow_and_update();
+                    if self.registered_reconnect_gen == reconnect_gen {
+                        // The new connection's connection_id push was already
+                        // handled (the dealer bumps the generation before
+                        // dispatching any of its messages), so we're registered
+                        // and there's nothing to recover.
+                        info!("Dealer reconnected; already re-registered.");
                         self.reconnect_grace_until = None;
                     } else {
+                        info!("Dealer reconnected; awaiting new connection_id.");
                         // Arm the watchdog: if no new connection_id re-registers
                         // us within the grace period, force a spirc restart so
                         // main.rs rebuilds the session/dealer and we re-appear as
@@ -1087,9 +1083,10 @@ impl SpircTask {
         );
 
         self.connect_established = true;
-        // We successfully (re-)registered: record it and disarm the reconnect
-        // watchdog so it won't force an unnecessary restart.
-        self.last_registration_at = Some(Instant::now());
+        // We successfully (re-)registered: record the dealer generation we
+        // registered under and disarm the reconnect watchdog so it won't force
+        // an unnecessary restart.
+        self.registered_reconnect_gen = *self.session.dealer().reconnect_receiver().borrow();
         self.reconnect_grace_until = None;
 
         self.diag_update_device_directory(&cluster.device);

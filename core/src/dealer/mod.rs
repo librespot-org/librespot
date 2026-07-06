@@ -337,7 +337,7 @@ impl Builder {
         let dealer = create_dealer!(self, reconnect_tx, shared -> {
             // Try to connect.
             let url = get_url().await?;
-            let tasks = connect(&url, proxy.as_ref(), &shared).await?;
+            let tasks = connect(&url, proxy.as_ref(), &shared, None).await?;
 
             // If a connection is established, continue in a background task.
             run(shared, Some(tasks), get_url, proxy, tx)
@@ -521,10 +521,15 @@ impl Dealer {
 }
 
 /// Initializes a connection and returns futures that will finish when the connection is closed/lost.
+///
+/// When `notify_reconnect` is set, it is bumped on the receive task before any
+/// message of the new connection is dispatched, so consumers can order their
+/// own state against the reconnect (e.g. "did I register before or after it?").
 async fn connect(
     address: &Url,
     proxy: Option<&Url>,
     shared: &Arc<DealerShared>,
+    notify_reconnect: Option<watch::Sender<u64>>,
 ) -> WsResult<(JoinHandle<()>, JoinHandle<()>)> {
     let host = address
         .host_str()
@@ -603,6 +608,11 @@ async fn connect(
 
     // A task that receives messages from the web socket.
     let receive_task = tokio::spawn(async {
+        if let Some(tx) = notify_reconnect {
+            warn!("Dealer reconnected; notifying consumers.");
+            tx.send_modify(|n| *n += 1);
+        }
+
         let pong_received = AtomicBool::new(true);
         let send_tx = send_tx;
         let shared = shared;
@@ -753,17 +763,20 @@ where
                     () = shared.closed() => break,
                     r = tokio::time::timeout(
                         RECONNECT_STEP_TIMEOUT,
-                        connect(&url, proxy.as_ref(), &shared),
+                        // Notify consumers of reconnects, but not of the very
+                        // first connection.
+                        connect(
+                            &url,
+                            proxy.as_ref(),
+                            &shared,
+                            has_connected.then(|| reconnect_tx.clone()),
+                        ),
                     ) => r,
                 };
 
                 match connect_result {
                     Ok(Ok((s, r))) => {
                         tasks = (init_task(s), init_task(r));
-                        if has_connected {
-                            warn!("Dealer reconnected; notifying consumers.");
-                            reconnect_tx.send_modify(|n| *n += 1);
-                        }
                         has_connected = true;
                     }
                     Ok(Err(e)) => {
