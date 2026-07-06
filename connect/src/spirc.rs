@@ -44,7 +44,10 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use thiserror::Error;
-use tokio::{sync::mpsc, time::sleep};
+use tokio::{
+    sync::mpsc,
+    time::{Instant, sleep, sleep_until},
+};
 
 #[derive(Debug, Error)]
 enum SpircError {
@@ -118,6 +121,17 @@ struct SpircTask {
     /// in the logs.
     device_directory: HashMap<String, String>,
 
+    /// When set, a dealer reconnect happened and we're waiting for a fresh
+    /// connection_id to re-register this device. If the deadline passes before
+    /// re-registration, we force a spirc restart to recover. Cleared whenever we
+    /// successfully register.
+    reconnect_grace_until: Option<Instant>,
+
+    /// When we last successfully put our connect state (registered). Used to
+    /// avoid arming the reconnect watchdog when a connection_id push already
+    /// re-registered us for the same reconnect.
+    last_registration_at: Option<Instant>,
+
     spirc_id: usize,
 }
 
@@ -151,6 +165,15 @@ const CONTEXT_FETCH_THRESHOLD: usize = 2;
 const VOLUME_UPDATE_DELAY: Duration = Duration::from_millis(500);
 // to reduce updates to remote, we group some request by waiting for a set amount of time
 const UPDATE_STATE_DELAY: Duration = Duration::from_millis(200);
+
+// After a dealer reconnect, how long we wait for a fresh connection_id to
+// re-register this device before forcing a spirc restart to recover. The push
+// normally arrives within ~1-2s; this only fires if it never does.
+const RECONNECT_REREGISTER_GRACE: Duration = Duration::from_secs(30);
+// If we (re-)registered within this window before a reconnect signal, assume
+// the reconnect's connection_id push already re-registered us (push handled
+// before the reconnect watch fired) and skip arming the watchdog.
+const RECENT_REGISTRATION_WINDOW: Duration = Duration::from_secs(5);
 
 /// The spotify connect handle
 pub struct Spirc {
@@ -299,6 +322,9 @@ impl Spirc {
             update_state: false,
 
             device_directory: HashMap::new(),
+
+            reconnect_grace_until: None,
+            last_registration_at: None,
 
             spirc_id,
         };
@@ -505,6 +531,10 @@ impl SpircTask {
             return None;
         }
 
+        // Set when the reconnect watchdog decides we must restart to recover our
+        // device registration. Handled after the loop like the session-lost path.
+        let mut force_restart = false;
+
         while !self.session.is_invalid() && !self.shutdown {
             let commands = self.commands.as_mut();
             let player_events = self.player_events.as_mut();
@@ -512,6 +542,9 @@ impl SpircTask {
             // when state and volume update have a higher priority than context resolving
             // because of that the context resolving has to wait, so that the other tasks can finish
             let allow_context_resolving = !self.update_state && !self.update_volume;
+
+            // Copied out so the watchdog select! branch below doesn't borrow self.
+            let reconnect_grace = self.reconnect_grace_until;
 
             tokio::select! {
                 // startup of the dealer requires a connection_id, which is retrieved at the very beginning
@@ -640,19 +673,63 @@ impl SpircTask {
                 // connection_id_update and re-register our device state.
                 Ok(()) = reconnect_rx.changed() => {
                     info!("Dealer reconnected; awaiting new connection_id.");
+                    let recently_registered = self
+                        .last_registration_at
+                        .map(|t| t.elapsed() < RECENT_REGISTRATION_WINDOW)
+                        .unwrap_or(false);
+                    if recently_registered {
+                        // A fresh connection_id push already re-registered us for
+                        // this reconnect (it was handled before this signal), so
+                        // there's nothing to recover.
+                        self.reconnect_grace_until = None;
+                    } else {
+                        // Arm the watchdog: if no new connection_id re-registers
+                        // us within the grace period, force a spirc restart so
+                        // main.rs rebuilds the session/dealer and we re-appear as
+                        // a device (playback continues from the player buffer).
+                        self.reconnect_grace_until =
+                            Some(Instant::now() + RECONNECT_REREGISTER_GRACE);
+                    }
+                },
+                // Reconnect watchdog: a dealer reconnect did not result in a
+                // re-registration within the grace period (e.g. the new
+                // connection_id never arrived). Recover by restarting spirc.
+                _ = async {
+                    match reconnect_grace {
+                        Some(deadline) => sleep_until(deadline).await,
+                        None => std::future::pending::<()>().await,
+                    }
+                }, if reconnect_grace.is_some() => {
+                    warn!(
+                        "dealer reconnected but device was not re-registered within {}s; \
+                         restarting spirc to refresh dealer subscriptions",
+                        RECONNECT_REREGISTER_GRACE.as_secs()
+                    );
+                    self.reconnect_grace_until = None;
+                    force_restart = true;
+                    break;
                 },
                 else => break
             }
         }
 
-        if self.session.is_invalid() && !self.shutdown {
-            // Session TCP connection died unexpectedly — skip server
-            // communication that would fail anyway. The Player continues
-            // playing from its buffer; main.rs will create a new session.
-            warn!(
-                "session lost, saving playback state for recovery: {:?}",
-                self.play_status
-            );
+        if (self.session.is_invalid() || force_restart) && !self.shutdown {
+            // Either the session TCP connection died, or the reconnect watchdog
+            // fired. In both cases skip the server cleanup below (which would
+            // pause/deregister the device) and hand our playback state back to
+            // main.rs. The Player continues playing from its buffer; main.rs
+            // creates a new session and restores this state, re-registering us.
+            if force_restart {
+                warn!(
+                    "forcing spirc restart to recover device registration, saving playback state: {:?}",
+                    self.play_status
+                );
+            } else {
+                warn!(
+                    "session lost, saving playback state for recovery: {:?}",
+                    self.play_status
+                );
+            }
             return Some(SavedPlaybackState {
                 connect_state: mem::take(&mut self.connect_state),
                 play_status: mem::replace(&mut self.play_status, SpircPlayStatus::Stopped),
@@ -996,6 +1073,10 @@ impl SpircTask {
         );
 
         self.connect_established = true;
+        // We successfully (re-)registered: record it and disarm the reconnect
+        // watchdog so it won't force an unnecessary restart.
+        self.last_registration_at = Some(Instant::now());
+        self.reconnect_grace_until = None;
 
         self.diag_update_device_directory(&cluster.device);
         info!(

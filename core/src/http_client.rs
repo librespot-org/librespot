@@ -40,6 +40,13 @@ pub const RATE_LIMIT_INTERVAL: Duration = Duration::from_secs(30);
 pub const RATE_LIMIT_MAX_WAIT: Duration = Duration::from_secs(10);
 pub const RATE_LIMIT_CALLS_PER_INTERVAL: u32 = 300;
 
+// Upper bound for a single HTTP request/response. Control-plane requests
+// (spclient, apresolve, login5) are small and normally complete in well under a
+// second; this only exists to convert a hung request over a half-open
+// connection into a retryable error, so callers such as the spirc event loop
+// can't be blocked forever. Audio streaming does not go through here.
+pub const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
+
 #[derive(Debug, Error)]
 pub enum HttpClientError {
     #[error("Response status code: {0}")]
@@ -195,7 +202,20 @@ impl HttpClient {
             *req.headers_mut() = parts.headers.clone();
 
             let request = self.request_fut(req)?;
-            let response = request.await;
+            let response = match tokio::time::timeout(REQUEST_TIMEOUT, request).await {
+                Ok(response) => response,
+                Err(_) => {
+                    warn!(
+                        "Request to {} timed out after {}s",
+                        parts.uri,
+                        REQUEST_TIMEOUT.as_secs()
+                    );
+                    return Err(Error::deadline_exceeded(format!(
+                        "HTTP request timed out after {}s",
+                        REQUEST_TIMEOUT.as_secs()
+                    )));
+                }
+            };
 
             if let Ok(response) = &response {
                 let code = response.status();
@@ -223,7 +243,17 @@ impl HttpClient {
 
     pub async fn request_body(&self, req: Request<Bytes>) -> Result<Bytes, Error> {
         let response = self.request(req).await?;
-        Ok(response.into_body().collect().await?.to_bytes())
+        let collected =
+            match tokio::time::timeout(REQUEST_TIMEOUT, response.into_body().collect()).await {
+                Ok(result) => result?,
+                Err(_) => {
+                    return Err(Error::deadline_exceeded(format!(
+                        "HTTP response body read timed out after {}s",
+                        REQUEST_TIMEOUT.as_secs()
+                    )));
+                }
+            };
+        Ok(collected.to_bytes())
     }
 
     pub fn request_stream(&self, req: Request<Bytes>) -> Result<IntoStream<ResponseFuture>, Error> {
