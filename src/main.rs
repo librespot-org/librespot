@@ -1885,6 +1885,11 @@ async fn main() {
     const RECONNECT_RATE_LIMIT_WINDOW: Duration = Duration::from_secs(600);
     const DISCOVERY_RETRY_TIMEOUT: Duration = Duration::from_secs(10);
     const RECONNECT_RATE_LIMIT: usize = 5;
+    // When spirc restarts to recover playback (session loss or reconnect
+    // watchdog) faster than the rate limit allows, delay the next attempt by
+    // this much instead of exiting — exiting would kill playback that is
+    // otherwise still running.
+    const RECOVERY_RECONNECT_BACKOFF: Duration = Duration::from_secs(120);
 
     if env::var(RUST_BACKTRACE).is_err() {
         set_env_var(RUST_BACKTRACE, "full").await;
@@ -1900,6 +1905,7 @@ async fn main() {
     let mut connecting = false;
     let mut _event_handler: Option<EventHandler> = None;
     let mut saved_playback_state = None;
+    let mut reconnect_backoff_until: Option<tokio::time::Instant> = None;
 
     let mut session = Session::new(setup.session_config.clone(), setup.cache.clone());
 
@@ -2009,6 +2015,10 @@ async fn main() {
     }
 
     loop {
+        // Copied out so the reconnect arm below doesn't borrow the variable
+        // it assigns.
+        let reconnect_backoff = reconnect_backoff_until;
+
         tokio::select! {
             credentials = async {
                 match discovery.as_mut() {
@@ -2022,8 +2032,10 @@ async fn main() {
                         auto_connect_times.clear();
 
                         // New account via Discovery — discard any saved
-                        // playback state from the previous account.
+                        // playback state from the previous account and
+                        // reconnect right away.
                         saved_playback_state = None;
+                        reconnect_backoff_until = None;
 
                         if let Some(spirc) = spirc.take() {
                             if let Err(e) = spirc.shutdown() {
@@ -2046,7 +2058,12 @@ async fn main() {
                     }
                 }
             },
-            _ = async {}, if connecting && last_credentials.is_some() => {
+            _ = async {
+                if let Some(deadline) = reconnect_backoff {
+                    tokio::time::sleep_until(deadline).await
+                }
+            }, if connecting && last_credentials.is_some() => {
+                reconnect_backoff_until = None;
                 if session.is_invalid() {
                     session = Session::new(setup.session_config.clone(), setup.cache.clone());
                     player.set_session(session.clone());
@@ -2093,16 +2110,30 @@ async fn main() {
                     auto_connect_times.len() > RECONNECT_RATE_LIMIT
                 };
 
-                if last_credentials.is_some() && !reconnect_exceeds_rate_limit() {
-                    auto_connect_times.push(Instant::now());
-                    if !session.is_invalid() {
-                        session.shutdown();
-                    }
-                    connecting = true;
-                } else {
+                if last_credentials.is_none()
+                    || (reconnect_exceeds_rate_limit() && saved_playback_state.is_none())
+                {
                     error!("Spirc shut down too often. Not reconnecting automatically.");
                     exit(1);
                 }
+
+                if reconnect_exceeds_rate_limit() {
+                    // Restarting faster than the rate limit allows, but with
+                    // playback to preserve: back off and keep trying instead
+                    // of exiting.
+                    warn!(
+                        "Spirc restarting too often; delaying reconnect by {}s",
+                        RECOVERY_RECONNECT_BACKOFF.as_secs()
+                    );
+                    reconnect_backoff_until =
+                        Some(tokio::time::Instant::now() + RECOVERY_RECONNECT_BACKOFF);
+                }
+
+                auto_connect_times.push(Instant::now());
+                if !session.is_invalid() {
+                    session.shutdown();
+                }
+                connecting = true;
             },
             _ = async {}, if player.is_invalid() => {
                 error!("Player shut down unexpectedly");
