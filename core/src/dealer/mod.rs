@@ -266,7 +266,7 @@ struct Builder {
 }
 
 macro_rules! create_dealer {
-    ($builder:expr, $reconnect_tx:expr, $shared:ident -> $body:expr) => {
+    ($builder:expr, $shared:ident -> $body:expr) => {
         match $builder {
             builder => {
                 let shared = Arc::new(DealerShared {
@@ -274,8 +274,6 @@ macro_rules! create_dealer {
                     request_handlers: Mutex::new(builder.request_handlers),
                     notify_drop: Semaphore::new(0),
                 });
-
-                let reconnect_tx: watch::Sender<u64> = $reconnect_tx;
 
                 let handle = {
                     let $shared = Arc::clone(&shared);
@@ -285,7 +283,6 @@ macro_rules! create_dealer {
                 Dealer {
                     shared,
                     handle: TimeoutOnDrop::new(handle, WEBSOCKET_CLOSE_TIMEOUT),
-                    reconnect_tx,
                 }
             }
         }
@@ -319,8 +316,7 @@ impl Builder {
         Fut: Future<Output = GetUrlResult> + Send + 'static,
         F: (Fn() -> Fut) + Send + 'static,
     {
-        let tx = reconnect_tx.clone();
-        create_dealer!(self, reconnect_tx, shared -> run(shared, None, get_url, proxy, tx))
+        create_dealer!(self, shared -> run(shared, None, get_url, proxy, reconnect_tx))
     }
 
     pub async fn launch<Fut, F>(
@@ -333,14 +329,13 @@ impl Builder {
         Fut: Future<Output = GetUrlResult> + Send + 'static,
         F: (Fn() -> Fut) + Send + 'static,
     {
-        let tx = reconnect_tx.clone();
-        let dealer = create_dealer!(self, reconnect_tx, shared -> {
+        let dealer = create_dealer!(self, shared -> {
             // Try to connect.
             let url = get_url().await?;
             let tasks = connect(&url, proxy.as_ref(), &shared, None).await?;
 
             // If a connection is established, continue in a background task.
-            run(shared, Some(tasks), get_url, proxy, tx)
+            run(shared, Some(tasks), get_url, proxy, reconnect_tx)
         });
 
         Ok(dealer)
@@ -446,7 +441,6 @@ impl DealerShared {
 struct Dealer {
     shared: Arc<DealerShared>,
     handle: TimeoutOnDrop<Result<(), Error>>,
-    reconnect_tx: watch::Sender<u64>,
 }
 
 impl Dealer {
@@ -501,10 +495,6 @@ impl Dealer {
                 .expect(DEALER_MESSAGE_HANDLERS_POISON_MSG),
             uri,
         )
-    }
-
-    pub fn reconnect_receiver(&self) -> watch::Receiver<u64> {
-        self.reconnect_tx.subscribe()
     }
 
     pub async fn close(mut self) {
