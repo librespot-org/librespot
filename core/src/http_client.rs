@@ -40,11 +40,13 @@ pub const RATE_LIMIT_INTERVAL: Duration = Duration::from_secs(30);
 pub const RATE_LIMIT_MAX_WAIT: Duration = Duration::from_secs(10);
 pub const RATE_LIMIT_CALLS_PER_INTERVAL: u32 = 300;
 
-// Upper bound for a single HTTP request/response. Control-plane requests
-// (spclient, apresolve, login5) are small and normally complete in well under a
-// second; this only exists to convert a hung request over a half-open
-// connection into a retryable error, so callers such as the spirc event loop
-// can't be blocked forever. Audio streaming does not go through here.
+// Upper bound for receiving the response headers of a request, and for the
+// stall between response body frames (not the whole transfer, so that large
+// downloads over slow links can still complete). Control-plane requests
+// (spclient, apresolve, login5) normally complete in well under a second; this
+// only exists to convert a hung request over a half-open connection into a
+// retryable error, so callers such as the spirc event loop can't be blocked
+// forever. Audio streaming does not go through here.
 pub const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[derive(Debug, Error)]
@@ -243,17 +245,29 @@ impl HttpClient {
 
     pub async fn request_body(&self, req: Request<Bytes>) -> Result<Bytes, Error> {
         let response = self.request(req).await?;
-        let collected =
-            match tokio::time::timeout(REQUEST_TIMEOUT, response.into_body().collect()).await {
-                Ok(result) => result?,
+
+        // Time out when the body stream stalls, not on total transfer time:
+        // large payloads (e.g. audio previews) may legitimately take longer
+        // than any fixed whole-body deadline on slow links.
+        let mut body = response.into_body();
+        let mut bytes = Vec::new();
+        loop {
+            match tokio::time::timeout(REQUEST_TIMEOUT, body.frame()).await {
+                Ok(Some(frame)) => {
+                    if let Some(data) = frame?.data_ref() {
+                        bytes.extend_from_slice(data);
+                    }
+                }
+                Ok(None) => break,
                 Err(_) => {
                     return Err(Error::deadline_exceeded(format!(
-                        "HTTP response body read timed out after {}s",
+                        "HTTP response body stalled for {}s",
                         REQUEST_TIMEOUT.as_secs()
                     )));
                 }
-            };
-        Ok(collected.to_bytes())
+            }
+        }
+        Ok(bytes.into())
     }
 
     pub fn request_stream(&self, req: Request<Bytes>) -> Result<IntoStream<ResponseFuture>, Error> {
