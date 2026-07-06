@@ -557,8 +557,15 @@ impl SpircTask {
                             // commands without it, so restart spirc.
                             break;
                         }
-                        // Re-registration after dealer reconnect failed —
-                        // stay alive, next connection_id push will retry.
+                        // Re-registration after a dealer reconnect failed. Arm
+                        // the watchdog (if it isn't already): without it,
+                        // nothing would retry unless another connection_id
+                        // push happens to arrive. A later successful
+                        // registration disarms it.
+                        if self.reconnect_grace_until.is_none() {
+                            self.reconnect_grace_until =
+                                Some(Instant::now() + RECONNECT_REREGISTER_GRACE);
+                        }
                     }
                 },
                 // main dealer update of any remote device updates
