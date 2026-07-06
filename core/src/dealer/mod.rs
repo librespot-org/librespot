@@ -56,7 +56,10 @@ const PING_INTERVAL: Duration = Duration::from_secs(30);
 const PING_TIMEOUT: Duration = Duration::from_secs(3);
 
 const RECONNECT_INTERVAL: Duration = Duration::from_secs(10);
-const RECONNECT_URL_TIMEOUT: Duration = Duration::from_secs(30);
+// Bounds each step of a reconnect attempt (URL resolution and the TCP/TLS/
+// websocket handshake), so a blackholed connection can't stall reconnection
+// forever.
+const RECONNECT_STEP_TIMEOUT: Duration = Duration::from_secs(30);
 
 const DEALER_REQUEST_HANDLERS_POISON_MSG: &str =
     "dealer request handlers mutex should not be poisoned";
@@ -729,7 +732,7 @@ where
                     () = shared.closed() => {
                         break
                     },
-                    result = tokio::time::timeout(RECONNECT_URL_TIMEOUT, get_url()) => {
+                    result = tokio::time::timeout(RECONNECT_STEP_TIMEOUT, get_url()) => {
                         match result {
                             Ok(Ok(url)) => url,
                             Ok(Err(e)) => {
@@ -746,8 +749,16 @@ where
                     }
                 };
 
-                match connect(&url, proxy.as_ref(), &shared).await {
-                    Ok((s, r)) => {
+                let connect_result = select! {
+                    () = shared.closed() => break,
+                    r = tokio::time::timeout(
+                        RECONNECT_STEP_TIMEOUT,
+                        connect(&url, proxy.as_ref(), &shared),
+                    ) => r,
+                };
+
+                match connect_result {
+                    Ok(Ok((s, r))) => {
                         tasks = (init_task(s), init_task(r));
                         if has_connected {
                             warn!("Dealer reconnected; notifying consumers.");
@@ -755,8 +766,12 @@ where
                         }
                         has_connected = true;
                     }
-                    Err(e) => {
+                    Ok(Err(e)) => {
                         error!("Error while connecting: {e}");
+                        tokio::time::sleep(RECONNECT_INTERVAL).await;
+                    }
+                    Err(_) => {
+                        error!("Timed out connecting to dealer.");
                         tokio::time::sleep(RECONNECT_INTERVAL).await;
                     }
                 }
