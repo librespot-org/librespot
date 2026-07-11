@@ -235,6 +235,17 @@ impl Spirc {
             ),
         };
 
+        // Subscribe to player events before any awaits below. Session setup
+        // (client_token / connect / login5) takes seconds, and a subscriber
+        // only receives events emitted after it subscribes — the previous
+        // SpircTask's channel died with it. Without this, events the Player
+        // emits meanwhile (EndOfTrack, Unavailable, ...) are lost, leaving a
+        // restored spirc stuck in a Playing/Loading state that nothing will
+        // ever advance. Buffered events are handled as soon as the task loop
+        // starts: its player-events select arm is not gated on
+        // connect_established.
+        let player_events = player.get_player_event_channel();
+
         let connection_id_update = session
             .dealer()
             .listen_for("hm://pusher/v1/connections/", extract_connection_id)?;
@@ -282,8 +293,6 @@ impl Spirc {
         let _ = session.login5().auth_token().await?;
 
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
-
-        let player_events = player.get_player_event_channel();
 
         let mut task = SpircTask {
             player,
