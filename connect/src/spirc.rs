@@ -350,6 +350,27 @@ impl Spirc {
             Err(why) => error!("failed to update initial volume: {why}"),
         };
 
+        // If the old session died while a track load was in flight, that load
+        // belongs to the dead session: its audio-key request rode the dead AP
+        // connection and will fail — possibly before we could subscribe to
+        // player events above. Don't trust it: drop the stale play_request_id
+        // so late events from the old load are ignored, and re-issue the load
+        // on the new session (the Player cancels the old loader). Playing and
+        // Paused restores are untouched: audio is running and must not be
+        // interrupted.
+        let reload = match task.play_status {
+            SpircPlayStatus::LoadingPlay { position_ms } => Some((true, position_ms)),
+            SpircPlayStatus::LoadingPause { position_ms } => Some((false, position_ms)),
+            _ => None,
+        };
+        if let Some((start_playing, position_ms)) = reload {
+            info!("Spirc[{spirc_id}] restored mid-load state, re-issuing load at {position_ms}ms");
+            task.play_request_id = None;
+            if let Err(why) = task.load_track(start_playing, position_ms) {
+                error!("failed to re-issue load after restore: {why}");
+            }
+        }
+
         Ok((spirc, task.run()))
     }
 
