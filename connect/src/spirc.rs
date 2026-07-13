@@ -101,7 +101,7 @@ pub struct ClusterState {
 }
 
 /// Queue information (previous and next tracks)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QueueList {
     /// Previous tracks in the queue (as URIs)
     pub prev_tracks: Vec<String>,
@@ -222,6 +222,7 @@ struct SpircTask {
     cluster_state_sender: watch::Sender<ClusterState>,
     queue_list_sender: watch::Sender<QueueList>,
     last_active_device_id: Option<String>,
+    last_queue_list: QueueList,
     last_player_state: Option<PlayerState>,
 
     spirc_id: usize,
@@ -399,6 +400,10 @@ impl Spirc {
             cluster_state_sender: cluster_state_sender_tx.clone(),
             queue_list_sender: queue_list_sender_tx.clone(),
             last_active_device_id: None,
+            last_queue_list: QueueList {
+                prev_tracks: Vec::new(),
+                next_tracks: Vec::new(),
+            },
             last_player_state: None,
 
             spirc_id,
@@ -931,10 +936,23 @@ impl SpircTask {
     }
 
     fn handle_player_event(&mut self, event: PlayerEvent) -> Result<(), Error> {
-        if let PlayerEvent::TrackChanged { audio_item } = event {
+        let player_update_reason = match &event {
+            PlayerEvent::TrackChanged { .. } => Some(PlayerUpdateReason::TrackChanged),
+            PlayerEvent::Playing { .. }
+            | PlayerEvent::Paused { .. }
+            | PlayerEvent::Stopped { .. } => Some(PlayerUpdateReason::PlayPauseChanged),
+            PlayerEvent::Seeked { .. } | PlayerEvent::PositionCorrection { .. } => {
+                Some(PlayerUpdateReason::SeekChanged)
+            }
+            PlayerEvent::ShuffleChanged { .. } => Some(PlayerUpdateReason::ShuffleChanged),
+            PlayerEvent::RepeatChanged { .. } => Some(PlayerUpdateReason::RepeatChanged),
+            PlayerEvent::SetQueue { .. } => Some(PlayerUpdateReason::ContextChanged),
+            _ => None,
+        };
+
+        if let PlayerEvent::TrackChanged { audio_item } = &event {
             self.connect_state.update_duration(audio_item.duration_ms);
             self.update_state = true;
-            return Ok(());
         }
 
         // update play_request_id
@@ -943,16 +961,29 @@ impl SpircTask {
             return Ok(());
         }
 
-        let is_current_track = matches! {
-            (event.get_play_request_id(), self.play_request_id),
-            (Some(event_id), Some(current_id)) if event_id == current_id
-        };
+        let should_gate_by_play_request_id = matches!(
+            event,
+            PlayerEvent::Loading { .. }
+                | PlayerEvent::Seeked { .. }
+                | PlayerEvent::PositionCorrection { .. }
+                | PlayerEvent::Playing { .. }
+                | PlayerEvent::Paused { .. }
+                | PlayerEvent::Stopped { .. }
+                | PlayerEvent::TimeToPreloadNextTrack { .. }
+                | PlayerEvent::EndOfTrack { .. }
+                | PlayerEvent::Unavailable { .. }
+        );
 
         // we only process events if the play_request_id matches. If it doesn't, it is
         // an event that belongs to a previous track and only arrives now due to a race
         // condition. In this case we have updated the state already and don't want to
         // mess with it.
-        if !is_current_track {
+        if should_gate_by_play_request_id
+            && !matches! {
+                (event.get_play_request_id(), self.play_request_id),
+                (Some(event_id), Some(current_id)) if event_id == current_id
+            }
+        {
             return Ok(());
         }
 
@@ -1050,6 +1081,16 @@ impl SpircTask {
                 self.handle_preload_next_track();
                 return Ok(());
             }
+            PlayerEvent::TrackChanged { .. }
+            | PlayerEvent::ShuffleChanged { .. }
+            | PlayerEvent::RepeatChanged { .. }
+            | PlayerEvent::SetQueue { .. } => {}
+            PlayerEvent::VolumeChanged { .. }
+            | PlayerEvent::SessionConnected { .. }
+            | PlayerEvent::SessionDisconnected { .. }
+            | PlayerEvent::SessionClientChanged { .. }
+            | PlayerEvent::AutoPlayChanged { .. }
+            | PlayerEvent::FilterExplicitContentChanged { .. } => return Ok(()),
             PlayerEvent::Unavailable { track_id, .. } => {
                 self.handle_unavailable(&track_id)?;
                 if self.connect_state.current_track(|t| &t.uri) == &track_id.to_uri() {
@@ -1061,25 +1102,10 @@ impl SpircTask {
 
         self.update_state = true;
 
-        // Emit local player state to watch channels if this device is active
         if self.connect_state.is_active() {
-            let player_state = self.connect_state.player().clone();
-            let _ = self.player_state_sender.send(Some(player_state.clone()));
-
-            // Also update queue list from local state
-            let queue_list = QueueList {
-                prev_tracks: player_state
-                    .prev_tracks
-                    .iter()
-                    .map(|t| t.uri.clone())
-                    .collect(),
-                next_tracks: player_state
-                    .next_tracks
-                    .iter()
-                    .map(|t| t.uri.clone())
-                    .collect(),
-            };
-            let _ = self.queue_list_sender.send(queue_list);
+            // sync play_status now instead of waiting on the debounced notify()
+            self.connect_state.set_status(&self.play_status);
+            self.publish_active_state(player_update_reason);
         }
 
         Ok(())
@@ -1275,8 +1301,7 @@ impl SpircTask {
                 last.position_as_of_timestamp
             };
 
-            let position_delta =
-                (state.position_as_of_timestamp - expected_position).abs();
+            let position_delta = (state.position_as_of_timestamp - expected_position).abs();
             if position_delta > 5000 {
                 PlayerUpdateReason::SeekChanged
             } else {
@@ -1311,6 +1336,57 @@ impl SpircTask {
 
         if let Err(why) = self.queue_update_sender.send(event) {
             warn!("couldn't emit queue update because: {why}")
+        }
+    }
+
+    fn queue_list_from_player_state(player_state: &PlayerState) -> QueueList {
+        QueueList {
+            prev_tracks: player_state
+                .prev_tracks
+                .iter()
+                .map(|t| t.uri.clone())
+                .collect(),
+            next_tracks: player_state
+                .next_tracks
+                .iter()
+                .map(|t| t.uri.clone())
+                .collect(),
+        }
+    }
+
+    fn publish_queue_snapshot(&mut self, player_state: &PlayerState) {
+        let queue_list = Self::queue_list_from_player_state(player_state);
+        let prev_queue_list = std::mem::replace(&mut self.last_queue_list, queue_list.clone());
+
+        let prev_changed = prev_queue_list.prev_tracks != queue_list.prev_tracks;
+        let next_changed = prev_queue_list.next_tracks != queue_list.next_tracks;
+
+        if prev_changed || next_changed {
+            let _ = self.queue_list_sender.send(queue_list);
+
+            if prev_changed {
+                self.emit_queue_update(QueueUpdateEvent {
+                    reason: QueueUpdateReason::PrevTracksChanged,
+                });
+            }
+            if next_changed {
+                self.emit_queue_update(QueueUpdateEvent {
+                    reason: QueueUpdateReason::NextTracksChanged,
+                });
+            }
+        }
+    }
+
+    fn publish_active_state(&mut self, reason: Option<PlayerUpdateReason>) {
+        let player_state = self.connect_state.player().clone();
+        let _ = self.player_state_sender.send(Some(player_state.clone()));
+        self.publish_queue_snapshot(&player_state);
+        self.last_player_state = Some(player_state);
+
+        if let Some(reason) = reason {
+            if let Err(why) = self.player_update_sender.send(PlayerUpdateEvent { reason }) {
+                warn!("couldn't emit player update because: {why}")
+            }
         }
     }
 
@@ -1411,34 +1487,7 @@ impl SpircTask {
                 //  tried: providing session_id, playback_id, track-metadata "track_player"
                 self.update_state = true;
             } else if let Some(state) = cluster.player_state.take() {
-                if let Some(last_state) = &self.last_player_state {
-                    let prev_changed = state.prev_tracks != last_state.prev_tracks;
-                    let next_changed = state.next_tracks != last_state.next_tracks;
-                    if prev_changed || next_changed {
-                        let queue_list = QueueList {
-                            prev_tracks: state.prev_tracks.iter().map(|t| t.uri.clone()).collect(),
-                            next_tracks: state.next_tracks.iter().map(|t| t.uri.clone()).collect(),
-                        };
-                        let _ = self.queue_list_sender.send(queue_list);
-
-                        if prev_changed {
-                            self.emit_queue_update(QueueUpdateEvent {
-                                reason: QueueUpdateReason::PrevTracksChanged,
-                            });
-                        }
-                        if next_changed {
-                            self.emit_queue_update(QueueUpdateEvent {
-                                reason: QueueUpdateReason::NextTracksChanged,
-                            });
-                        }
-                    }
-                } else {
-                    let queue_list = QueueList {
-                        prev_tracks: state.prev_tracks.iter().map(|t| t.uri.clone()).collect(),
-                        next_tracks: state.next_tracks.iter().map(|t| t.uri.clone()).collect(),
-                    };
-                    let _ = self.queue_list_sender.send(queue_list);
-                }
+                self.publish_queue_snapshot(&state);
                 self.emit_player_update(Some(state.clone()), self.last_player_state.as_ref());
                 self.last_player_state = Some(state);
             }
