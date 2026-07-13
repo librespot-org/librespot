@@ -114,8 +114,10 @@ pub struct QueueList {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ClusterUpdateReason {
-    /// Device list changed
-    DeviceListChanged,
+    /// A device joined the cluster
+    DeviceAppeared,
+    /// A device left the cluster
+    DeviceDisappeared,
     /// Active device switched
     ActiveDeviceChanged,
     /// Device state changed
@@ -1336,11 +1338,18 @@ impl SpircTask {
             if let Ok(reason_enum) = reason {
                 match reason_enum {
                     ServerClusterUpdateReason::DEVICE_NEW_CONNECTION
-                    | ServerClusterUpdateReason::NEW_DEVICE_APPEARED
-                    | ServerClusterUpdateReason::DEVICES_DISAPPEARED => {
+                    | ServerClusterUpdateReason::NEW_DEVICE_APPEARED => {
                         for device_id in &cluster_update.devices_that_changed {
                             self.emit_cluster_update(ClusterUpdateEvent {
-                                reason: ClusterUpdateReason::DeviceListChanged,
+                                reason: ClusterUpdateReason::DeviceAppeared,
+                                device_id: Some(device_id.clone()),
+                            });
+                        }
+                    }
+                    ServerClusterUpdateReason::DEVICES_DISAPPEARED => {
+                        for device_id in &cluster_update.devices_that_changed {
+                            self.emit_cluster_update(ClusterUpdateEvent {
+                                reason: ClusterUpdateReason::DeviceDisappeared,
                                 device_id: Some(device_id.clone()),
                             });
                         }
