@@ -261,6 +261,10 @@ const CONTEXT_FETCH_THRESHOLD: usize = 2;
 const VOLUME_UPDATE_DELAY: Duration = Duration::from_millis(500);
 // to reduce updates to remote, we group some request by waiting for a set amount of time
 const UPDATE_STATE_DELAY: Duration = Duration::from_millis(200);
+// a single cluster update can emit several of these back-to-back (e.g. multiple devices
+// changing at once) with no await point in between for a receiver to drain the channel,
+// so capacity 1 would silently drop all but the last one
+const UPDATE_EVENT_CHANNEL_CAPACITY: usize = 16;
 
 /// The spotify connect handle
 pub struct Spirc {
@@ -348,9 +352,9 @@ impl Spirc {
         let _ = session.login5().auth_token().await?;
 
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
-        let (player_update_sender_tx, _) = broadcast::channel(1);
-        let (cluster_update_sender_tx, _) = broadcast::channel(1);
-        let (queue_update_sender_tx, _) = broadcast::channel(1);
+        let (player_update_sender_tx, _) = broadcast::channel(UPDATE_EVENT_CHANNEL_CAPACITY);
+        let (cluster_update_sender_tx, _) = broadcast::channel(UPDATE_EVENT_CHANNEL_CAPACITY);
+        let (queue_update_sender_tx, _) = broadcast::channel(UPDATE_EVENT_CHANNEL_CAPACITY);
         let (player_state_sender_tx, _) = watch::channel(None);
         let (cluster_state_sender_tx, _) = watch::channel(ClusterState {
             devices: HashMap::new(),
@@ -1225,7 +1229,16 @@ impl SpircTask {
         let reason = classify_player_update_reason(&state, last_state);
 
         let _ = self.player_state_sender.send(Some(state));
-        if let Err(why) = self.player_update_sender.send(PlayerUpdateEvent { reason }) {
+        self.emit_player_update_event(PlayerUpdateEvent { reason });
+    }
+
+    /// No-op without subscribers, so local playback doesn't warn when nobody's listening
+    fn emit_player_update_event(&self, event: PlayerUpdateEvent) {
+        if self.player_update_sender.receiver_count() == 0 {
+            return;
+        }
+
+        if let Err(why) = self.player_update_sender.send(event) {
             warn!("couldn't emit player update because: {why}")
         }
     }
@@ -1294,9 +1307,7 @@ impl SpircTask {
         self.last_player_state = Some(player_state);
 
         if let Some(reason) = reason {
-            if let Err(why) = self.player_update_sender.send(PlayerUpdateEvent { reason }) {
-                warn!("couldn't emit player update because: {why}")
-            }
+            self.emit_player_update_event(PlayerUpdateEvent { reason });
         }
     }
 
