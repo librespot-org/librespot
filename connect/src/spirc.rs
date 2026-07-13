@@ -22,6 +22,7 @@ use crate::{
             LogoutCommand, SetVolumeCommand,
         },
         context::Context,
+        devices::DeviceType,
         explicit_content_pubsub::UserAttributesUpdate,
         player::ProvidedTrack,
         playlist4_external::PlaylistModificationInfo,
@@ -83,8 +84,8 @@ pub struct DeviceInfo {
     pub device_id: String,
     /// Human-readable device name
     pub device_alias: String,
-    /// Device type (e.g., "Speaker", "Phone")
-    pub device_type: String,
+    /// Device type (e.g., speaker, phone)
+    pub device_type: DeviceType,
     /// Volume level 0-100
     pub volume: u32,
     /// Whether this is the currently active device
@@ -1266,8 +1267,7 @@ impl SpircTask {
         let queue_list = Self::queue_list_from_player_state(player_state);
         let prev_queue_list = std::mem::replace(&mut self.last_queue_list, queue_list.clone());
 
-        let prev_changed = prev_queue_list.prev_tracks != queue_list.prev_tracks;
-        let next_changed = prev_queue_list.next_tracks != queue_list.next_tracks;
+        let (prev_changed, next_changed) = queue_lists_changed(&prev_queue_list, &queue_list);
 
         if prev_changed || next_changed {
             let _ = self.queue_list_sender.send(queue_list);
@@ -1359,29 +1359,9 @@ impl SpircTask {
             }
 
             // Sync device state to cluster_state_sender (after emitting events)
-            let devices: HashMap<String, DeviceInfo> = cluster
-                .device
-                .values()
-                .map(|device| {
-                    let info = DeviceInfo {
-                        device_id: device.device_id.clone(),
-                        device_alias: device.name.clone(),
-                        device_type: format!("{:?}", device.device_type),
-                        volume: device.volume,
-                        is_active: device.device_id == cluster.active_device_id,
-                    };
-                    (info.device_id.clone(), info)
-                })
-                .collect();
-
-            let _ = self.cluster_state_sender.send(ClusterState {
-                devices,
-                active_device_id: if cluster.active_device_id.is_empty() {
-                    None
-                } else {
-                    Some(cluster.active_device_id.clone())
-                },
-            });
+            let _ = self
+                .cluster_state_sender
+                .send(build_cluster_state(&cluster));
 
             let became_inactive = self.connect_state.is_active()
                 && cluster.active_device_id != self.session.device_id();
@@ -2326,6 +2306,43 @@ impl Drop for SpircTask {
     }
 }
 
+/// Returns whether the prev/next track lists differ between two `QueueList`s
+fn queue_lists_changed(prev: &QueueList, next: &QueueList) -> (bool, bool) {
+    (
+        prev.prev_tracks != next.prev_tracks,
+        prev.next_tracks != next.next_tracks,
+    )
+}
+
+/// Builds the device map and active device id from a server `Cluster` snapshot
+fn build_cluster_state(cluster: &Cluster) -> ClusterState {
+    let devices = cluster
+        .device
+        .values()
+        .map(|device| {
+            let info = DeviceInfo {
+                device_id: device.device_id.clone(),
+                device_alias: device.name.clone(),
+                device_type: device.device_type.enum_value_or_default(),
+                volume: device.volume,
+                is_active: device.device_id == cluster.active_device_id,
+            };
+            (info.device_id.clone(), info)
+        })
+        .collect();
+
+    let active_device_id = if cluster.active_device_id.is_empty() {
+        None
+    } else {
+        Some(cluster.active_device_id.clone())
+    };
+
+    ClusterState {
+        devices,
+        active_device_id,
+    }
+}
+
 /// Classifies why a remote `PlayerState` snapshot differs from the last one seen
 fn classify_player_update_reason(
     state: &PlayerState,
@@ -2466,5 +2483,84 @@ mod tests {
             classify_player_update_reason(&next, Some(&last)),
             PlayerUpdateReason::Other
         );
+    }
+
+    fn queue_list(prev: &[&str], next: &[&str]) -> QueueList {
+        QueueList {
+            prev_tracks: prev.iter().map(ToString::to_string).collect(),
+            next_tracks: next.iter().map(ToString::to_string).collect(),
+        }
+    }
+
+    #[test]
+    fn queue_lists_changed_detects_no_change() {
+        let a = queue_list(&["a"], &["b"]);
+        let b = queue_list(&["a"], &["b"]);
+        assert_eq!(queue_lists_changed(&a, &b), (false, false));
+    }
+
+    #[test]
+    fn queue_lists_changed_detects_prev_and_next_independently() {
+        let a = queue_list(&["a"], &["b"]);
+        assert_eq!(
+            queue_lists_changed(&a, &queue_list(&["z"], &["b"])),
+            (true, false)
+        );
+        assert_eq!(
+            queue_lists_changed(&a, &queue_list(&["a"], &["z"])),
+            (false, true)
+        );
+        assert_eq!(
+            queue_lists_changed(&a, &queue_list(&["z"], &["z"])),
+            (true, true)
+        );
+    }
+
+    fn device(
+        id: &str,
+        name: &str,
+        volume: u32,
+        device_type: DeviceType,
+    ) -> crate::protocol::connect::DeviceInfo {
+        let mut d = crate::protocol::connect::DeviceInfo::new();
+        d.device_id = id.to_string();
+        d.name = name.to_string();
+        d.volume = volume;
+        d.device_type = ::protobuf::EnumOrUnknown::new(device_type);
+        d
+    }
+
+    #[test]
+    fn build_cluster_state_maps_devices_and_marks_active() {
+        let mut cluster = Cluster::new();
+        cluster.active_device_id = "device-1".to_string();
+        cluster.device.insert(
+            "device-1".to_string(),
+            device("device-1", "Kitchen", 50, DeviceType::SPEAKER),
+        );
+        cluster.device.insert(
+            "device-2".to_string(),
+            device("device-2", "Phone", 80, DeviceType::SMARTPHONE),
+        );
+
+        let state = build_cluster_state(&cluster);
+
+        assert_eq!(state.active_device_id.as_deref(), Some("device-1"));
+        assert_eq!(state.devices.len(), 2);
+        assert!(state.devices["device-1"].is_active);
+        assert!(!state.devices["device-2"].is_active);
+        assert_eq!(state.devices["device-2"].volume, 80);
+        assert_eq!(
+            state.devices["device-2"].device_type,
+            DeviceType::SMARTPHONE
+        );
+    }
+
+    #[test]
+    fn build_cluster_state_no_active_device_is_none() {
+        let cluster = Cluster::new();
+        let state = build_cluster_state(&cluster);
+        assert_eq!(state.active_device_id, None);
+        assert!(state.devices.is_empty());
     }
 }
