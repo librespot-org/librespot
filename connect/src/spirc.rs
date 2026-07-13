@@ -789,6 +789,7 @@ impl SpircTask {
             if let Err(why) = self.handle_disconnect().await {
                 error!("error during disconnecting: {why}")
             }
+            self.publish_local_activation(false);
         }
 
         // this should clear the active session id, leaving an empty state
@@ -898,6 +899,7 @@ impl SpircTask {
                 trace!("Received SpircCommand::Shutdown");
                 self.handle_pause();
                 self.handle_disconnect().await?;
+                self.publish_local_activation(false);
                 self.shutdown = true;
                 if let Some(rx) = self.commands.as_mut() {
                     rx.close()
@@ -926,7 +928,9 @@ impl SpircTask {
                 if pause {
                     self.handle_pause()
                 }
-                return self.handle_disconnect().await;
+                let result = self.handle_disconnect().await;
+                self.publish_local_activation(false);
+                return result;
             }
             SpircCommand::Play => self.handle_play(),
             SpircCommand::PlayPause => self.handle_play_pause(),
@@ -1713,6 +1717,7 @@ impl SpircTask {
 
     fn handle_activate(&mut self) {
         self.connect_state.set_active(true);
+        self.publish_local_activation(true);
         self.player
             .emit_session_connected_event(self.session.connection_id(), self.session.username());
         self.player.emit_session_client_changed_event(
@@ -2326,21 +2331,43 @@ impl SpircTask {
             }
 
             // reflect locally now; the server only echoes this back on its own schedule
-            let device_id = self.session.device_id().to_string();
-            let device_info = self.connect_state.device_info();
-            let info = DeviceInfo {
-                device_id: device_id.clone(),
-                device_alias: device_info.name.clone(),
-                device_type: device_info.device_type.enum_value_or_default(),
-                volume: new_volume,
-                is_active: self.connect_state.is_active(),
-            };
+            let (device_id, info) = self.own_device_info(self.connect_state.is_active());
             self.cluster_state_sender.send_modify(|state| {
                 state.devices.insert(device_id.clone(), info);
             });
             self.emit_cluster_update(ClusterUpdateEvent {
                 reason: ClusterUpdateReason::DeviceInfoChanged,
                 device_id: Some(device_id),
+            });
+        }
+    }
+
+    fn own_device_info(&self, is_active: bool) -> (String, DeviceInfo) {
+        let device_id = self.session.device_id().to_string();
+        let device_info = self.connect_state.device_info();
+        let info = DeviceInfo {
+            device_id: device_id.clone(),
+            device_alias: device_info.name.clone(),
+            device_type: device_info.device_type.enum_value_or_default(),
+            volume: device_info.volume,
+            is_active,
+        };
+        (device_id, info)
+    }
+
+    /// Local echo of an activation change, same rationale as `set_volume`'s
+    fn publish_local_activation(&mut self, active: bool) {
+        let (device_id, info) = self.own_device_info(active);
+        let new_active_device_id = active.then(|| device_id.clone());
+
+        self.cluster_state_sender
+            .send_modify(|state| apply_local_activation(state, device_id, info, active));
+
+        if new_active_device_id != self.last_active_device_id {
+            self.last_active_device_id = new_active_device_id.clone();
+            self.emit_cluster_update(ClusterUpdateEvent {
+                reason: ClusterUpdateReason::ActiveDeviceChanged,
+                device_id: new_active_device_id,
             });
         }
     }
@@ -2358,6 +2385,23 @@ fn queue_lists_changed(prev: &QueueList, next: &QueueList) -> (bool, bool) {
         prev.prev_tracks != next.prev_tracks,
         prev.next_tracks != next.next_tracks,
     )
+}
+
+/// Upserts one device's entry into a `ClusterState`, clearing `is_active` on whichever
+/// device previously held it
+fn apply_local_activation(
+    state: &mut ClusterState,
+    device_id: String,
+    info: DeviceInfo,
+    active: bool,
+) {
+    if let Some(prev_id) = &state.active_device_id {
+        if let Some(prev) = state.devices.get_mut(prev_id) {
+            prev.is_active = false;
+        }
+    }
+    state.active_device_id = active.then(|| device_id.clone());
+    state.devices.insert(device_id, info);
 }
 
 /// Builds the device map and active device id from a server `Cluster` snapshot
@@ -2657,5 +2701,52 @@ mod tests {
         let state = build_cluster_state(&cluster);
         assert_eq!(state.active_device_id, None);
         assert!(state.devices.is_empty());
+    }
+
+    fn device_info(device_id: &str, is_active: bool) -> DeviceInfo {
+        DeviceInfo {
+            device_id: device_id.to_string(),
+            device_alias: "test device".to_string(),
+            device_type: DeviceType::COMPUTER,
+            volume: 50,
+            is_active,
+        }
+    }
+
+    #[test]
+    fn apply_local_activation_marks_device_active_and_clears_previous() {
+        let mut state = ClusterState {
+            devices: [("old".to_string(), device_info("old", true))].into(),
+            active_device_id: Some("old".to_string()),
+        };
+
+        apply_local_activation(
+            &mut state,
+            "new".to_string(),
+            device_info("new", true),
+            true,
+        );
+
+        assert_eq!(state.active_device_id.as_deref(), Some("new"));
+        assert!(!state.devices["old"].is_active);
+        assert!(state.devices["new"].is_active);
+    }
+
+    #[test]
+    fn apply_local_activation_deactivation_clears_active_device_id() {
+        let mut state = ClusterState {
+            devices: [("me".to_string(), device_info("me", true))].into(),
+            active_device_id: Some("me".to_string()),
+        };
+
+        apply_local_activation(
+            &mut state,
+            "me".to_string(),
+            device_info("me", false),
+            false,
+        );
+
+        assert_eq!(state.active_device_id, None);
+        assert!(!state.devices["me"].is_active);
     }
 }
