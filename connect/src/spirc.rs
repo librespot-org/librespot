@@ -161,6 +161,8 @@ pub enum PlayerUpdateReason {
     RepeatChanged,
     /// Context changed
     ContextChanged,
+    /// Queue was set or reloaded
+    QueueChanged,
     /// Seek detected
     SeekChanged,
     /// Other state change
@@ -947,7 +949,7 @@ impl SpircTask {
             }
             PlayerEvent::ShuffleChanged { .. } => Some(PlayerUpdateReason::ShuffleChanged),
             PlayerEvent::RepeatChanged { .. } => Some(PlayerUpdateReason::RepeatChanged),
-            PlayerEvent::SetQueue { .. } => Some(PlayerUpdateReason::ContextChanged),
+            PlayerEvent::SetQueue { .. } => Some(PlayerUpdateReason::QueueChanged),
             _ => None,
         };
 
