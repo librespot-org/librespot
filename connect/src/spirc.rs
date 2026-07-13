@@ -1209,6 +1209,8 @@ impl SpircTask {
         }
     }
 
+    /// Remote snapshots carry no event metadata, so the reason is inferred by diffing here.
+    /// Local updates get it directly from the originating `PlayerEvent` instead.
     fn emit_player_update(&self, state: Option<PlayerState>, last_state: Option<&PlayerState>) {
         if self.player_update_sender.receiver_count() == 0
             && self.player_state_sender.receiver_count() == 0
@@ -1410,7 +1412,7 @@ impl SpircTask {
                     | ServerClusterUpdateReason::DEVICES_DISAPPEARED => {
                         for device_id in &cluster_update.devices_that_changed {
                             self.emit_cluster_update(ClusterUpdateEvent {
-                                reason: crate::spirc::ClusterUpdateReason::DeviceListChanged,
+                                reason: ClusterUpdateReason::DeviceListChanged,
                                 device_id: device_id.clone(),
                             });
                         }
@@ -1419,7 +1421,7 @@ impl SpircTask {
                     | ServerClusterUpdateReason::DEVICE_VOLUME_CHANGED => {
                         for device_id in &cluster_update.devices_that_changed {
                             self.emit_cluster_update(ClusterUpdateEvent {
-                                reason: crate::spirc::ClusterUpdateReason::DeviceInfoChanged,
+                                reason: ClusterUpdateReason::DeviceInfoChanged,
                                 device_id: device_id.clone(),
                             });
                         }
@@ -1427,7 +1429,7 @@ impl SpircTask {
                     ServerClusterUpdateReason::DEVICE_STATE_CHANGED => {
                         for device_id in &cluster_update.devices_that_changed {
                             self.emit_cluster_update(ClusterUpdateEvent {
-                                reason: crate::spirc::ClusterUpdateReason::DeviceStateChanged,
+                                reason: ClusterUpdateReason::DeviceStateChanged,
                                 device_id: device_id.clone(),
                             });
                         }
@@ -1444,7 +1446,7 @@ impl SpircTask {
             };
             if new_active_device_id != self.last_active_device_id {
                 self.emit_cluster_update(ClusterUpdateEvent {
-                    reason: crate::spirc::ClusterUpdateReason::ActiveDeviceChanged,
+                    reason: ClusterUpdateReason::ActiveDeviceChanged,
                     device_id: new_active_device_id.clone().unwrap_or_default(),
                 });
                 self.last_active_device_id = new_active_device_id;
