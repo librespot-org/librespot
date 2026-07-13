@@ -2298,6 +2298,24 @@ impl SpircTask {
             if self.connect_state.is_active() {
                 self.player.emit_volume_changed_event(volume);
             }
+
+            // reflect locally now; the server only echoes this back on its own schedule
+            let device_id = self.session.device_id().to_string();
+            let device_info = self.connect_state.device_info();
+            let info = DeviceInfo {
+                device_id: device_id.clone(),
+                device_alias: device_info.name.clone(),
+                device_type: device_info.device_type.enum_value_or_default(),
+                volume: new_volume,
+                is_active: self.connect_state.is_active(),
+            };
+            self.cluster_state_sender.send_modify(|state| {
+                state.devices.insert(device_id.clone(), info);
+            });
+            self.emit_cluster_update(ClusterUpdateEvent {
+                reason: ClusterUpdateReason::DeviceInfoChanged,
+                device_id,
+            });
         }
     }
 }
