@@ -2379,12 +2379,17 @@ fn apply_local_activation(
     info: ClusterDeviceInfo,
     active: bool,
 ) {
-    if let Some(prev_id) = &state.active_device_id {
-        if let Some(prev) = state.devices.get_mut(prev_id) {
-            prev.is_active = false;
+    if active {
+        if let Some(prev_id) = &state.active_device_id {
+            if let Some(prev) = state.devices.get_mut(prev_id) {
+                prev.is_active = false;
+            }
         }
+        state.active_device_id = Some(device_id.clone());
+    } else if state.active_device_id.as_deref() == Some(device_id.as_str()) {
+        // don't relinquish if a remote update already moved active elsewhere
+        state.active_device_id = None;
     }
-    state.active_device_id = active.then(|| device_id.clone());
     state.devices.insert(device_id, info);
 }
 
@@ -2805,6 +2810,31 @@ mod tests {
         );
 
         assert_eq!(state.active_device_id, None);
+        assert!(!state.devices["me"].is_active);
+    }
+
+    #[test]
+    fn apply_local_activation_deactivation_does_not_clobber_newer_active_device() {
+        // a remote ClusterUpdate already made "other" active before our own
+        // deactivation got processed; we shouldn't stomp that back to None
+        let mut state = ClusterState {
+            devices: [
+                ("me".to_string(), device_info("me", false)),
+                ("other".to_string(), device_info("other", true)),
+            ]
+            .into(),
+            active_device_id: Some("other".to_string()),
+        };
+
+        apply_local_activation(
+            &mut state,
+            "me".to_string(),
+            device_info("me", false),
+            false,
+        );
+
+        assert_eq!(state.active_device_id.as_deref(), Some("other"));
+        assert!(state.devices["other"].is_active);
         assert!(!state.devices["me"].is_active);
     }
 }
