@@ -271,6 +271,9 @@ const UPDATE_STATE_DELAY: Duration = Duration::from_millis(200);
 // changing at once) with no await point in between for a receiver to drain the channel,
 // so capacity 1 would silently drop all but the last one
 const UPDATE_EVENT_CHANNEL_CAPACITY: usize = 16;
+// position drift beyond this is treated as a user seek rather than natural playback
+// progress or network jitter in the timestamp/position reporting
+const SEEK_THRESHOLD_MS: i64 = 5_000;
 
 /// The spotify connect handle
 pub struct Spirc {
@@ -2446,7 +2449,19 @@ fn build_cluster_state(cluster: &Cluster) -> ClusterState {
     }
 }
 
-/// Every way a remote `PlayerState` snapshot differs from the last one seen
+/// Position drift beyond `SEEK_THRESHOLD_MS` relative to natural playback progress
+fn is_seek(state: &PlayerState, last: &PlayerState) -> bool {
+    let time_diff = state.timestamp.saturating_sub(last.timestamp);
+    let expected_position = if state.is_playing {
+        last.position_as_of_timestamp + time_diff
+    } else {
+        last.position_as_of_timestamp
+    };
+    (state.position_as_of_timestamp - expected_position).abs() > SEEK_THRESHOLD_MS
+}
+
+/// Every way a remote `PlayerState` snapshot differs from the last one seen.
+/// Adding a new kind of change to track is a single entry in `checks` below.
 fn classify_player_update_reasons(
     state: &PlayerState,
     last_state: Option<&PlayerState>,
@@ -2455,53 +2470,48 @@ fn classify_player_update_reasons(
         return vec![PlayerUpdateReason::Other];
     };
 
-    let mut reasons = Vec::new();
-
-    let new_track_uri = state.track.as_ref().map(|t| t.uri.as_str());
-    let old_track_uri = last.track.as_ref().map(|t| t.uri.as_str());
-    let track_changed = new_track_uri != old_track_uri;
-    if track_changed {
-        reasons.push(PlayerUpdateReason::TrackChanged);
+    fn track_uri(s: &PlayerState) -> Option<&str> {
+        s.track.as_ref().map(|t| t.uri.as_str())
     }
-
-    let new_is_playing = state.is_playing && !state.is_paused;
-    let old_is_playing = last.is_playing && !last.is_paused;
-    if new_is_playing != old_is_playing {
-        reasons.push(PlayerUpdateReason::PlayPauseChanged);
-    }
-
+    let is_playing = |s: &PlayerState| s.is_playing && !s.is_paused;
     let shuffle = |s: &PlayerState| s.options.as_ref().map(|o| o.shuffling_context);
-    if shuffle(state) != shuffle(last) {
-        reasons.push(PlayerUpdateReason::ShuffleChanged);
-    }
-
     let repeat = |s: &PlayerState| {
         s.options
             .as_ref()
             .map(|o| (o.repeating_context, o.repeating_track))
     };
-    if repeat(state) != repeat(last) {
-        reasons.push(PlayerUpdateReason::RepeatChanged);
-    }
 
-    if state.context_uri != last.context_uri {
-        reasons.push(PlayerUpdateReason::ContextChanged);
-    }
+    let track_changed = track_uri(state) != track_uri(last);
 
-    // seek doesn't apply across a track change: position naturally resets then
-    if !track_changed {
-        let time_diff = state.timestamp.saturating_sub(last.timestamp);
-        let expected_position = if state.is_playing {
-            last.position_as_of_timestamp + time_diff
-        } else {
-            last.position_as_of_timestamp
-        };
-        let position_delta = (state.position_as_of_timestamp - expected_position).abs();
+    let checks = [
+        (track_changed, PlayerUpdateReason::TrackChanged),
+        (
+            is_playing(state) != is_playing(last),
+            PlayerUpdateReason::PlayPauseChanged,
+        ),
+        (
+            shuffle(state) != shuffle(last),
+            PlayerUpdateReason::ShuffleChanged,
+        ),
+        (
+            repeat(state) != repeat(last),
+            PlayerUpdateReason::RepeatChanged,
+        ),
+        (
+            state.context_uri != last.context_uri,
+            PlayerUpdateReason::ContextChanged,
+        ),
+        // seek doesn't apply across a track change: position naturally resets then
+        (
+            !track_changed && is_seek(state, last),
+            PlayerUpdateReason::SeekChanged,
+        ),
+    ];
 
-        if position_delta > 5000 {
-            reasons.push(PlayerUpdateReason::SeekChanged);
-        }
-    }
+    let mut reasons: Vec<_> = checks
+        .into_iter()
+        .filter_map(|(changed, reason)| changed.then_some(reason))
+        .collect();
 
     if reasons.is_empty() {
         reasons.push(PlayerUpdateReason::Other);
