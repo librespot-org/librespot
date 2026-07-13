@@ -1356,43 +1356,12 @@ impl SpircTask {
                 .cluster_state_sender
                 .send(build_cluster_state(&cluster));
 
-            if let Ok(reason_enum) = reason {
-                match reason_enum {
-                    ServerClusterUpdateReason::DEVICE_NEW_CONNECTION
-                    | ServerClusterUpdateReason::NEW_DEVICE_APPEARED => {
-                        for device_id in &cluster_update.devices_that_changed {
-                            self.emit_cluster_update(ClusterUpdateEvent {
-                                reason: ClusterUpdateReason::DeviceAppeared,
-                                device_id: Some(device_id.clone()),
-                            });
-                        }
-                    }
-                    ServerClusterUpdateReason::DEVICES_DISAPPEARED => {
-                        for device_id in &cluster_update.devices_that_changed {
-                            self.emit_cluster_update(ClusterUpdateEvent {
-                                reason: ClusterUpdateReason::DeviceDisappeared,
-                                device_id: Some(device_id.clone()),
-                            });
-                        }
-                    }
-                    ServerClusterUpdateReason::DEVICE_ALIAS_CHANGED
-                    | ServerClusterUpdateReason::DEVICE_VOLUME_CHANGED => {
-                        for device_id in &cluster_update.devices_that_changed {
-                            self.emit_cluster_update(ClusterUpdateEvent {
-                                reason: ClusterUpdateReason::DeviceInfoChanged,
-                                device_id: Some(device_id.clone()),
-                            });
-                        }
-                    }
-                    ServerClusterUpdateReason::DEVICE_STATE_CHANGED => {
-                        for device_id in &cluster_update.devices_that_changed {
-                            self.emit_cluster_update(ClusterUpdateEvent {
-                                reason: ClusterUpdateReason::DeviceStateChanged,
-                                device_id: Some(device_id.clone()),
-                            });
-                        }
-                    }
-                    _ => {}
+            if let Some(mapped_reason) = reason.ok().and_then(map_server_cluster_update_reason) {
+                for device_id in &cluster_update.devices_that_changed {
+                    self.emit_cluster_update(ClusterUpdateEvent {
+                        reason: mapped_reason,
+                        device_id: Some(device_id.clone()),
+                    });
                 }
             }
 
@@ -2419,6 +2388,30 @@ fn apply_local_activation(
     state.devices.insert(device_id, info);
 }
 
+/// Maps the server's cluster update reason to ours; `None` for reasons we don't
+/// broadcast a per-device event for (e.g. the active device change, handled separately)
+fn map_server_cluster_update_reason(
+    reason: ServerClusterUpdateReason,
+) -> Option<ClusterUpdateReason> {
+    match reason {
+        ServerClusterUpdateReason::DEVICE_NEW_CONNECTION
+        | ServerClusterUpdateReason::NEW_DEVICE_APPEARED => {
+            Some(ClusterUpdateReason::DeviceAppeared)
+        }
+        ServerClusterUpdateReason::DEVICES_DISAPPEARED => {
+            Some(ClusterUpdateReason::DeviceDisappeared)
+        }
+        ServerClusterUpdateReason::DEVICE_ALIAS_CHANGED
+        | ServerClusterUpdateReason::DEVICE_VOLUME_CHANGED => {
+            Some(ClusterUpdateReason::DeviceInfoChanged)
+        }
+        ServerClusterUpdateReason::DEVICE_STATE_CHANGED => {
+            Some(ClusterUpdateReason::DeviceStateChanged)
+        }
+        _ => None,
+    }
+}
+
 /// Builds the device map and active device id from a server `Cluster` snapshot
 fn build_cluster_state(cluster: &Cluster) -> ClusterState {
     let devices = cluster
@@ -2716,6 +2709,56 @@ mod tests {
         let state = build_cluster_state(&cluster);
         assert_eq!(state.active_device_id, None);
         assert!(state.devices.is_empty());
+    }
+
+    #[test]
+    fn maps_new_device_reasons_to_appeared() {
+        assert_eq!(
+            map_server_cluster_update_reason(ServerClusterUpdateReason::DEVICE_NEW_CONNECTION),
+            Some(ClusterUpdateReason::DeviceAppeared)
+        );
+        assert_eq!(
+            map_server_cluster_update_reason(ServerClusterUpdateReason::NEW_DEVICE_APPEARED),
+            Some(ClusterUpdateReason::DeviceAppeared)
+        );
+    }
+
+    #[test]
+    fn maps_disappeared_reason() {
+        assert_eq!(
+            map_server_cluster_update_reason(ServerClusterUpdateReason::DEVICES_DISAPPEARED),
+            Some(ClusterUpdateReason::DeviceDisappeared)
+        );
+    }
+
+    #[test]
+    fn maps_alias_and_volume_to_device_info_changed() {
+        assert_eq!(
+            map_server_cluster_update_reason(ServerClusterUpdateReason::DEVICE_ALIAS_CHANGED),
+            Some(ClusterUpdateReason::DeviceInfoChanged)
+        );
+        assert_eq!(
+            map_server_cluster_update_reason(ServerClusterUpdateReason::DEVICE_VOLUME_CHANGED),
+            Some(ClusterUpdateReason::DeviceInfoChanged)
+        );
+    }
+
+    #[test]
+    fn maps_state_changed_reason() {
+        assert_eq!(
+            map_server_cluster_update_reason(ServerClusterUpdateReason::DEVICE_STATE_CHANGED),
+            Some(ClusterUpdateReason::DeviceStateChanged)
+        );
+    }
+
+    #[test]
+    fn unknown_reason_has_no_per_device_event() {
+        assert_eq!(
+            map_server_cluster_update_reason(
+                ServerClusterUpdateReason::UNKNOWN_CLUSTER_UPDATE_REASON
+            ),
+            None
+        );
     }
 
     fn device_info(device_id: &str, is_active: bool) -> ClusterDeviceInfo {
