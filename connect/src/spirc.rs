@@ -1327,6 +1327,12 @@ impl SpircTask {
         );
 
         if let Some(mut cluster) = cluster_update.cluster.take() {
+            // published before any broadcast below, so a receiver woken by one of those
+            // events can trust watch_cluster_state() already reflects it
+            let _ = self
+                .cluster_state_sender
+                .send(build_cluster_state(&cluster));
+
             if let Ok(reason_enum) = reason {
                 match reason_enum {
                     ServerClusterUpdateReason::DEVICE_NEW_CONNECTION
@@ -1373,11 +1379,6 @@ impl SpircTask {
                 });
                 self.last_active_device_id = new_active_device_id;
             }
-
-            // Sync device state to cluster_state_sender (after emitting events)
-            let _ = self
-                .cluster_state_sender
-                .send(build_cluster_state(&cluster));
 
             let became_inactive = self.connect_state.is_active()
                 && cluster.active_device_id != self.session.device_id();
