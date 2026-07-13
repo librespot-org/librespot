@@ -112,6 +112,7 @@ pub struct QueueList {
 
 /// Semantic reason for cluster updates
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ClusterUpdateReason {
     /// Device list changed
     DeviceListChanged,
@@ -126,14 +127,15 @@ pub enum ClusterUpdateReason {
 /// Event emitted when cluster state changes
 #[derive(Debug, Clone)]
 pub struct ClusterUpdateEvent {
-    /// Device ID that changed
-    pub device_id: String,
+    /// Device that changed, or `None` if `ActiveDeviceChanged` means nothing is active
+    pub device_id: Option<String>,
     /// Reason for the update
     pub reason: ClusterUpdateReason,
 }
 
 /// Semantic reasons for queue updates
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum QueueUpdateReason {
     /// Previous tracks changed
     PrevTracksChanged,
@@ -150,6 +152,7 @@ pub struct QueueUpdateEvent {
 
 /// Semantic reasons for player state updates
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum PlayerUpdateReason {
     /// Track changed
     TrackChanged,
@@ -1332,7 +1335,7 @@ impl SpircTask {
                         for device_id in &cluster_update.devices_that_changed {
                             self.emit_cluster_update(ClusterUpdateEvent {
                                 reason: ClusterUpdateReason::DeviceListChanged,
-                                device_id: device_id.clone(),
+                                device_id: Some(device_id.clone()),
                             });
                         }
                     }
@@ -1341,7 +1344,7 @@ impl SpircTask {
                         for device_id in &cluster_update.devices_that_changed {
                             self.emit_cluster_update(ClusterUpdateEvent {
                                 reason: ClusterUpdateReason::DeviceInfoChanged,
-                                device_id: device_id.clone(),
+                                device_id: Some(device_id.clone()),
                             });
                         }
                     }
@@ -1349,7 +1352,7 @@ impl SpircTask {
                         for device_id in &cluster_update.devices_that_changed {
                             self.emit_cluster_update(ClusterUpdateEvent {
                                 reason: ClusterUpdateReason::DeviceStateChanged,
-                                device_id: device_id.clone(),
+                                device_id: Some(device_id.clone()),
                             });
                         }
                     }
@@ -1366,7 +1369,7 @@ impl SpircTask {
             if new_active_device_id != self.last_active_device_id {
                 self.emit_cluster_update(ClusterUpdateEvent {
                     reason: ClusterUpdateReason::ActiveDeviceChanged,
-                    device_id: new_active_device_id.clone().unwrap_or_default(),
+                    device_id: new_active_device_id.clone(),
                 });
                 self.last_active_device_id = new_active_device_id;
             }
@@ -2325,7 +2328,7 @@ impl SpircTask {
             });
             self.emit_cluster_update(ClusterUpdateEvent {
                 reason: ClusterUpdateReason::DeviceInfoChanged,
-                device_id,
+                device_id: Some(device_id),
             });
         }
     }
