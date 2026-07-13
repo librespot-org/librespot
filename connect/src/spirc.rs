@@ -77,9 +77,10 @@ impl From<SpircError> for Error {
     }
 }
 
-/// Information about a device in the cluster
+/// Information about a device in the cluster. Named to avoid colliding with
+/// `librespot_protocol::connect::DeviceInfo` under a wildcard import.
 #[derive(Debug, Clone)]
-pub struct DeviceInfo {
+pub struct ClusterDeviceInfo {
     /// Unique device identifier
     pub device_id: String,
     /// Human-readable device name
@@ -96,7 +97,7 @@ pub struct DeviceInfo {
 #[derive(Debug, Clone)]
 pub struct ClusterState {
     /// Map of all known devices by device_id
-    pub devices: HashMap<String, DeviceInfo>,
+    pub devices: HashMap<String, ClusterDeviceInfo>,
     /// Currently active device ID (if any)
     pub active_device_id: Option<String>,
 }
@@ -2342,10 +2343,10 @@ impl SpircTask {
         }
     }
 
-    fn own_device_info(&self, is_active: bool) -> (String, DeviceInfo) {
+    fn own_device_info(&self, is_active: bool) -> (String, ClusterDeviceInfo) {
         let device_id = self.session.device_id().to_string();
         let device_info = self.connect_state.device_info();
-        let info = DeviceInfo {
+        let info = ClusterDeviceInfo {
             device_id: device_id.clone(),
             device_alias: device_info.name.clone(),
             device_type: device_info.device_type.enum_value_or_default(),
@@ -2392,7 +2393,7 @@ fn queue_lists_changed(prev: &QueueList, next: &QueueList) -> (bool, bool) {
 fn apply_local_activation(
     state: &mut ClusterState,
     device_id: String,
-    info: DeviceInfo,
+    info: ClusterDeviceInfo,
     active: bool,
 ) {
     if let Some(prev_id) = &state.active_device_id {
@@ -2410,7 +2411,7 @@ fn build_cluster_state(cluster: &Cluster) -> ClusterState {
         .device
         .values()
         .map(|device| {
-            let info = DeviceInfo {
+            let info = ClusterDeviceInfo {
                 device_id: device.device_id.clone(),
                 device_alias: device.name.clone(),
                 device_type: device.device_type.enum_value_or_default(),
@@ -2703,8 +2704,8 @@ mod tests {
         assert!(state.devices.is_empty());
     }
 
-    fn device_info(device_id: &str, is_active: bool) -> DeviceInfo {
-        DeviceInfo {
+    fn device_info(device_id: &str, is_active: bool) -> ClusterDeviceInfo {
+        ClusterDeviceInfo {
             device_id: device_id.to_string(),
             device_alias: "test device".to_string(),
             device_type: DeviceType::COMPUTER,
