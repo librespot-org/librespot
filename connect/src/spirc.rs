@@ -1221,8 +1221,8 @@ impl SpircTask {
         }
     }
 
-    /// Remote snapshots carry no event metadata, so the reason is inferred by diffing here.
-    /// Local updates get it directly from the originating `PlayerEvent` instead.
+    /// Remote snapshots carry no event metadata, so reasons are inferred by diffing here.
+    /// Local updates get theirs directly from the originating `PlayerEvent` instead.
     fn emit_player_update(&self, state: Option<PlayerState>, last_state: Option<&PlayerState>) {
         if self.player_update_sender.receiver_count() == 0
             && self.player_state_sender.receiver_count() == 0
@@ -1231,10 +1231,12 @@ impl SpircTask {
         }
 
         let state = state.unwrap_or_else(|| self.connect_state.player().clone());
-        let reason = classify_player_update_reason(&state, last_state);
+        let reasons = classify_player_update_reasons(&state, last_state);
 
         let _ = self.player_state_sender.send(Some(state));
-        self.emit_player_update_event(PlayerUpdateEvent { reason });
+        for reason in reasons {
+            self.emit_player_update_event(PlayerUpdateEvent { reason });
+        }
     }
 
     /// No-op without subscribers, so local playback doesn't warn when nobody's listening
@@ -2387,30 +2389,33 @@ fn build_cluster_state(cluster: &Cluster) -> ClusterState {
     }
 }
 
-/// Classifies why a remote `PlayerState` snapshot differs from the last one seen
-fn classify_player_update_reason(
+/// Every way a remote `PlayerState` snapshot differs from the last one seen
+fn classify_player_update_reasons(
     state: &PlayerState,
     last_state: Option<&PlayerState>,
-) -> PlayerUpdateReason {
+) -> Vec<PlayerUpdateReason> {
     let Some(last) = last_state else {
-        return PlayerUpdateReason::Other;
+        return vec![PlayerUpdateReason::Other];
     };
+
+    let mut reasons = Vec::new();
 
     let new_track_uri = state.track.as_ref().map(|t| t.uri.as_str());
     let old_track_uri = last.track.as_ref().map(|t| t.uri.as_str());
-    if new_track_uri != old_track_uri {
-        return PlayerUpdateReason::TrackChanged;
+    let track_changed = new_track_uri != old_track_uri;
+    if track_changed {
+        reasons.push(PlayerUpdateReason::TrackChanged);
     }
 
     let new_is_playing = state.is_playing && !state.is_paused;
     let old_is_playing = last.is_playing && !last.is_paused;
     if new_is_playing != old_is_playing {
-        return PlayerUpdateReason::PlayPauseChanged;
+        reasons.push(PlayerUpdateReason::PlayPauseChanged);
     }
 
     let shuffle = |s: &PlayerState| s.options.as_ref().map(|o| o.shuffling_context);
     if shuffle(state) != shuffle(last) {
-        return PlayerUpdateReason::ShuffleChanged;
+        reasons.push(PlayerUpdateReason::ShuffleChanged);
     }
 
     let repeat = |s: &PlayerState| {
@@ -2419,27 +2424,33 @@ fn classify_player_update_reason(
             .map(|o| (o.repeating_context, o.repeating_track))
     };
     if repeat(state) != repeat(last) {
-        return PlayerUpdateReason::RepeatChanged;
+        reasons.push(PlayerUpdateReason::RepeatChanged);
     }
 
     if state.context_uri != last.context_uri {
-        return PlayerUpdateReason::ContextChanged;
+        reasons.push(PlayerUpdateReason::ContextChanged);
     }
 
-    // seek: a position jump beyond what natural playback progress would explain
-    let time_diff = state.timestamp.saturating_sub(last.timestamp);
-    let expected_position = if state.is_playing {
-        last.position_as_of_timestamp + time_diff
-    } else {
-        last.position_as_of_timestamp
-    };
-    let position_delta = (state.position_as_of_timestamp - expected_position).abs();
+    // seek doesn't apply across a track change: position naturally resets then
+    if !track_changed {
+        let time_diff = state.timestamp.saturating_sub(last.timestamp);
+        let expected_position = if state.is_playing {
+            last.position_as_of_timestamp + time_diff
+        } else {
+            last.position_as_of_timestamp
+        };
+        let position_delta = (state.position_as_of_timestamp - expected_position).abs();
 
-    if position_delta > 5000 {
-        PlayerUpdateReason::SeekChanged
-    } else {
-        PlayerUpdateReason::Other
+        if position_delta > 5000 {
+            reasons.push(PlayerUpdateReason::SeekChanged);
+        }
     }
+
+    if reasons.is_empty() {
+        reasons.push(PlayerUpdateReason::Other);
+    }
+
+    reasons
 }
 
 #[cfg(test)]
@@ -2462,13 +2473,29 @@ mod tests {
     fn no_previous_state_is_other() {
         let state = PlayerState::default();
         assert_eq!(
-            classify_player_update_reason(&state, None),
-            PlayerUpdateReason::Other
+            classify_player_update_reasons(&state, None),
+            vec![PlayerUpdateReason::Other]
         );
     }
 
     #[test]
-    fn track_change_wins_over_everything_else() {
+    fn track_change_alone() {
+        let last = state_with(|s| {
+            s.track = MessageField::some(track("spotify:track:a"));
+            s.is_playing = true;
+        });
+        let next = state_with(|s| {
+            s.track = MessageField::some(track("spotify:track:b"));
+            s.is_playing = true;
+        });
+        assert_eq!(
+            classify_player_update_reasons(&next, Some(&last)),
+            vec![PlayerUpdateReason::TrackChanged]
+        );
+    }
+
+    #[test]
+    fn track_and_play_pause_both_reported() {
         let last = state_with(|s| {
             s.track = MessageField::some(track("spotify:track:a"));
             s.is_playing = true;
@@ -2478,8 +2505,11 @@ mod tests {
             s.is_playing = false;
         });
         assert_eq!(
-            classify_player_update_reason(&next, Some(&last)),
-            PlayerUpdateReason::TrackChanged
+            classify_player_update_reasons(&next, Some(&last)),
+            vec![
+                PlayerUpdateReason::TrackChanged,
+                PlayerUpdateReason::PlayPauseChanged,
+            ]
         );
     }
 
@@ -2488,8 +2518,8 @@ mod tests {
         let last = state_with(|s| s.is_playing = false);
         let next = state_with(|s| s.is_playing = true);
         assert_eq!(
-            classify_player_update_reason(&next, Some(&last)),
-            PlayerUpdateReason::PlayPauseChanged
+            classify_player_update_reasons(&next, Some(&last)),
+            vec![PlayerUpdateReason::PlayPauseChanged]
         );
     }
 
@@ -2506,8 +2536,8 @@ mod tests {
             s.position_as_of_timestamp = 50_000;
         });
         assert_eq!(
-            classify_player_update_reason(&next, Some(&last)),
-            PlayerUpdateReason::SeekChanged
+            classify_player_update_reasons(&next, Some(&last)),
+            vec![PlayerUpdateReason::SeekChanged]
         );
     }
 
@@ -2524,8 +2554,29 @@ mod tests {
             s.position_as_of_timestamp = 11_000;
         });
         assert_eq!(
-            classify_player_update_reason(&next, Some(&last)),
-            PlayerUpdateReason::Other
+            classify_player_update_reasons(&next, Some(&last)),
+            vec![PlayerUpdateReason::Other]
+        );
+    }
+
+    #[test]
+    fn track_change_suppresses_seek() {
+        // position naturally resets on a track change; that's not a seek
+        let last = state_with(|s| {
+            s.track = MessageField::some(track("spotify:track:a"));
+            s.is_playing = true;
+            s.timestamp = 1_000;
+            s.position_as_of_timestamp = 100_000;
+        });
+        let next = state_with(|s| {
+            s.track = MessageField::some(track("spotify:track:b"));
+            s.is_playing = true;
+            s.timestamp = 2_000;
+            s.position_as_of_timestamp = 0;
+        });
+        assert_eq!(
+            classify_player_update_reasons(&next, Some(&last)),
+            vec![PlayerUpdateReason::TrackChanged]
         );
     }
 
