@@ -1291,6 +1291,12 @@ impl SpircTask {
     }
 
     fn publish_queue_snapshot(&mut self, player_state: &PlayerState) {
+        if self.queue_list_sender.receiver_count() == 0
+            && self.queue_update_sender.receiver_count() == 0
+        {
+            return;
+        }
+
         let queue_list = Self::queue_list_from_player_state(player_state);
         let prev_queue_list = std::mem::replace(&mut self.last_queue_list, queue_list.clone());
 
@@ -1313,6 +1319,14 @@ impl SpircTask {
     }
 
     fn publish_active_state(&mut self, reason: Option<PlayerUpdateReason>) {
+        let has_subscribers = self.player_update_sender.receiver_count() > 0
+            || self.player_state_sender.receiver_count() > 0
+            || self.queue_list_sender.receiver_count() > 0
+            || self.queue_update_sender.receiver_count() > 0;
+        if !has_subscribers {
+            return;
+        }
+
         let player_state = self.connect_state.player().clone();
         let _ = self.player_state_sender.send(Some(player_state.clone()));
         self.publish_queue_snapshot(&player_state);
