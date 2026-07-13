@@ -1135,7 +1135,7 @@ impl SpircTask {
         trace!("Received connection ID update: {connection_id:?}");
         self.session.set_connection_id(&connection_id);
 
-        let cluster = match self
+        let mut cluster = match self
             .connect_state
             .notify_new_device_appeared(&self.session)
             .await
@@ -1154,6 +1154,7 @@ impl SpircTask {
         );
 
         self.connect_established = true;
+        self.sync_cluster_state(&cluster);
 
         let same_session = cluster.player_state.session_id == self.session.session_id()
             || cluster.player_state.session_id.is_empty();
@@ -1162,6 +1163,9 @@ impl SpircTask {
                 "active device is <{}> with session <{}>",
                 cluster.active_device_id, cluster.player_state.session_id
             );
+            if let Some(state) = cluster.player_state.take() {
+                self.publish_remote_player_state(state);
+            }
             return Ok(());
         } else if cluster.transfer_data.is_empty() {
             debug!("got empty transfer state, do nothing");
@@ -1256,6 +1260,30 @@ impl SpircTask {
         if let Err(why) = self.player_update_sender.send(event) {
             warn!("couldn't emit player update because: {why}")
         }
+    }
+
+    /// Shared by connect-time hydration and ongoing dealer updates so neither forgets it
+    fn sync_cluster_state(&mut self, cluster: &Cluster) {
+        let _ = self.cluster_state_sender.send(build_cluster_state(cluster));
+
+        let new_active_device_id = if cluster.active_device_id.is_empty() {
+            None
+        } else {
+            Some(cluster.active_device_id.clone())
+        };
+        if new_active_device_id != self.last_active_device_id {
+            self.emit_cluster_update(ClusterUpdateEvent {
+                reason: ClusterUpdateReason::ActiveDeviceChanged,
+                device_id: new_active_device_id.clone(),
+            });
+            self.last_active_device_id = new_active_device_id;
+        }
+    }
+
+    fn publish_remote_player_state(&mut self, state: PlayerState) {
+        self.publish_queue_snapshot(&state);
+        self.emit_player_update(Some(state.clone()), self.last_player_state.as_ref());
+        self.last_player_state = Some(state);
     }
 
     fn emit_cluster_update(&self, event: ClusterUpdateEvent) {
@@ -1355,9 +1383,7 @@ impl SpircTask {
         if let Some(mut cluster) = cluster_update.cluster.take() {
             // published before any broadcast below, so a receiver woken by one of those
             // events can trust watch_cluster_state() already reflects it
-            let _ = self
-                .cluster_state_sender
-                .send(build_cluster_state(&cluster));
+            self.sync_cluster_state(&cluster);
 
             if let Some(mapped_reason) = reason.ok().and_then(map_server_cluster_update_reason) {
                 for device_id in &cluster_update.devices_that_changed {
@@ -1366,20 +1392,6 @@ impl SpircTask {
                         device_id: Some(device_id.clone()),
                     });
                 }
-            }
-
-            // Check for active device changes
-            let new_active_device_id = if cluster.active_device_id.is_empty() {
-                None
-            } else {
-                Some(cluster.active_device_id.clone())
-            };
-            if new_active_device_id != self.last_active_device_id {
-                self.emit_cluster_update(ClusterUpdateEvent {
-                    reason: ClusterUpdateReason::ActiveDeviceChanged,
-                    device_id: new_active_device_id.clone(),
-                });
-                self.last_active_device_id = new_active_device_id;
             }
 
             let became_inactive = self.connect_state.is_active()
@@ -1394,9 +1406,7 @@ impl SpircTask {
                 //  tried: providing session_id, playback_id, track-metadata "track_player"
                 self.update_state = true;
             } else if let Some(state) = cluster.player_state.take() {
-                self.publish_queue_snapshot(&state);
-                self.emit_player_update(Some(state.clone()), self.last_player_state.as_ref());
-                self.last_player_state = Some(state);
+                self.publish_remote_player_state(state);
             }
         } else if self.connect_state.is_active() {
             self.connect_state.became_inactive(&self.session).await?;
