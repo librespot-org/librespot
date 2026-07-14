@@ -798,8 +798,8 @@ impl SpircTask {
             Err(why) => {
                 self.context_resolver.mark_next_unavailable();
                 self.context_resolver.remove_used_and_invalid();
-                error!("{why}");
-                return false;
+                error!("context resolving failed: {why}");
+                return self.handle_resolve_failure();
             }
             Ok(ctx) => ctx,
         };
@@ -837,6 +837,30 @@ impl SpircTask {
 
         self.context_resolver.remove_used_and_invalid();
         update_state
+    }
+
+    /// A context resolve failed and won't be retried automatically. Ensure the
+    /// device is left in a state a fresh user action can recover from: no
+    /// pending transfer and no load stuck waiting on the missing context.
+    ///
+    /// Failures of automatic context updates while something is playing don't
+    /// require any cleanup and must leave the playback untouched.
+    fn handle_resolve_failure(&mut self) -> bool {
+        let had_transfer = self.transfer_state.take().is_some();
+        let was_loading = matches!(
+            self.play_status,
+            SpircPlayStatus::LoadingPlay { .. } | SpircPlayStatus::LoadingPause { .. }
+        );
+
+        if !had_transfer && !was_loading {
+            return false;
+        }
+
+        warn!("giving up on unresolved context, stopping so a new user action can recover");
+        self.handle_stop();
+        self.play_status = SpircPlayStatus::Stopped;
+
+        true
     }
 
     /// Emit set queue event via PlayerEvent
