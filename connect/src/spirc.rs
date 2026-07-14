@@ -27,6 +27,7 @@ use crate::{
         user_attributes::UserAttributesMutation,
     },
     state::{
+        StateError,
         context::{ContextType, ResetContext},
         provider::IsProvider,
         {ConnectConfig, ConnectState},
@@ -74,6 +75,13 @@ impl From<SpircError> for Error {
     }
 }
 
+fn is_no_context_error(err: &Error) -> bool {
+    matches!(
+        err.error.downcast_ref::<StateError>(),
+        Some(StateError::NoContext(_))
+    )
+}
+
 struct SpircTask {
     player: Arc<Player>,
     mixer: Arc<dyn Mixer>,
@@ -107,6 +115,10 @@ struct SpircTask {
 
     /// is set when transferring, and used after resolving the contexts to finish the transfer
     pub transfer_state: Option<TransferState>,
+
+    /// tracks that became unavailable while their context was still resolving,
+    /// handled again once the context is available
+    pending_unavailable_tracks: Vec<SpotifyUri>,
 
     /// when set to true, it will update the volume after [VOLUME_UPDATE_DELAY],
     /// when no other future resolves, otherwise resets the delay
@@ -324,6 +336,7 @@ impl Spirc {
             session,
 
             transfer_state: None,
+            pending_unavailable_tracks: Vec::new(),
             update_volume: false,
             update_state: false,
 
@@ -825,6 +838,7 @@ impl SpircTask {
             .try_finish(&mut self.connect_state, &mut self.transfer_state)
         {
             self.add_autoplay_resolving_when_required();
+            self.handle_deferred_unavailable_tracks();
             true
         } else {
             false
@@ -839,6 +853,28 @@ impl SpircTask {
         update_state
     }
 
+    fn context_resolution_pending(&self) -> bool {
+        self.transfer_state.is_some() || self.context_resolver.has_next()
+    }
+
+    /// Handles tracks whose unavailability couldn't be processed earlier
+    /// because their context was still resolving.
+    fn handle_deferred_unavailable_tracks(&mut self) {
+        for track_id in mem::take(&mut self.pending_unavailable_tracks) {
+            info!("handling deferred unavailable track <{track_id}>");
+            let res = self.handle_unavailable(&track_id).and_then(|_| {
+                if self.connect_state.current_track(|t| &t.uri) == &track_id.to_uri() {
+                    self.handle_next(None)
+                } else {
+                    Ok(())
+                }
+            });
+            if let Err(why) = res {
+                warn!("failed handling deferred unavailable track: {why}")
+            }
+        }
+    }
+
     /// A context resolve failed and won't be retried automatically. Ensure the
     /// device is left in a state a fresh user action can recover from: no
     /// pending transfer and no load stuck waiting on the missing context.
@@ -846,6 +882,7 @@ impl SpircTask {
     /// Failures of automatic context updates while something is playing don't
     /// require any cleanup and must leave the playback untouched.
     fn handle_resolve_failure(&mut self) -> bool {
+        self.pending_unavailable_tracks.clear();
         let had_transfer = self.transfer_state.take().is_some();
         let was_loading = matches!(
             self.play_status,
@@ -1086,9 +1123,22 @@ impl SpircTask {
                 return Ok(());
             }
             PlayerEvent::Unavailable { track_id, .. } => {
-                self.handle_unavailable(&track_id)?;
-                if self.connect_state.current_track(|t| &t.uri) == &track_id.to_uri() {
-                    self.handle_next(None)?
+                match self.handle_unavailable(&track_id) {
+                    Ok(_) => {
+                        if self.connect_state.current_track(|t| &t.uri) == &track_id.to_uri() {
+                            self.handle_next(None)?
+                        }
+                    }
+                    // the track failed before its context was resolved (e.g. it
+                    // raced the resolve during a transfer), so it can't be
+                    // skipped over yet: handle it again when the context arrives
+                    Err(why) if is_no_context_error(&why) && self.context_resolution_pending() => {
+                        warn!(
+                            "track <{track_id}> became unavailable before its context resolved, deferring"
+                        );
+                        self.pending_unavailable_tracks.push(track_id);
+                    }
+                    Err(why) => return Err(why),
                 }
             }
             _ => return Ok(()),
@@ -1443,6 +1493,8 @@ impl SpircTask {
     }
 
     fn handle_transfer(&mut self, mut transfer: TransferState) -> Result<(), Error> {
+        self.pending_unavailable_tracks.clear();
+
         let mut ctx_uri = match transfer.current_session.context.uri {
             None => Err(SpircError::NoUri("transfer context"))?,
             // can apparently happen when a state is transferred and was started with "uris" via the api
@@ -1579,6 +1631,7 @@ impl SpircTask {
 
     async fn handle_disconnect(&mut self) -> Result<(), Error> {
         self.context_resolver.clear();
+        self.pending_unavailable_tracks.clear();
 
         self.play_status = SpircPlayStatus::Stopped {};
         self.connect_state
@@ -1771,6 +1824,7 @@ impl SpircTask {
         } else {
             debug!("resolving context for load command");
             self.context_resolver.clear();
+            self.pending_unavailable_tracks.clear();
             self.context_resolver.add_forced(ResolveContext::from_uri(
                 &context_uri,
                 fallback,
