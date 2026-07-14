@@ -79,7 +79,8 @@ impl From<HttpClientError> for Error {
                     | StatusCode::PRECONDITION_FAILED
                     | StatusCode::PRECONDITION_REQUIRED => Error::failed_precondition(err),
                     StatusCode::RANGE_NOT_SATISFIABLE => Error::out_of_range(err),
-                    StatusCode::INTERNAL_SERVER_ERROR
+                    StatusCode::BAD_GATEWAY
+                    | StatusCode::INTERNAL_SERVER_ERROR
                     | StatusCode::MISDIRECTED_REQUEST
                     | StatusCode::SERVICE_UNAVAILABLE
                     | StatusCode::UNAVAILABLE_FOR_LEGAL_REASONS => Error::unavailable(err),
