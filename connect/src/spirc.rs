@@ -1451,7 +1451,7 @@ impl SpircTask {
 
         match ctx_uri {
             Some(ref uri) => {
-                self.context_resolver.add(ResolveContext::from_uri(
+                self.context_resolver.add_forced(ResolveContext::from_uri(
                     uri.clone(),
                     &fallback,
                     ContextType::Default,
@@ -1522,7 +1522,7 @@ impl SpircTask {
         if self.connect_state.current_track(|t| t.is_autoplay()) || autoplay {
             if let Some(ctx_uri) = ctx_uri {
                 debug!("currently in autoplay context, async resolving autoplay for {ctx_uri}");
-                self.context_resolver.add(ResolveContext::from_uri(
+                self.context_resolver.add_forced(ResolveContext::from_uri(
                     ctx_uri,
                     fallback,
                     ContextType::Autoplay,
@@ -1747,7 +1747,7 @@ impl SpircTask {
         } else {
             debug!("resolving context for load command");
             self.context_resolver.clear();
-            self.context_resolver.add(ResolveContext::from_uri(
+            self.context_resolver.add_forced(ResolveContext::from_uri(
                 &context_uri,
                 fallback,
                 update_context,
