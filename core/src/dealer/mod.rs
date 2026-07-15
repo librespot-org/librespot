@@ -369,7 +369,7 @@ impl DealerShared {
         request: WebsocketRequest,
         send_tx: &mpsc::UnboundedSender<WsMessage>,
     ) {
-        trace!("dealer request {}", &request.message_ident);
+        trace!("dealer request {}", request.message_ident);
 
         let payload_request = match request.handle_payload() {
             Ok(payload) => payload,
@@ -387,7 +387,7 @@ impl DealerShared {
         } else {
             warn!(
                 "Dealer request with invalid message_ident: {}",
-                &request.message_ident
+                request.message_ident
             );
             return;
         };
@@ -402,7 +402,7 @@ impl DealerShared {
             return;
         }
 
-        warn!("No handler for message_ident: {}", &request.message_ident);
+        warn!("No handler for message_ident: {}", request.message_ident);
     }
 
     fn dispatch(&self, m: MessageOrRequest, send_tx: &mpsc::UnboundedSender<WsMessage>) {
