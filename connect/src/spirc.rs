@@ -131,6 +131,7 @@ enum SpircCommand {
     RepeatTrack(bool),
     Disconnect { pause: bool },
     SetPosition(u32),
+    SeekOffset(i32),
     SetVolume(u16),
     Activate,
     Transfer(Option<TransferRequest>),
@@ -146,6 +147,7 @@ const VOLUME_UPDATE_DELAY: Duration = Duration::from_millis(500);
 const UPDATE_STATE_DELAY: Duration = Duration::from_millis(200);
 
 /// The spotify connect handle
+#[derive(Clone)]
 pub struct Spirc {
     commands: mpsc::UnboundedSender<SpircCommand>,
 }
@@ -393,6 +395,13 @@ impl Spirc {
     /// Does not overwrite the queue.
     pub fn load(&self, command: LoadRequest) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::Load(command))?)
+    }
+
+    /// Seek to given offset.
+    ///
+    /// Does nothing if we are not the active device.
+    pub fn seek_offset(&self, offset_ms: i32) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::SeekOffset(offset_ms))?)
     }
 
     /// Adds a track, episode, album or playlist to the queue.
@@ -744,6 +753,7 @@ impl SpircTask {
             SpircCommand::Repeat(repeat) => self.handle_repeat_context(repeat)?,
             SpircCommand::RepeatTrack(repeat) => self.handle_repeat_track(repeat),
             SpircCommand::SetPosition(position) => self.handle_seek(position),
+            SpircCommand::SeekOffset(offset) => self.handle_seek_offset(offset),
             SpircCommand::SetVolume(volume) => self.set_volume(volume),
             SpircCommand::Load(command) => self.handle_load(command, None, None).await?,
             SpircCommand::AddToQueue(uri) => self.handle_add_to_queue(uri).await,
@@ -1602,6 +1612,25 @@ impl SpircTask {
                 ..
             } => *nominal_start_time = now - position_ms as i64,
         };
+    }
+
+    fn handle_seek_offset(&mut self, offset_ms: i32) {
+        let position_ms = match self.play_status {
+            SpircPlayStatus::Stopped => return,
+            SpircPlayStatus::LoadingPause { position_ms }
+            | SpircPlayStatus::LoadingPlay { position_ms }
+            | SpircPlayStatus::Paused { position_ms, .. } => position_ms,
+            SpircPlayStatus::Playing {
+                nominal_start_time, ..
+            } => {
+                let now = self.now_ms();
+                (now - nominal_start_time) as u32
+            }
+        };
+
+        let position_ms = ((position_ms as i32) + offset_ms).max(0) as u32;
+
+        self.handle_seek(position_ms);
     }
 
     fn handle_shuffle(&mut self, shuffle: bool) -> Result<(), Error> {
