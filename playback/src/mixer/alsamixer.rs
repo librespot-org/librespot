@@ -25,6 +25,7 @@ pub struct AlsaMixer {
     has_switch: bool,
     is_softvol: bool,
     use_linear_in_db: bool,
+    has_db: bool,
 }
 
 // min_db cannot be depended on to be mute. Also note that contrary to
@@ -42,8 +43,6 @@ enum AlsaMixerError {
     CouldNotOpenWithDevice(AlsaError),
     #[error("Could not open Alsa softvol with that name. {0}")]
     CouldNotOpenWithName(NulError),
-    #[error("Could not get Alsa softvol dB range. {0}")]
-    NoDbRange(AlsaError),
     #[error("Could not convert Alsa raw volume to dB volume. {0}")]
     CouldNotConvertRaw(AlsaError),
 }
@@ -81,6 +80,7 @@ impl Mixer for AlsaMixer {
 
         // Query dB volume range -- note that Alsa exposes a different
         // API for hardware and software mixers
+        let mut has_db = true;
         let (min_millibel, max_millibel) = if is_softvol {
             let control =
                 Ctl::new(&config.device, false).map_err(AlsaMixerError::CouldNotOpenWithDevice)?;
@@ -90,9 +90,23 @@ impl Mixer for AlsaMixer {
                     .map_err(AlsaMixerError::CouldNotOpenWithName)?,
             );
             element_id.set_index(config.index);
-            let (min_millibel, mut max_millibel) = control
-                .get_db_range(&element_id)
-                .map_err(AlsaMixerError::NoDbRange)?;
+            let (min_millibel, mut max_millibel) = match control.get_db_range(&element_id) {
+                Ok(range) => range,
+                Err(e) => {
+                    // Some controls (e.g. the Alsa pulse plugin's `Master`,
+                    // which maps onto the PulseAudio sink volume) expose no
+                    // dB information at all. Fall back to mapping the volume
+                    // linearly onto the raw range; for PulseAudio this is
+                    // the right thing since its raw scale is already
+                    // perceptually (cubically) tapered.
+                    info!(
+                        "Alsa mixer control has no dB information ({e}), \
+                         falling back to linear mapping on the raw volume range"
+                    );
+                    has_db = false;
+                    (ZERO_DB, ZERO_DB)
+                }
+            };
 
             // Alsa can report incorrect maximum volumes due to rounding
             // errors. e.g. Alsa rounds [-60.0..0.0] in range [0..255] to
@@ -170,6 +184,12 @@ impl Mixer for AlsaMixer {
             config.volume_ctrl = VolumeCtrl::Linear;
         }
 
+        // Without dB information the volume can only be mapped onto the raw
+        // range, so other taper curves cannot be applied faithfully.
+        if !has_db {
+            config.volume_ctrl = VolumeCtrl::Linear;
+        }
+
         debug!("Alsa mixer control is softvol: {}", is_softvol);
         debug!("Alsa support for playback (mute) switch: {}", has_switch);
         debug!("Alsa raw volume range: [{}..{}] ({})", min, max, range);
@@ -190,6 +210,7 @@ impl Mixer for AlsaMixer {
             has_switch,
             is_softvol,
             use_linear_in_db,
+            has_db,
         })
     }
 
@@ -312,6 +333,10 @@ impl AlsaMixer {
     }
 
     fn is_some_linear(&self) -> bool {
-        self.is_softvol || self.use_linear_in_db
+        // The antilog compensation assumes Alsa maps the raw range onto a
+        // dB scale internally (as the softvol plugin does). Controls without
+        // dB information (e.g. the pulse plugin) apply the raw volume
+        // directly, so no compensation must be applied there.
+        (self.is_softvol && self.has_db) || self.use_linear_in_db
     }
 }
