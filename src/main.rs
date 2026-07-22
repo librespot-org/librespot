@@ -951,12 +951,10 @@ async fn get_setup() -> Setup {
     }
 
     let external_volume_query = if is_external_mixer {
-        opt_str(EXTERNAL_VOLUME_QUERY).map(|query| {
+        opt_str(EXTERNAL_VOLUME_QUERY).inspect(|query| {
             if query.is_empty() {
                 empty_string_error_msg(EXTERNAL_VOLUME_QUERY, EXTERNAL_VOLUME_QUERY_SHORT);
             }
-
-            query
         })
     } else {
         if opt_present(EXTERNAL_VOLUME_QUERY) {
