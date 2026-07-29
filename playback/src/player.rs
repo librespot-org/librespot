@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, VecDeque},
     fmt, fs,
     fs::File,
     future::Future,
@@ -76,6 +76,7 @@ struct PlayerInternal {
 
     state: PlayerState,
     preload: PlayerPreload,
+    crossfade: Option<Crossfade>,
     sink: Box<dyn Sink>,
     sink_status: SinkStatus,
     sink_event_callback: Option<SinkEventCallback>,
@@ -511,6 +512,7 @@ impl Player {
 
                 state: PlayerState::Stopped,
                 preload: PlayerPreload::None,
+                crossfade: None,
                 sink: sink_builder(),
                 sink_status: SinkStatus::Closed,
                 sink_event_callback: None,
@@ -720,6 +722,61 @@ enum PlayerPreload {
 }
 
 type Decoder = Box<dyn AudioDecoder + Send>;
+
+/// The outgoing track of a crossfade: it keeps decoding after the player has moved on to the
+/// next track, and gets mixed underneath it until the fade is over.
+struct Crossfade {
+    /// Decoder of the outgoing track. `None` once it has run dry.
+    decoder: Option<Decoder>,
+    normalisation_factor: f64,
+    /// Samples decoded but not mixed yet.
+    pending: VecDeque<f64>,
+    /// Interleaved samples faded so far, out of `total`.
+    done: usize,
+    total: usize,
+}
+
+impl Crossfade {
+    fn new(decoder: Decoder, normalisation_factor: f64, duration: Duration) -> Self {
+        Self {
+            decoder: Some(decoder),
+            normalisation_factor,
+            pending: VecDeque::new(),
+            done: 0,
+            total: (duration.as_secs_f64() * SAMPLES_PER_SECOND as f64) as usize,
+        }
+    }
+
+    /// Decode up to `wanted` more interleaved samples of the outgoing track. Returns fewer
+    /// (possibly none) once the track ends.
+    fn take(&mut self, wanted: usize) -> Vec<f64> {
+        // ponytail: bounded so a decoder handing back empty packets can't spin us forever.
+        for _ in 0..64 {
+            if self.pending.len() >= wanted {
+                break;
+            }
+            let Some(decoder) = self.decoder.as_mut() else {
+                break;
+            };
+            match decoder.next_packet() {
+                // A raw packet means passthrough, which we cannot mix.
+                Ok(Some((_, packet))) => match packet.samples() {
+                    Ok(samples) => self.pending.extend(samples),
+                    Err(_) => self.decoder = None,
+                },
+                Ok(None) | Err(_) => self.decoder = None,
+            }
+        }
+
+        let available = wanted.min(self.pending.len());
+        self.pending.drain(..available).collect()
+    }
+
+    /// Nothing left to fade, either because the fade elapsed or the track ran out.
+    fn is_spent(&self) -> bool {
+        self.done >= self.total || (self.decoder.is_none() && self.pending.is_empty())
+    }
+}
 
 enum PlayerState {
     Stopped,
@@ -1613,6 +1670,28 @@ impl Future for PlayerInternal {
                 }
             }
 
+            // Start overlapping with the next track once we are within the crossfade window of
+            // the end. It has to be preloaded already, otherwise there is nothing to fade into.
+            let crossfade_ms = self.config.crossfade.as_millis() as u32;
+            if crossfade_ms > 0
+                && !passthrough
+                && self.crossfade.is_none()
+                && matches!(self.preload, PlayerPreload::Ready { .. })
+                && matches!(self.state,
+                    PlayerState::Playing { duration_ms, stream_position_ms, .. }
+                        if duration_ms > crossfade_ms
+                            && duration_ms - stream_position_ms <= crossfade_ms)
+            {
+                self.begin_crossfade();
+            }
+
+            // The outgoing track outlives the state that owned it, so it needs feeding even
+            // while the next track is still loading.
+            if self.crossfade.is_some() && !self.state.is_playing() {
+                all_futures_completed_or_not_ready = false;
+                self.write_crossfade_tail();
+            }
+
             if (!self.state.is_playing()) && all_futures_completed_or_not_ready {
                 return Poll::Pending;
             }
@@ -1671,6 +1750,8 @@ impl PlayerInternal {
     }
 
     fn handle_player_stop(&mut self) {
+        self.crossfade = None;
+
         match self.state {
             PlayerState::Playing {
                 ref track_id,
@@ -1738,6 +1819,9 @@ impl PlayerInternal {
     }
 
     fn handle_pause(&mut self) {
+        // Resuming into a half-finished fade would replay the tail of a track we already left.
+        self.crossfade = None;
+
         match self.state {
             PlayerState::Paused { .. } => self.ensure_sink_stopped(false),
             PlayerState::Playing {
@@ -1868,6 +1952,10 @@ impl PlayerInternal {
                         }
                     }
 
+                    if let AudioPacket::Samples(ref mut data) = packet {
+                        self.mix_crossfade(data);
+                    }
+
                     if let Err(e) = self.sink.write(packet, &mut self.converter) {
                         error!("{e}");
                         self.handle_pause();
@@ -1892,6 +1980,97 @@ impl PlayerInternal {
                     exit(1);
                 }
             }
+        }
+    }
+
+    /// Hand the currently playing decoder over to a crossfade and ask for the next track. The
+    /// next track is already preloaded at this point, so it starts almost immediately and the
+    /// two overlap for the configured duration.
+    fn begin_crossfade(&mut self) {
+        let (track_id, play_request_id, decoder, normalisation_factor) =
+            match mem::replace(&mut self.state, PlayerState::Stopped) {
+                PlayerState::Playing {
+                    track_id,
+                    play_request_id,
+                    decoder,
+                    normalisation_factor,
+                    ..
+                } => (track_id, play_request_id, decoder, normalisation_factor),
+                other => {
+                    self.state = other;
+                    return;
+                }
+            };
+
+        trace!("== Crossfading out of {track_id:?} ==");
+        self.crossfade = Some(Crossfade::new(
+            decoder,
+            normalisation_factor,
+            self.config.crossfade,
+        ));
+
+        self.send_event(PlayerEvent::EndOfTrack {
+            track_id,
+            play_request_id,
+        });
+    }
+
+    /// Fade `data` (the incoming track) in while mixing the outgoing track out underneath it,
+    /// on an equal-power curve so the transition holds a constant loudness.
+    fn mix_crossfade(&mut self, data: &mut [f64]) {
+        // ponytail: the outgoing track gets basic gain, not the dynamic limiter. Running a
+        // second limiter state for a stream that is on its way to silence buys nothing.
+        let volume = self.volume_getter.attenuation_factor();
+
+        let Some(fade) = self.crossfade.as_mut() else {
+            return;
+        };
+
+        let faded_out = fade.take(data.len());
+        let gain = fade.normalisation_factor * volume;
+        let total = fade.total as f64;
+        let start = fade.done as f64;
+
+        for (i, sample) in data.iter_mut().enumerate() {
+            let progress = ((start + i as f64) / total).clamp(0.0, 1.0);
+            *sample *= progress.sqrt();
+
+            if let Some(outgoing) = faded_out.get(i) {
+                *sample += outgoing * gain * (1.0 - progress).sqrt();
+            }
+        }
+
+        fade.done += data.len();
+
+        if fade.is_spent() {
+            trace!("== Crossfade complete ==");
+            self.crossfade = None;
+        }
+    }
+
+    /// Keep the outgoing track audible in the gap between asking for the next track and it
+    /// actually starting to play.
+    fn write_crossfade_tail(&mut self) {
+        // ~23ms at 44.1kHz stereo, small enough to hand over mid-fade without an audible seam.
+        const TAIL_SAMPLES: usize = 2048;
+
+        if self.crossfade.as_ref().is_none_or(Crossfade::is_spent) {
+            self.crossfade = None;
+            return;
+        }
+
+        self.ensure_sink_running();
+
+        // Mixing into silence leaves just the outgoing track.
+        let mut data = vec![0.0; TAIL_SAMPLES];
+        self.mix_crossfade(&mut data);
+
+        if let Err(e) = self
+            .sink
+            .write(AudioPacket::Samples(data), &mut self.converter)
+        {
+            error!("{e}");
+            self.crossfade = None;
         }
     }
 
@@ -2700,5 +2879,92 @@ where
 
     fn byte_len(&self) -> Option<u64> {
         Some(self.length)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::decoder::{DecoderError, DecoderResult};
+
+    struct StubDecoder {
+        packets: Vec<Vec<f64>>,
+    }
+
+    impl AudioDecoder for StubDecoder {
+        fn seek(&mut self, _position_ms: u32) -> Result<u32, DecoderError> {
+            Ok(0)
+        }
+
+        fn next_packet(&mut self) -> DecoderResult<Option<(AudioPacketPosition, AudioPacket)>> {
+            if self.packets.is_empty() {
+                return Ok(None);
+            }
+
+            let position = AudioPacketPosition {
+                position_ms: 0,
+                skipped: false,
+            };
+
+            Ok(Some((
+                position,
+                AudioPacket::Samples(self.packets.remove(0)),
+            )))
+        }
+    }
+
+    fn crossfade_of(packets: Vec<Vec<f64>>) -> Crossfade {
+        Crossfade::new(
+            Box::new(StubDecoder { packets }),
+            1.0,
+            Duration::from_secs(1),
+        )
+    }
+
+    /// The outgoing track is decoded in packets of its own size, which has nothing to do with
+    /// how many samples the incoming track asks for.
+    #[test]
+    fn take_spans_packet_boundaries() {
+        let mut fade = crossfade_of(vec![vec![1.0, 2.0], vec![3.0], vec![4.0, 5.0, 6.0]]);
+
+        assert_eq!(fade.take(5), vec![1.0, 2.0, 3.0, 4.0, 5.0]);
+        assert!(!fade.is_spent());
+
+        // Short read once the decoder is exhausted, and then nothing at all.
+        assert_eq!(fade.take(5), vec![6.0]);
+        assert_eq!(fade.take(5), Vec::<f64>::new());
+        assert!(fade.is_spent(), "a dry fade must not hold playback open");
+    }
+
+    #[test]
+    fn take_of_a_silent_decoder_terminates() {
+        let mut fade = crossfade_of(vec![]);
+
+        assert_eq!(fade.take(1024), Vec::<f64>::new());
+        assert!(fade.is_spent());
+    }
+
+    /// Equal-power law: the two tracks must sum to a constant loudness across the fade, or the
+    /// transition dips in the middle.
+    #[test]
+    fn gains_hold_constant_power() {
+        for step in 0..=100 {
+            let progress = step as f64 / 100.0;
+            let incoming = progress.sqrt();
+            let outgoing = (1.0 - progress).sqrt();
+
+            let power = incoming * incoming + outgoing * outgoing;
+            assert!((power - 1.0).abs() < 1e-9, "power {power} at t={progress}");
+        }
+    }
+
+    /// A fade is over when its time is up, even if the outgoing track still has audio left.
+    #[test]
+    fn is_spent_when_the_ramp_elapses() {
+        let mut fade = crossfade_of(vec![vec![0.5; 16]]);
+        assert!(!fade.is_spent());
+
+        fade.done = fade.total;
+        assert!(fade.is_spent());
     }
 }
