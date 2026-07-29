@@ -226,6 +226,7 @@ struct Setup {
 async fn get_setup() -> Setup {
     const VALID_INITIAL_VOLUME_RANGE: RangeInclusive<u16> = 0..=100;
     const VALID_VOLUME_RANGE: RangeInclusive<f64> = 0.0..=100.0;
+    const VALID_CROSSFADE_RANGE: RangeInclusive<f64> = 0.0..=12.0;
     const VALID_NORMALISATION_KNEE_RANGE: RangeInclusive<f64> = 0.0..=10.0;
     const VALID_NORMALISATION_PREGAIN_RANGE: RangeInclusive<f64> = -10.0..=10.0;
     const VALID_NORMALISATION_THRESHOLD_RANGE: RangeInclusive<f64> = -10.0..=0.0;
@@ -239,6 +240,7 @@ async fn get_setup() -> Setup {
     const BITRATE: &str = "bitrate";
     const CACHE: &str = "cache";
     const CACHE_SIZE_LIMIT: &str = "cache-size-limit";
+    const CROSSFADE: &str = "crossfade";
     const DEVICE: &str = "device";
     const DEVICE_TYPE: &str = "device-type";
     const DEVICE_IS_GROUP: &str = "group";
@@ -297,6 +299,7 @@ async fn get_setup() -> Setup {
     const VOLUME_CTRL_SHORT: &str = "E";
     const VOLUME_RANGE_SHORT: &str = "e";
     const VOLUME_STEPS_SHORT: &str = ""; // no short flag
+    const CROSSFADE_SHORT: &str = ""; // no short flag
     const DEVICE_TYPE_SHORT: &str = "F";
     const FORMAT_SHORT: &str = "f";
     const DISABLE_AUDIO_CACHE_SHORT: &str = "G";
@@ -448,6 +451,12 @@ async fn get_setup() -> Setup {
         BITRATE,
         "Bitrate (kbps) {96|160|320}. Defaults to 160.",
         "BITRATE",
+    )
+    .optopt(
+        CROSSFADE_SHORT,
+        CROSSFADE,
+        "Overlap consecutive tracks by SECONDS (0 - 12). Defaults to 0 (off).",
+        "SECONDS",
     )
     .optopt(
         FORMAT_SHORT,
@@ -1585,7 +1594,32 @@ async fn get_setup() -> Setup {
             })
             .unwrap_or(player_default_config.bitrate);
 
-        let gapless = !opt_present(DISABLE_GAPLESS);
+        let crossfade = opt_str(CROSSFADE)
+            .map(|seconds| match seconds.parse::<f64>() {
+                Ok(value) if VALID_CROSSFADE_RANGE.contains(&value) => {
+                    Duration::from_secs_f64(value)
+                }
+                _ => {
+                    let valid_values = &format!(
+                        "{} - {}",
+                        VALID_CROSSFADE_RANGE.start(),
+                        VALID_CROSSFADE_RANGE.end()
+                    );
+
+                    invalid_error_msg(CROSSFADE, CROSSFADE_SHORT, &seconds, valid_values, "0");
+
+                    exit(1);
+                }
+            })
+            .unwrap_or(player_default_config.crossfade);
+
+        // Crossfading is gapless by definition: stopping the sink between tracks would cut the
+        // outgoing one dead halfway through its fade.
+        let gapless = !opt_present(DISABLE_GAPLESS) || !crossfade.is_zero();
+
+        if !crossfade.is_zero() && opt_present(DISABLE_GAPLESS) {
+            warn!("`--{CROSSFADE}` overrides `--{DISABLE_GAPLESS}`");
+        }
 
         let normalisation = opt_present(ENABLE_VOLUME_NORMALISATION);
 
@@ -1824,6 +1858,7 @@ async fn get_setup() -> Setup {
             bitrate,
             gapless,
             passthrough,
+            crossfade,
             normalisation,
             normalisation_type,
             normalisation_method,
