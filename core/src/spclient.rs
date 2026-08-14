@@ -51,6 +51,13 @@ component! {
 
 pub type SpClientResult = Result<Bytes, Error>;
 
+fn audio_storage_endpoints(file_id: &str) -> [String; 2] {
+    [
+        format!("/storage-resolve/v2/files/audio/{file_id}"),
+        format!("/storage-resolve/files/audio/interactive/{file_id}"),
+    ]
+}
+
 #[allow(clippy::declare_interior_mutable_const)]
 pub const CLIENT_TOKEN: HeaderName = HeaderName::from_static("client-token");
 #[allow(clippy::declare_interior_mutable_const)]
@@ -771,11 +778,20 @@ impl SpClient {
     // - /presence-view/v1/buddylist
 
     pub async fn get_audio_storage(&self, file_id: &FileId) -> SpClientResult {
-        let endpoint = format!(
-            "/storage-resolve/files/audio/interactive/{}",
-            file_id.to_base16()
-        );
-        self.request(&Method::GET, &endpoint, None, None).await
+        let endpoints = audio_storage_endpoints(&file_id.to_base16());
+
+        match self.request(&Method::GET, &endpoints[0], None, None).await {
+            Ok(response) => Ok(response),
+            Err(v2_error) => {
+                // Spotify 1.2.96 uses the versioned route. Keep the legacy
+                // interactive route as a compatibility fallback for older
+                // spclient clusters and Connect-era accounts.
+                warn!(
+                    "Storage resolve v2 failed ({v2_error}); trying legacy interactive endpoint"
+                );
+                self.request(&Method::GET, &endpoints[1], None, None).await
+            }
+        }
     }
 
     pub fn stream_from_cdn<U>(
@@ -956,5 +972,21 @@ impl SpClient {
             &NO_METRICS_AND_SALT,
         )
         .await
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::audio_storage_endpoints;
+
+    #[test]
+    fn audio_storage_uses_current_route_before_legacy_fallback() {
+        let endpoints = audio_storage_endpoints("ABC123");
+
+        assert_eq!(endpoints[0], "/storage-resolve/v2/files/audio/ABC123");
+        assert_eq!(
+            endpoints[1],
+            "/storage-resolve/files/audio/interactive/ABC123"
+        );
     }
 }
