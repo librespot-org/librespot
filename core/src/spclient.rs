@@ -51,9 +51,9 @@ component! {
 
 pub type SpClientResult = Result<Bytes, Error>;
 
-fn audio_storage_endpoints(file_id: &str) -> [String; 2] {
+fn audio_storage_endpoints(file_id: &str, audio_format: i32) -> [String; 2] {
     [
-        format!("/storage-resolve/v2/files/audio/{file_id}"),
+        format!("/storage-resolve/v2/files/audio/interactive/{audio_format}/{file_id}"),
         format!("/storage-resolve/files/audio/interactive/{file_id}"),
     ]
 }
@@ -777,8 +777,8 @@ impl SpClient {
     // TODO: Seen-in-the-wild but unimplemented endpoints
     // - /presence-view/v1/buddylist
 
-    pub async fn get_audio_storage(&self, file_id: &FileId) -> SpClientResult {
-        let endpoints = audio_storage_endpoints(&file_id.to_base16());
+    pub async fn get_audio_storage(&self, file_id: &FileId, audio_format: i32) -> SpClientResult {
+        let endpoints = audio_storage_endpoints(&file_id.to_base16(), audio_format);
 
         match self.request(&Method::GET, &endpoints[0], None, None).await {
             Ok(response) => Ok(response),
@@ -786,9 +786,7 @@ impl SpClient {
                 // Spotify 1.2.96 uses the versioned route. Keep the legacy
                 // interactive route as a compatibility fallback for older
                 // spclient clusters and Connect-era accounts.
-                warn!(
-                    "Storage resolve v2 failed ({v2_error}); trying legacy interactive endpoint"
-                );
+                warn!("Storage resolve v2 failed ({v2_error}); trying legacy interactive endpoint");
                 self.request(&Method::GET, &endpoints[1], None, None).await
             }
         }
@@ -981,9 +979,12 @@ mod test {
 
     #[test]
     fn audio_storage_uses_current_route_before_legacy_fallback() {
-        let endpoints = audio_storage_endpoints("ABC123");
+        let endpoints = audio_storage_endpoints("ABC123", 2);
 
-        assert_eq!(endpoints[0], "/storage-resolve/v2/files/audio/ABC123");
+        assert_eq!(
+            endpoints[0],
+            "/storage-resolve/v2/files/audio/interactive/2/ABC123"
+        );
         assert_eq!(
             endpoints[1],
             "/storage-resolve/files/audio/interactive/ABC123"
