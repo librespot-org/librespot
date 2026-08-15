@@ -40,9 +40,14 @@ use symphonia::core::io::MediaSource;
 use symphonia::core::probe::Hint;
 use tokio::sync::{mpsc, oneshot};
 
-use crate::SAMPLES_PER_SECOND;
+use crate::{NUM_CHANNELS, SAMPLES_PER_SECOND};
 
 const PRELOAD_NEXT_TRACK_BEFORE_END_DURATION_MS: u32 = 30000;
+const MANUAL_TRACK_SWITCH_FADE_DURATION_MS: usize = 20;
+const MANUAL_TRACK_SWITCH_FADE_SAMPLES: usize =
+    SAMPLES_PER_SECOND as usize * MANUAL_TRACK_SWITCH_FADE_DURATION_MS / 1000;
+const MANUAL_TRACK_SWITCH_FADE_FRAMES: usize =
+    MANUAL_TRACK_SWITCH_FADE_SAMPLES / NUM_CHANNELS as usize;
 pub const DB_VOLTAGE_RATIO: f64 = 20.0;
 pub const PCM_AT_0DBFS: f64 = 1.0;
 
@@ -82,6 +87,9 @@ struct PlayerInternal {
     volume_getter: Box<dyn VolumeGetter + Send>,
     event_senders: Vec<mpsc::UnboundedSender<PlayerEvent>>,
     converter: Converter,
+
+    last_output_frame: Option<[f64; NUM_CHANNELS as usize]>,
+    manual_track_switch_fade_in_remaining: usize,
 
     normalisation_integrators: [f64; 2],
     normalisation_peaks: [f64; 2],
@@ -517,6 +525,9 @@ impl Player {
                 volume_getter,
                 event_senders: vec![],
                 converter,
+
+                last_output_frame: None,
+                manual_track_switch_fade_in_remaining: 0,
 
                 normalisation_peaks: [0.0; 2],
                 normalisation_integrators: [0.0; 2],
@@ -1620,7 +1631,50 @@ impl Future for PlayerInternal {
     }
 }
 
+fn manual_track_switch_fade_out(last_frame: [f64; NUM_CHANNELS as usize]) -> Vec<f64> {
+    let mut fade = Vec::with_capacity(MANUAL_TRACK_SWITCH_FADE_SAMPLES);
+    for frame in 0..MANUAL_TRACK_SWITCH_FADE_FRAMES {
+        let gain = 1.0 - frame as f64 / (MANUAL_TRACK_SWITCH_FADE_FRAMES - 1) as f64;
+        for sample in last_frame {
+            fade.push(sample * gain);
+        }
+    }
+    fade
+}
+
+fn apply_manual_track_switch_fade_in(data: &mut [f64], remaining: &mut usize) {
+    let completed = MANUAL_TRACK_SWITCH_FADE_SAMPLES - *remaining;
+    let count = (*remaining).min(data.len());
+
+    for (offset, sample) in data[..count].iter_mut().enumerate() {
+        let frame = (completed + offset) / NUM_CHANNELS as usize;
+        let gain = frame as f64 / (MANUAL_TRACK_SWITCH_FADE_FRAMES - 1) as f64;
+        *sample *= gain;
+    }
+    *remaining -= count;
+}
+
 impl PlayerInternal {
+    fn prepare_manual_track_switch(&mut self) {
+        self.manual_track_switch_fade_in_remaining = MANUAL_TRACK_SWITCH_FADE_SAMPLES;
+
+        let Some(last_frame) = self.last_output_frame.take() else {
+            return;
+        };
+        if self.sink_status != SinkStatus::Running {
+            return;
+        }
+
+        let fade = manual_track_switch_fade_out(last_frame);
+        if let Err(e) = self
+            .sink
+            .write(AudioPacket::Samples(fade), &mut self.converter)
+        {
+            error!("Unable to fade out before manual track switch: {e}");
+            self.manual_track_switch_fade_in_remaining = 0;
+        }
+    }
+
     fn ensure_sink_running(&mut self) {
         if self.sink_status != SinkStatus::Running {
             trace!("== Starting sink ==");
@@ -1671,6 +1725,9 @@ impl PlayerInternal {
     }
 
     fn handle_player_stop(&mut self) {
+        self.manual_track_switch_fade_in_remaining = 0;
+        self.last_output_frame = None;
+
         match self.state {
             PlayerState::Playing {
                 ref track_id,
@@ -1866,6 +1923,17 @@ impl PlayerInternal {
                                 }
                             }
                         }
+
+                        apply_manual_track_switch_fade_in(
+                            data,
+                            &mut self.manual_track_switch_fade_in_remaining,
+                        );
+                        if data.len() >= NUM_CHANNELS as usize {
+                            let start = data.len() - NUM_CHANNELS as usize;
+                            let mut frame = [0.0; NUM_CHANNELS as usize];
+                            frame.copy_from_slice(&data[start..]);
+                            self.last_output_frame = Some(frame);
+                        }
                     }
 
                     if let Err(e) = self.sink.write(packet, &mut self.converter) {
@@ -1980,6 +2048,21 @@ impl PlayerInternal {
             play_request_id_option.unwrap_or(self.play_request_id_generator.get());
 
         self.send_event(PlayerEvent::PlayRequestIdChanged { play_request_id });
+
+        let switching_tracks = match &self.state {
+            PlayerState::Playing {
+                track_id: current_track_id,
+                ..
+            }
+            | PlayerState::Paused {
+                track_id: current_track_id,
+                ..
+            } => current_track_id != &track_id,
+            _ => false,
+        };
+        if self.config.gapless && switching_tracks {
+            self.prepare_manual_track_switch();
+        }
 
         if !self.config.gapless {
             self.ensure_sink_stopped(play);
@@ -2700,5 +2783,52 @@ where
 
     fn byte_len(&self) -> Option<u64> {
         Some(self.length)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        MANUAL_TRACK_SWITCH_FADE_FRAMES, MANUAL_TRACK_SWITCH_FADE_SAMPLES,
+        apply_manual_track_switch_fade_in, manual_track_switch_fade_out,
+    };
+
+    fn assert_near(actual: f64, expected: f64) {
+        assert!((actual - expected).abs() < 1e-12, "{actual} != {expected}");
+    }
+
+    #[test]
+    fn manual_track_switch_fade_out_preserves_channels_and_ends_at_zero() {
+        let fade = manual_track_switch_fade_out([1.0, -0.5]);
+
+        assert_eq!(fade.len(), MANUAL_TRACK_SWITCH_FADE_SAMPLES);
+        assert_near(fade[0], 1.0);
+        assert_near(fade[1], -0.5);
+        assert_near(fade[fade.len() - 2], 0.0);
+        assert_near(fade[fade.len() - 1], 0.0);
+    }
+
+    #[test]
+    fn manual_track_switch_fade_in_is_frame_aligned_across_packets() {
+        let mut remaining = MANUAL_TRACK_SWITCH_FADE_SAMPLES;
+        let mut first_packet = [1.0; 6];
+        apply_manual_track_switch_fade_in(&mut first_packet, &mut remaining);
+
+        assert_near(first_packet[0], 0.0);
+        assert_near(first_packet[1], first_packet[0]);
+        assert_near(
+            first_packet[2],
+            1.0 / (MANUAL_TRACK_SWITCH_FADE_FRAMES - 1) as f64,
+        );
+        assert_near(first_packet[3], first_packet[2]);
+        assert_eq!(
+            remaining,
+            MANUAL_TRACK_SWITCH_FADE_SAMPLES - first_packet.len()
+        );
+
+        let mut rest = vec![1.0; remaining];
+        apply_manual_track_switch_fade_in(&mut rest, &mut remaining);
+        assert_near(*rest.last().unwrap(), 1.0);
+        assert_eq!(remaining, 0);
     }
 }
