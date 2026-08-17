@@ -79,23 +79,46 @@ impl AudioKeyManager {
     }
 
     pub async fn request(&self, track: SpotifyId, file: FileId) -> Result<AudioKey, Error> {
-        let (tx, rx) = oneshot::channel();
-
-        let seq = self.lock(move |inner| {
-            let seq = inner.sequence.get();
-            inner.pending.insert(seq, tx);
-            seq
-        });
-
-        self.send_key_request(seq, track, file)?;
         const KEY_RESPONSE_TIMEOUT: Duration = Duration::from_millis(1500);
-        match tokio::time::timeout(KEY_RESPONSE_TIMEOUT, rx).await {
-            Err(_) => {
-                error!("Audio key response timeout");
-                Err(AudioKeyError::Timeout.into())
+        const MAX_RETRIES: u32 = 2;
+
+        for attempt in 0..=MAX_RETRIES {
+            if attempt > 0 {
+                warn!(
+                    "Retrying audio key request (attempt {}/{})",
+                    attempt + 1,
+                    MAX_RETRIES + 1
+                );
             }
-            Ok(k) => k?,
+
+            let (tx, rx) = oneshot::channel();
+
+            let seq = self.lock(move |inner| {
+                let seq = inner.sequence.get();
+                inner.pending.insert(seq, tx);
+                seq
+            });
+
+            self.send_key_request(seq, track, file)?;
+
+            match tokio::time::timeout(KEY_RESPONSE_TIMEOUT, rx).await {
+                Ok(result) => return result?,
+                Err(_) => {
+                    self.lock(|inner| inner.pending.remove(&seq));
+                    warn!(
+                        "Audio key response timeout (attempt {}/{})",
+                        attempt + 1,
+                        MAX_RETRIES + 1
+                    );
+                }
+            }
         }
+
+        error!(
+            "Audio key request failed after {} attempts",
+            MAX_RETRIES + 1
+        );
+        Err(AudioKeyError::Timeout.into())
     }
 
     fn send_key_request(&self, seq: u32, track: SpotifyId, file: FileId) -> Result<(), Error> {

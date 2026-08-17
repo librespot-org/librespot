@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- [core] Audio key requests now retry up to 2 times on timeout before giving up, improving resilience after access-point reconnects
+- [playback] Audio key transport failures (timeout, channel error) now fail the track cleanly instead of continuing without decryption, which always failed downstream and dropped the session
+
 ## [0.8.0] - 2025-11-10
 
 ### Added
