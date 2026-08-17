@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- [core] Audio key requests now retry up to 2 times on timeout before giving up, improving resilience after access-point reconnects
+- [playback] Audio key transport failures (timeout, channel error) now fail the track cleanly instead of continuing without decryption, which always failed downstream and dropped the session
 - [audio] Fixed integer overflow in throughput calculation
 - [main] Fixed `--volume-ctrl fixed` not disabling volume control
 - [core] Fix default permissions on credentials file and warn user if file is world readable
