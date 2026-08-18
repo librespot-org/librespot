@@ -1,15 +1,21 @@
 #![warn(missing_docs)]
-//! Provides a Spotify access token using the OAuth authorization code flow
-//! with PKCE.
+//! Provides a Spotify access token using either the OAuth authorization code
+//! flow with PKCE, or the device authorization flow.
 //!
 //! Assuming sufficient scopes, the returned access token may be used with Spotify's
 //! Web API, and/or to establish a new Session with [`librespot_core`].
 //!
-//! The authorization code flow is an interactive process which requires a web browser
-//! to complete. The resulting code must then be provided back from the browser to this
-//! library for exchange into an access token. Providing the code can be automatic via
-//! a spawned http server (mimicking Spotify's client), or manually via stdin. The latter
-//! is appropriate for headless systems.
+//! The authorization code flow ([`OAuthClient`]) is an interactive process which
+//! requires a web browser to complete. The resulting code must then be provided back
+//! from the browser to this library for exchange into an access token. Providing the
+//! code can be automatic via a spawned http server (mimicking Spotify's client), or
+//! manually via stdin. The latter is appropriate for headless systems.
+//!
+//! The device authorization flow ([`DeviceAuthClient`]) instead has Spotify issue a
+//! short code which the user types in at <https://spotify.com/pair> from any other
+//! device. Nothing has to listen on a port and no browser is needed on the machine
+//! running librespot. Spotify only enables this flow for some client IDs; see
+//! `docs/device-authorization.md`.
 
 use std::{
     io::{self, BufRead, BufReader, Write},
@@ -19,9 +25,10 @@ use std::{
 };
 
 use oauth2::{
-    AuthUrl, AuthorizationCode, ClientId, CsrfToken, EmptyExtraTokenFields, EndpointNotSet,
-    EndpointSet, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RefreshToken, Scope,
-    StandardTokenResponse, TokenResponse, TokenUrl, basic::BasicClient, basic::BasicTokenType,
+    AuthUrl, AuthorizationCode, ClientId, CsrfToken, DeviceAuthorizationUrl, EmptyExtraTokenFields,
+    EndpointNotSet, EndpointSet, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RefreshToken,
+    Scope, StandardDeviceAuthorizationResponse, StandardTokenResponse, TokenResponse, TokenUrl,
+    basic::BasicClient, basic::BasicTokenType,
 };
 
 use log::{error, info, trace};
@@ -48,6 +55,22 @@ compile_error!(
 compile_error!(
     "Either feature \"native-tls\" (default), \"rustls-tls-native-roots\" or \"rustls-tls-webpki-roots\" must be enabled for this crate."
 );
+
+/// Spotify's authorization endpoint, for the authorization code flow.
+const AUTH_URL: &str = "https://accounts.spotify.com/authorize";
+
+/// Spotify's token endpoint, shared by every grant type in this crate.
+const TOKEN_URL: &str = "https://accounts.spotify.com/api/token";
+
+/// Spotify's device authorization endpoint.
+const DEVICE_AUTHORIZATION_URL: &str = "https://accounts.spotify.com/oauth2/device/authorize";
+
+/// A [`BasicClient`] configured for the device authorization flow.
+///
+/// The authorization endpoint is deliberately left unset: this flow never
+/// redirects a user agent, so there is nothing to send them to.
+type DeviceBasicClient =
+    BasicClient<EndpointNotSet, EndpointSet, EndpointNotSet, EndpointNotSet, EndpointSet>;
 
 /// Possible errors encountered during the OAuth authentication flow.
 #[derive(Debug, Error)]
@@ -117,6 +140,20 @@ pub enum OAuthError {
     /// Token exchange failure with Spotify's authorization server.
     #[error("Failed to exchange code for access token ({e})")]
     ExchangeCode {
+        /// Inner error description
+        e: String,
+    },
+
+    /// Device code request failure with Spotify's authorization server.
+    #[error("Failed to obtain device code ({e})")]
+    DeviceCode {
+        /// Inner error description
+        e: String,
+    },
+
+    /// Token exchange failure, including the user declining or letting the code expire.
+    #[error("Failed to exchange device code for access token ({e})")]
+    ExchangeDeviceCode {
         /// Inner error description
         e: String,
     },
@@ -230,6 +267,36 @@ pub struct OAuthClient {
     client: BasicClient<EndpointSet, EndpointNotSet, EndpointNotSet, EndpointNotSet, EndpointSet>,
 }
 
+/// Convert a token endpoint response into an [`OAuthToken`].
+///
+/// `default_scopes` stands in for the granted scopes when Spotify omits them
+/// from the response.
+fn build_token(
+    resp: StandardTokenResponse<EmptyExtraTokenFields, BasicTokenType>,
+    default_scopes: &[String],
+) -> OAuthToken {
+    trace!("Obtained new access token: {resp:?}");
+
+    let token_scopes: Vec<String> = match resp.scopes() {
+        Some(s) => s.iter().map(|s| s.to_string()).collect(),
+        _ => default_scopes.to_vec(),
+    };
+    let refresh_token = match resp.refresh_token() {
+        Some(t) => t.secret().to_string(),
+        _ => "".to_string(), // Spotify always provides a refresh token.
+    };
+    OAuthToken {
+        access_token: resp.access_token().secret().to_string(),
+        refresh_token,
+        expires_at: Instant::now()
+            + resp
+                .expires_in()
+                .unwrap_or_else(|| Duration::from_secs(3600)),
+        token_type: format!("{:?}", resp.token_type()),
+        scopes: token_scopes,
+    }
+}
+
 impl OAuthClient {
     /// Generates and opens/shows the authorization URL to obtain an access token.
     ///
@@ -259,26 +326,7 @@ impl OAuthClient {
         &self,
         resp: StandardTokenResponse<EmptyExtraTokenFields, BasicTokenType>,
     ) -> Result<OAuthToken, OAuthError> {
-        trace!("Obtained new access token: {resp:?}");
-
-        let token_scopes: Vec<String> = match resp.scopes() {
-            Some(s) => s.iter().map(|s| s.to_string()).collect(),
-            _ => self.scopes.clone(),
-        };
-        let refresh_token = match resp.refresh_token() {
-            Some(t) => t.secret().to_string(),
-            _ => "".to_string(), // Spotify always provides a refresh token.
-        };
-        Ok(OAuthToken {
-            access_token: resp.access_token().secret().to_string(),
-            refresh_token,
-            expires_at: Instant::now()
-                + resp
-                    .expires_in()
-                    .unwrap_or_else(|| Duration::from_secs(3600)),
-            token_type: format!("{:?}", resp.token_type()),
-            scopes: token_scopes,
-        })
+        Ok(build_token(resp, &self.scopes))
     }
 
     /// Syncronously obtain a Spotify access token using the authorization code with PKCE OAuth flow.
@@ -399,10 +447,10 @@ impl OAuthClientBuilder {
 
     /// End of the building process pipeline. If Ok, a OAuthClient instance will be returned.
     pub fn build(self) -> Result<OAuthClient, OAuthError> {
-        let auth_url = AuthUrl::new("https://accounts.spotify.com/authorize".to_string())
-            .map_err(|_| OAuthError::InvalidSpotifyUri)?;
-        let token_url = TokenUrl::new("https://accounts.spotify.com/api/token".to_string())
-            .map_err(|_| OAuthError::InvalidSpotifyUri)?;
+        let auth_url =
+            AuthUrl::new(AUTH_URL.to_string()).map_err(|_| OAuthError::InvalidSpotifyUri)?;
+        let token_url =
+            TokenUrl::new(TOKEN_URL.to_string()).map_err(|_| OAuthError::InvalidSpotifyUri)?;
         let redirect_url = RedirectUrl::new(self.redirect_uri.clone()).map_err(|e| {
             OAuthError::InvalidRedirectUri {
                 uri: self.redirect_uri.clone(),
@@ -438,10 +486,9 @@ pub fn get_access_token(
     redirect_uri: &str,
     scopes: Vec<&str>,
 ) -> Result<OAuthToken, OAuthError> {
-    let auth_url = AuthUrl::new("https://accounts.spotify.com/authorize".to_string())
-        .map_err(|_| OAuthError::InvalidSpotifyUri)?;
-    let token_url = TokenUrl::new("https://accounts.spotify.com/api/token".to_string())
-        .map_err(|_| OAuthError::InvalidSpotifyUri)?;
+    let auth_url = AuthUrl::new(AUTH_URL.to_string()).map_err(|_| OAuthError::InvalidSpotifyUri)?;
+    let token_url =
+        TokenUrl::new(TOKEN_URL.to_string()).map_err(|_| OAuthError::InvalidSpotifyUri)?;
     let redirect_url =
         RedirectUrl::new(redirect_uri.to_string()).map_err(|e| OAuthError::InvalidRedirectUri {
             uri: redirect_uri.to_string(),
@@ -509,6 +556,231 @@ pub fn get_access_token(
         token_type: format!("{:?}", token.token_type()).to_string(), // Urgh!?
         scopes: token_scopes,
     })
+}
+
+/// A pending device authorization, waiting on the user's approval.
+///
+/// Show [`Self::url`] and [`Self::user_code`] to the user, then hand this to
+/// [`DeviceAuthClient::poll_for_token`].
+#[derive(Debug, Clone)]
+pub struct DeviceAuthorization {
+    inner: StandardDeviceAuthorizationResponse,
+}
+
+impl DeviceAuthorization {
+    /// The code the user types in at [`Self::verification_uri`].
+    pub fn user_code(&self) -> &str {
+        self.inner.user_code().secret()
+    }
+
+    /// The page the user visits to enter [`Self::user_code`].
+    pub fn verification_uri(&self) -> &str {
+        self.inner.verification_uri().as_str()
+    }
+
+    /// [`Self::verification_uri`] with the code already filled in, when Spotify
+    /// provides it.
+    pub fn verification_uri_complete(&self) -> Option<&str> {
+        self.inner
+            .verification_uri_complete()
+            .map(|uri| uri.secret().as_str())
+    }
+
+    /// The URL to send the user to, preferring the prefilled variant.
+    pub fn url(&self) -> &str {
+        self.verification_uri_complete()
+            .unwrap_or_else(|| self.verification_uri())
+    }
+}
+
+/// Struct that handles obtaining and refreshing access tokens by pairing a code.
+///
+/// Unlike [`OAuthClient`] this needs no redirect URI, nothing listening on a port,
+/// and no browser on the machine running it. Spotify only enables this flow for
+/// some client IDs; see `docs/device-authorization.md`.
+pub struct DeviceAuthClient {
+    scopes: Vec<String>,
+    should_open_url: bool,
+    client: DeviceBasicClient,
+}
+
+impl DeviceAuthClient {
+    fn request_scopes(&self) -> Vec<Scope> {
+        self.scopes.iter().map(|s| Scope::new(s.into())).collect()
+    }
+
+    /// Shows the user where to approve the authorization, opening it for them if
+    /// the client was built with [`DeviceAuthClientBuilder::open_in_browser`].
+    fn announce(&self, auth: &DeviceAuthorization) {
+        let url = auth.url();
+        if self.should_open_url {
+            open::that_in_background(url);
+        }
+        println!("Browse to: {url}");
+        println!("If prompted, enter code: {}", auth.user_code());
+    }
+
+    /// Synchronously request a device code for the user to approve
+    pub fn request_device_code(&self) -> Result<DeviceAuthorization, OAuthError> {
+        let http_client = reqwest::blocking::Client::new();
+        let inner = self
+            .client
+            .exchange_device_code()
+            .add_scopes(self.request_scopes())
+            .request(&http_client)
+            .map_err(|e| OAuthError::DeviceCode { e: e.to_string() })?;
+
+        trace!("Obtained device authorization: {inner:?}");
+        Ok(DeviceAuthorization { inner })
+    }
+
+    /// Synchronously poll Spotify until the user resolves `auth`
+    ///
+    /// Blocks until the user approves or declines, or the authorization expires.
+    /// Spotify's requested poll interval and any `slow_down` it sends back are
+    /// both respected.
+    pub fn poll_for_token(&self, auth: &DeviceAuthorization) -> Result<OAuthToken, OAuthError> {
+        let http_client = reqwest::blocking::Client::new();
+        let resp = self
+            .client
+            .exchange_device_access_token(&auth.inner)
+            .request(&http_client, std::thread::sleep, None)
+            .map_err(|e| OAuthError::ExchangeDeviceCode { e: e.to_string() })?;
+
+        Ok(build_token(resp, &self.scopes))
+    }
+
+    /// Synchronously obtain a Spotify access token using the device authorization flow.
+    ///
+    /// Requests a code, shows it to the user, then blocks until they approve it.
+    /// Drive [`Self::request_device_code`] and [`Self::poll_for_token`] directly
+    /// to present the code some other way.
+    pub fn get_access_token(&self) -> Result<OAuthToken, OAuthError> {
+        let auth = self.request_device_code()?;
+        self.announce(&auth);
+        self.poll_for_token(&auth)
+    }
+
+    /// Synchronously obtain a new valid OAuth token from `refresh_token`
+    pub fn refresh_token(&self, refresh_token: &str) -> Result<OAuthToken, OAuthError> {
+        let refresh_token = RefreshToken::new(refresh_token.to_string());
+        let http_client = reqwest::blocking::Client::new();
+        let resp = self
+            .client
+            .exchange_refresh_token(&refresh_token)
+            .request(&http_client)
+            .map_err(|e| OAuthError::ExchangeCode { e: e.to_string() })?;
+
+        Ok(build_token(resp, &self.scopes))
+    }
+
+    /// Asynchronously request a device code for the user to approve
+    pub async fn request_device_code_async(&self) -> Result<DeviceAuthorization, OAuthError> {
+        let http_client = reqwest::Client::new();
+        let inner = self
+            .client
+            .exchange_device_code()
+            .add_scopes(self.request_scopes())
+            .request_async(&http_client)
+            .await
+            .map_err(|e| OAuthError::DeviceCode { e: e.to_string() })?;
+
+        trace!("Obtained device authorization: {inner:?}");
+        Ok(DeviceAuthorization { inner })
+    }
+
+    /// Asynchronously poll Spotify until the user resolves `auth`
+    ///
+    /// See [`Self::poll_for_token`].
+    pub async fn poll_for_token_async(
+        &self,
+        auth: &DeviceAuthorization,
+    ) -> Result<OAuthToken, OAuthError> {
+        let http_client = reqwest::Client::new();
+        let resp = self
+            .client
+            .exchange_device_access_token(&auth.inner)
+            .request_async(&http_client, tokio::time::sleep, None)
+            .await
+            .map_err(|e| OAuthError::ExchangeDeviceCode { e: e.to_string() })?;
+
+        Ok(build_token(resp, &self.scopes))
+    }
+
+    /// Asynchronously obtain a Spotify access token using the device authorization flow.
+    ///
+    /// See [`Self::get_access_token`].
+    pub async fn get_access_token_async(&self) -> Result<OAuthToken, OAuthError> {
+        let auth = self.request_device_code_async().await?;
+        self.announce(&auth);
+        self.poll_for_token_async(&auth).await
+    }
+
+    /// Asynchronously obtain a new valid OAuth token from `refresh_token`
+    pub async fn refresh_token_async(&self, refresh_token: &str) -> Result<OAuthToken, OAuthError> {
+        let refresh_token = RefreshToken::new(refresh_token.to_string());
+        let http_client = reqwest::Client::new();
+        let resp = self
+            .client
+            .exchange_refresh_token(&refresh_token)
+            .request_async(&http_client)
+            .await
+            .map_err(|e| OAuthError::ExchangeCode { e: e.to_string() })?;
+
+        Ok(build_token(resp, &self.scopes))
+    }
+}
+
+/// Builder struct through which structures of type DeviceAuthClient are instantiated.
+pub struct DeviceAuthClientBuilder {
+    client_id: String,
+    scopes: Vec<String>,
+    should_open_url: bool,
+}
+
+impl DeviceAuthClientBuilder {
+    /// Create a new DeviceAuthClientBuilder with provided params and default config.
+    ///
+    /// Spotify fails the whole request with `invalid_scope` if it does not
+    /// recognise any one of `scopes`, so unsupported scopes cannot be discovered
+    /// by asking for extras and seeing what comes back.
+    pub fn new(client_id: &str, scopes: Vec<&str>) -> Self {
+        Self {
+            client_id: client_id.to_string(),
+            scopes: scopes.into_iter().map(Into::into).collect(),
+            should_open_url: false,
+        }
+    }
+
+    /// When this function is added to the building process pipeline, the verification
+    /// url will also be opened with the default web browser. Otherwise, it is only
+    /// printed to standard output.
+    ///
+    /// Off by default, since the point of this flow is that the device running
+    /// librespot need not have a browser at all.
+    pub fn open_in_browser(mut self) -> Self {
+        self.should_open_url = true;
+        self
+    }
+
+    /// End of the building process pipeline. If Ok, a DeviceAuthClient instance will be returned.
+    pub fn build(self) -> Result<DeviceAuthClient, OAuthError> {
+        let device_authorization_url =
+            DeviceAuthorizationUrl::new(DEVICE_AUTHORIZATION_URL.to_string())
+                .map_err(|_| OAuthError::InvalidSpotifyUri)?;
+        let token_url =
+            TokenUrl::new(TOKEN_URL.to_string()).map_err(|_| OAuthError::InvalidSpotifyUri)?;
+
+        let client = BasicClient::new(ClientId::new(self.client_id))
+            .set_token_uri(token_url)
+            .set_device_authorization_url(device_authorization_url);
+
+        Ok(DeviceAuthClient {
+            scopes: self.scopes,
+            should_open_url: self.should_open_url,
+            client,
+        })
+    }
 }
 
 #[cfg(test)]
