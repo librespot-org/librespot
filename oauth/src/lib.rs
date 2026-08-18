@@ -258,6 +258,7 @@ impl OAuthClient {
     fn build_token(
         &self,
         resp: StandardTokenResponse<EmptyExtraTokenFields, BasicTokenType>,
+        fallback_refresh_token: Option<&str>,
     ) -> Result<OAuthToken, OAuthError> {
         trace!("Obtained new access token: {resp:?}");
 
@@ -265,10 +266,11 @@ impl OAuthClient {
             Some(s) => s.iter().map(|s| s.to_string()).collect(),
             _ => self.scopes.clone(),
         };
-        let refresh_token = match resp.refresh_token() {
-            Some(t) => t.secret().to_string(),
-            _ => "".to_string(), // Spotify always provides a refresh token.
-        };
+        let refresh_token = resp
+            .refresh_token()
+            .map(|token| token.secret().to_string())
+            .or_else(|| fallback_refresh_token.map(str::to_string))
+            .unwrap_or_default();
         Ok(OAuthToken {
             access_token: resp.access_token().secret().to_string(),
             refresh_token,
@@ -307,20 +309,20 @@ impl OAuthClient {
         let token_response =
             channel_response.map_err(|e| OAuthError::ExchangeCode { e: e.to_string() })?;
 
-        self.build_token(token_response)
+        self.build_token(token_response, None)
     }
 
     /// Synchronously obtain a new valid OAuth token from `refresh_token`
     pub fn refresh_token(&self, refresh_token: &str) -> Result<OAuthToken, OAuthError> {
-        let refresh_token = RefreshToken::new(refresh_token.to_string());
+        let request_token = RefreshToken::new(refresh_token.to_string());
         let http_client = reqwest::blocking::Client::new();
         let resp = self
             .client
-            .exchange_refresh_token(&refresh_token)
+            .exchange_refresh_token(&request_token)
             .request(&http_client);
 
         let resp = resp.map_err(|e| OAuthError::ExchangeCode { e: e.to_string() })?;
-        self.build_token(resp)
+        self.build_token(resp, Some(refresh_token))
     }
 
     /// Asyncronously obtain a Spotify access token using the authorization code with PKCE OAuth flow.
@@ -342,21 +344,21 @@ impl OAuthClient {
             .await;
 
         let resp = resp.map_err(|e| OAuthError::ExchangeCode { e: e.to_string() })?;
-        self.build_token(resp)
+        self.build_token(resp, None)
     }
 
     /// Asynchronously obtain a new valid OAuth token from `refresh_token`
     pub async fn refresh_token_async(&self, refresh_token: &str) -> Result<OAuthToken, OAuthError> {
-        let refresh_token = RefreshToken::new(refresh_token.to_string());
+        let request_token = RefreshToken::new(refresh_token.to_string());
         let http_client = reqwest::Client::new();
         let resp = self
             .client
-            .exchange_refresh_token(&refresh_token)
+            .exchange_refresh_token(&request_token)
             .request_async(&http_client)
             .await;
 
         let resp = resp.map_err(|e| OAuthError::ExchangeCode { e: e.to_string() })?;
-        self.build_token(resp)
+        self.build_token(resp, Some(refresh_token))
     }
 }
 
@@ -515,7 +517,25 @@ pub fn get_access_token(
 mod test {
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
+    use oauth2::AccessToken;
+
     use super::*;
+
+    #[test]
+    fn refresh_response_without_refresh_token_keeps_current_token() {
+        let client = OAuthClientBuilder::new("client-id", "http://localhost:1234", Vec::new())
+            .build()
+            .unwrap();
+        let response = StandardTokenResponse::new(
+            AccessToken::new("access-token".to_string()),
+            BasicTokenType::Bearer,
+            EmptyExtraTokenFields {},
+        );
+
+        let token = client.build_token(response, Some("refresh-token")).unwrap();
+
+        assert_eq!(token.refresh_token, "refresh-token");
+    }
 
     #[test]
     fn get_socket_address_none() {
