@@ -16,7 +16,7 @@ use super::{
 
 use librespot_core::{Error, Session, SpotifyUri, date::Date, spotify_id::SpotifyId};
 use librespot_protocol as protocol;
-use protocol::playlist4_external::GeoblockBlockingType as Geoblock;
+use protocol::playlist_api::GeoblockBlockingType as Geoblock;
 
 #[derive(Debug, Clone, Default)]
 pub struct Geoblocks(Vec<Geoblock>);
@@ -86,7 +86,7 @@ impl Playlist {
 
 #[async_trait]
 impl Metadata for Playlist {
-    type Message = protocol::playlist4_external::SelectedListContent;
+    type Message = protocol::playlist_api::SelectedListContent;
 
     async fn request(session: &Session, playlist_uri: &SpotifyUri) -> RequestResult {
         let SpotifyUri::Playlist {

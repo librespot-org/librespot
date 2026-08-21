@@ -13,9 +13,9 @@ use super::{
 use librespot_core::{SpotifyUri, date::Date};
 
 use librespot_protocol as protocol;
-use protocol::playlist4_external::Item as PlaylistItemMessage;
-use protocol::playlist4_external::ListItems as PlaylistItemsMessage;
-use protocol::playlist4_external::MetaItem as PlaylistMetaItemMessage;
+use protocol::playlist_api::Item as PlaylistItemMessage;
+use protocol::playlist_api::ListItems as PlaylistItemsMessage;
+use protocol::playlist_api::MetaItem as PlaylistMetaItemMessage;
 
 #[derive(Debug, Clone)]
 pub struct PlaylistItem {
