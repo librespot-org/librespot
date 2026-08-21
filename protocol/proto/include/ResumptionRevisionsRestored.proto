@@ -1,0 +1,20 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message ResumptionRevisionsRestored {
+    optional int32 number_of_key_read_success = 1;
+    optional int32 number_of_key_failures = 2;
+    optional int32 number_of_revision_read_success = 3;
+    optional int32 number_of_revision_parse_failures = 4;
+    optional float seconds_reading = 5;
+    optional int64 bytes_read = 6;
+    optional int32 cache_total_keys = 7;
+    optional int32 cache_total_revisions = 8;
+    optional int64 cache_estimated_bytes = 9;
+    optional int64 leveldb_disk_bytes = 10;
+}

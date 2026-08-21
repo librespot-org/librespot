@@ -1,0 +1,101 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.desktop.ble_debug_esperanto.proto;
+
+import "google/protobuf/empty.proto";
+
+option optimize_for = CODE_SIZE;
+
+service BleDebug {
+    rpc Subscribe(google.protobuf.Empty) returns (stream BleDebugState);
+}
+
+message BleCapabilityBit {
+    string name = 1;
+    uint32 bit = 2;
+    bool active = 3;
+}
+
+message BleWriteOperation {
+    string characteristic_uuid = 1;
+    string characteristic_name = 2;
+    bool success = 3;
+    int64 timestamp_ms = 4;
+}
+
+message BleDiscoveredDevice {
+    string uuid = 1;
+    string local_name = 2;
+    uint32 capabilities_raw = 3;
+    CapabilitiesSource capabilities_source = 4;
+    int64 capabilities_detected_at_ms = 5;
+    int32 rssi = 6;
+    repeated BleCapabilityBit capabilities = 7;
+    ConnectionStatus connection_status = 8;
+    DeviceType device_type = 9;
+    DeviceRange range = 10;
+    int64 last_updated_ms = 11;
+    repeated BleWriteOperation write_operations = 12;
+    bool is_stale = 13;
+}
+
+message BleReceivedWrite {
+    string characteristic_uuid = 1;
+    int64 timestamp_ms = 2;
+    bytes value = 3;
+}
+
+message BleAdvertisedDevice {
+    string uuid = 1;
+    repeated BleReceivedWrite received_writes = 2;
+}
+
+message BleAdvertisingState {
+    bool is_advertising = 1;
+    string service_uuid = 2;
+    repeated BleAdvertisedDevice devices = 3;
+}
+
+message BleScanningState {
+    bool is_scanning = 1;
+    repeated BleDiscoveredDevice devices = 2;
+    uint32 legacy_device_count = 3;
+}
+
+message BleDebugState {
+    BleAdvertisingState advertising = 1;
+    BleScanningState scanning = 2;
+}
+
+enum ConnectionStatus {
+    CONNECTION_STATUS_DISCONNECTED = 0;
+    CONNECTION_STATUS_CONNECTING = 1;
+    CONNECTION_STATUS_CONNECTED = 2;
+}
+
+enum DeviceType {
+    DEVICE_TYPE_UNKNOWN = 0;
+    DEVICE_TYPE_IOS = 1;
+    DEVICE_TYPE_ANDROID = 2;
+    DEVICE_TYPE_TVOS = 3;
+    DEVICE_TYPE_APPLE_WATCH = 4;
+    DEVICE_TYPE_ANDROID_WEAR = 5;
+    DEVICE_TYPE_DESKTOP_WINDOWS = 6;
+    DEVICE_TYPE_DESKTOP_MACOS = 7;
+    DEVICE_TYPE_DESKTOP_LINUX = 8;
+}
+
+enum DeviceRange {
+    DEVICE_RANGE_UNKNOWN = 0;
+    DEVICE_RANGE_IMMEDIATE = 1;
+    DEVICE_RANGE_CLOSE = 2;
+    DEVICE_RANGE_FAR = 3;
+}
+
+enum CapabilitiesSource {
+    CAPABILITIES_SOURCE_UNKNOWN = 0;
+    CAPABILITIES_SOURCE_LOCAL_NAME = 1;
+    CAPABILITIES_SOURCE_SERVICE_DATA = 2;
+}

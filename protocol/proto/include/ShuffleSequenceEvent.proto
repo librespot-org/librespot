@@ -1,0 +1,25 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message ShuffleSequenceEvent {
+    optional string player_session_id = 1;
+    optional bool is_first_track_selected = 2;
+    repeated string shuffled_sequence = 3;
+    repeated int32 shuffled_sequence_original_position = 4;
+    optional string context_uri = 5;
+    optional string trigger_command = 6;
+    optional string shuffle_algorithm_setting = 7;
+    optional int32 play_context_length = 8;
+    repeated string shuffled_sequence_distributions = 9;
+    optional string shuffle_seed = 10;
+    optional string skip_to_track_uri = 11;
+    optional string root_seed_number = 12;
+    optional string chosen_seed_number = 13;
+    optional string shuffle_sequence_uuid = 14;
+    optional int32 player_major_version = 15;
+}

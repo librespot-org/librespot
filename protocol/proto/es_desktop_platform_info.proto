@@ -1,0 +1,48 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.desktop.platform_info_esperanto.proto;
+
+option optimize_for = CODE_SIZE;
+
+service DesktopPlatformInfo {
+    rpc GetPlatformInfo(GetPlatformInfoRequest) returns (PlatformInfoResponse);
+}
+
+message Capabilities {
+    bool can_autostart = 1;
+    bool can_restart = 2;
+    bool can_minimize_or_exit_on_close = 3;
+    bool can_show_system_media_controls = 5;
+}
+
+message EventSenderContextInformation {
+    string device_id = 1;
+    string device_manufacturer = 2;
+    string device_model = 3;
+    string os_version = 4;
+    string platform_type = 5;
+    string client_id = 6;
+    string client_version_string = 7;
+    int64 client_version_int = 8;
+    string installation_id = 9;
+}
+
+message GetPlatformInfoRequest {
+    
+}
+
+message PlatformInfoResponse {
+    string locale = 1;
+    bool localization_is_rtl = 2;
+    bool load_connect_modal = 3;
+    string app_platform = 4;
+    string os_version = 5;
+    EventSenderContextInformation event_sender_context_information = 6;
+    bool is_developer_mode = 7;
+    Capabilities capabilities = 8;
+    string client_version = 9;
+    string platform_string = 10;
+    string client_variant = 11;
+}

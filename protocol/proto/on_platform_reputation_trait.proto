@@ -1,0 +1,67 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.contentagnostic.v2;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.contentagnostic.v2";
+
+message OnPlatformReputationTrait {
+    oneof _total_established_user_relationships {
+        int64 total_established_user_relationships = 1;
+    }
+    
+    oneof _is_verified {
+        bool is_verified = 2;
+    }
+    
+    oneof _total_plays {
+        int64 total_plays = 3;
+    }
+    
+    oneof _monthly_listeners {
+        int64 monthly_listeners = 4;
+    }
+    
+    oneof _chart_position {
+        ChartPosition chart_position = 7;
+    }
+    
+    oneof _rating {
+        Rating rating = 8;
+    }
+    
+    reserved 5, 6;
+}
+
+message Chart {
+    string name = 1;
+    
+    oneof _uri {
+        string uri = 2;
+    }
+}
+
+message ChartPosition {
+    Chart chart = 1;
+    int32 position = 2;
+}
+
+message Rating {
+    double average = 1;
+    int64 count = 2;
+    
+    oneof _granular_ratings {
+        GranularRatings granular_ratings = 3;
+    }
+}
+
+message GranularRatings {
+    int64 one_star = 1;
+    int64 two_stars = 2;
+    int64 three_stars = 3;
+    int64 four_stars = 4;
+    int64 five_stars = 5;
+}

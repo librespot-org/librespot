@@ -1,0 +1,13 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message ContentIntegrity {
+    optional bytes playback_id = 1;
+    optional int32 ripping_categories = 2;
+    optional bool is_ripping_faster_than_rt = 3;
+}

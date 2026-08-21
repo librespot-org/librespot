@@ -1,0 +1,16 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message ImageDownload {
+    optional string cdn_domain = 1;
+    optional int64 bytes_from_cdn = 2;
+    optional int64 cdn_total_latency = 3;
+    optional int64 cdn_initial_latency = 4;
+    optional string cdn_protocol = 5;
+    optional bool new_connection = 6;
+}

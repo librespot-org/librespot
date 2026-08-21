@@ -1,0 +1,299 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.resumption_progress_esperanto.proto;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+option optimize_for = CODE_SIZE;
+
+service ResumptionProgress {
+    rpc GetState(GetStateRequest) returns (GetStateResponse);
+    rpc SubState(GetStateRequest) returns (stream GetStateResponse);
+    rpc GetDetails(GetDetailsRequest) returns (GetDetailsResponse);
+    rpc SubDetails(GetDetailsRequest) returns (stream GetDetailsResponse);
+    rpc GetAllDetails(GetAllDetailsRequest) returns (GetAllDetailsResponse);
+    rpc MarkAsFinished(MarkAsFinishedRequest) returns (MarkAsFinishedResponse);
+    rpc MarkAsNotStarted(MarkAsNotStartedRequest) returns (MarkAsNotStartedResponse);
+    rpc GetResumePoint(GetResumePointRequest) returns (GetResumePointResponse);
+    rpc SubResumePoint(GetResumePointRequest) returns (stream GetResumePointResponse);
+    rpc GetProgress(GetProgressRequest) returns (GetProgressResponse);
+    rpc SubProgress(GetProgressRequest) returns (stream GetProgressResponse);
+}
+
+message ItemState {
+    string item = 1;
+    ItemResult result = 2;
+    State state = 3;
+    State current_progress_state = 4;
+}
+
+message CurrentProgress {
+    google.protobuf.Duration time_left = 1;
+    google.protobuf.Duration time_played = 2;
+    google.protobuf.Duration duration = 3;
+    uint32 position_percentage = 4;
+    State state = 5;
+}
+
+message ItemDetails {
+    string item = 1;
+    ItemResult result = 2;
+    CurrentProgress current_progress = 3;
+    State state = 4;
+    google.protobuf.Timestamp last_played_at = 5;
+}
+
+message GetStateRequest {
+    repeated string item = 1;
+    
+    oneof _page_identifier {
+        string page_identifier = 2;
+    }
+}
+
+message GetStateResponse {
+    ResponseResult result = 1;
+    repeated ItemState item_state = 2;
+}
+
+message GetDetailsRequest {
+    repeated string item = 1;
+    
+    oneof _page_identifier {
+        string page_identifier = 2;
+    }
+}
+
+message GetDetailsResponse {
+    ResponseResult result = 1;
+    repeated ItemDetails item_details = 2;
+}
+
+message TimeRange {
+    oneof _min {
+        google.protobuf.Duration min = 1;
+    }
+    
+    oneof _max {
+        google.protobuf.Duration max = 2;
+    }
+}
+
+message PercentageRange {
+    oneof _min {
+        uint32 min = 1;
+    }
+    
+    oneof _max {
+        uint32 max = 2;
+    }
+}
+
+message CurrentProgressFilter {
+    TimeRange time_left = 1;
+    TimeRange time_played = 2;
+    PercentageRange position_percentage = 3;
+}
+
+message LastPlayedFilter {
+    oneof _min {
+        google.protobuf.Timestamp min = 1;
+    }
+    
+    oneof _max {
+        google.protobuf.Timestamp max = 2;
+    }
+}
+
+message Filter {
+    CurrentProgressFilter current_progress_filter = 1;
+    StateFilter state_filter = 2;
+    LastPlayedFilter last_played_filter = 3;
+    ContentType type_filter = 4;
+    
+    oneof _parent_uri_filter {
+        string parent_uri_filter = 5;
+    }
+}
+
+message GetAllDetailsRequest {
+    Filter filter = 1;
+    Sort sort = 2;
+    uint32 max_items_per_parent_uri = 3;
+    uint32 max_items_in_response = 4;
+    
+    oneof _page_identifier {
+        string page_identifier = 5;
+    }
+}
+
+message GetAllDetailsResponse {
+    ResponseResult result = 1;
+    repeated ItemDetails item_details = 2;
+}
+
+message ItemMarkResult {
+    string item = 1;
+    ItemResult result = 2;
+}
+
+message MarkAsFinishedRequest {
+    repeated string item = 1;
+}
+
+message MarkAsFinishedResponse {
+    ResponseResult result = 1;
+    repeated ItemMarkResult item_result = 2;
+}
+
+message TimeProgress {
+    google.protobuf.Duration played = 1;
+    google.protobuf.Duration remaining = 2;
+    google.protobuf.Duration duration = 3;
+}
+
+message ItemProgress {
+    uint32 current = 1;
+    uint32 total = 2;
+}
+
+message Progress {
+    uint32 position_percentage = 3;
+    
+    oneof progress {
+        TimeProgress time = 1;
+        ItemProgress items = 2;
+    }
+    
+    oneof _current_state {
+        State current_state = 4;
+    }
+}
+
+message ProgressItem {
+    string item = 1;
+    ItemResult result = 2;
+    Progress progress = 3;
+    
+    oneof _last_played_at {
+        google.protobuf.Timestamp last_played_at = 4;
+    }
+    
+    oneof _state {
+        State state = 5;
+    }
+    
+    oneof _resume_applicable {
+        bool resume_applicable = 6;
+    }
+}
+
+message GetProgressRequest {
+    repeated string item = 1;
+    
+    oneof _page_identifier {
+        string page_identifier = 2;
+    }
+}
+
+message GetProgressResponse {
+    ResponseResult result = 1;
+    repeated ProgressItem items = 2;
+}
+
+message MarkAsNotStartedRequest {
+    repeated string item = 1;
+}
+
+message MarkAsNotStartedResponse {
+    ResponseResult result = 1;
+    repeated ItemMarkResult item_result = 2;
+}
+
+message GetResumePointRequest {
+    repeated string items = 1;
+    string page_identifier = 2;
+    string use_case_identifier = 3;
+    ResumePointView view = 4;
+}
+
+message GetResumePointResponse {
+    ResponseResult result = 1;
+    map<string, ItemResumePoint> resume_points = 2;
+}
+
+message ItemResumePoint {
+    ItemResult result = 1;
+    
+    oneof _resume_point {
+        ResumePoint resume_point = 2;
+    }
+}
+
+message ItemResumePointEntry {
+    string uri = 1;
+    ItemResumePoint resume_point = 2;
+}
+
+message ResumePoint {
+    google.protobuf.Timestamp last_updated = 2;
+    
+    oneof value {
+        google.protobuf.Duration position = 1;
+        ItemResumePointEntry resume_point = 3;
+        string uri = 4;
+    }
+}
+
+enum ResponseResult {
+    RESPONSE_RESULT_UNSPECIFIED = 0;
+    RESPONSE_RESULT_SUCCESS = 1;
+    RESPONSE_RESULT_NO_ITEMS_IN_REQUEST = 2;
+    RESPONSE_RESULT_INVALID_ITEM_IN_REQUEST = 3;
+    RESPONSE_RESULT_INVALID_FILTER_IN_REQUEST = 4;
+    RESPONSE_RESULT_PAGE_IDENTIFIER_TOO_LONG = 5;
+    RESPONSE_RESULT_PAGE_IDENTIFIER_EMPTY = 6;
+    RESPONSE_RESULT_USE_CASE_IDENTIFIER_TOO_LONG = 7;
+    RESPONSE_RESULT_USE_CASE_IDENTIFIER_EMPTY = 8;
+}
+
+enum ItemResult {
+    ITEM_RESULT_UNSPECIFIED = 0;
+    ITEM_RESULT_SUCCESS = 1;
+    ITEM_RESULT_NOT_AVAILABLE = 2;
+}
+
+enum State {
+    STATE_UNSPECIFIED = 0;
+    STATE_NOT_STARTED = 1;
+    STATE_IN_PROGRESS = 2;
+    STATE_FINISHED = 3;
+}
+
+enum StateFilter {
+    STATE_FILTER_UNSPECIFIED = 0;
+    STATE_FILTER_IN_PROGRESS = 1;
+}
+
+enum ContentType {
+    CONTENT_TYPE_UNSPECIFIED = 0;
+    CONTENT_TYPE_PODCAST_EPISODE = 1;
+    CONTENT_TYPE_PODCAST_CHAPTER = 2;
+    CONTENT_TYPE_AUDIOBOOK_CHAPTER = 3;
+    CONTENT_TYPE_USER_HIGHLIGHT = 4;
+    CONTENT_TYPE_CLIP = 5;
+}
+
+enum Sort {
+    SORT_UNSPECIFIED = 0;
+    SORT_LAST_PLAYED_AT = 1;
+}
+
+enum ResumePointView {
+    RESUME_POINT_VIEW_UNSPECIFIED = 0;
+    RESUME_POINT_VIEW_BASIC = 1;
+    RESUME_POINT_VIEW_FULL = 2;
+}

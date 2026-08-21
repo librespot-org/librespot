@@ -1,0 +1,36 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.desktop.desktop_remote_config.proto;
+
+import "google/protobuf/timestamp.proto";
+
+option optimize_for = CODE_SIZE;
+
+message Overrides {
+    repeated Property properties = 1;
+    message Property {
+        string component_id = 5;
+        string name = 6;
+        google.protobuf.Timestamp expiry = 4;
+        
+        oneof structured_value {
+            BoolValue bool_value = 1;
+            IntValue int_value = 2;
+            EnumValue enum_value = 3;
+        }
+        
+        message BoolValue {
+            bool value = 1;
+        }
+        
+        message IntValue {
+            int32 value = 1;
+        }
+        
+        message EnumValue {
+            string value = 1;
+        }
+    }
+}

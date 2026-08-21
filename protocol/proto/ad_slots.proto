@@ -1,0 +1,93 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.ads.esperanto.proto;
+
+import "ad_common.proto";
+import "google/protobuf/empty.proto";
+
+option objc_class_prefix = "ESP";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.ads.esperanto.proto";
+
+service Slots {
+    rpc GetSlots(GetSlotsRequest) returns (GetSlotsResponse);
+    rpc GetSlot(GetSlotRequest) returns (GetSlotResponse);
+    rpc CreateSlot(CreateSlotRequest) returns (CreateSlotResponse);
+    rpc SubSlot(SubSlotRequest) returns (stream SubSlotResponse);
+    rpc FetchSlot(PrepareSlotRequest) returns (PrepareSlotResponse);
+    rpc PrepareNextTrackSlot(PrepareSlotRequest) returns (PrepareSlotResponse);
+    rpc PrepareNextContextSlot(PrepareSlotRequest) returns (PrepareSlotResponse);
+    rpc TriggerSlot(TriggerSlotRequest) returns (TriggerSlotResponse);
+    rpc ClearAvailableAds(ClearSlotRequest) returns (google.protobuf.Empty);
+    rpc ClearAllAds(ClearSlotRequest) returns (google.protobuf.Empty);
+}
+
+message GetSlotsRequest {
+    
+}
+
+message GetSlotsResponse {
+    repeated AdSlot ad_slots = 1;
+}
+
+message GetSlotRequest {
+    string slot_id = 1;
+}
+
+message GetSlotResponse {
+    AdSlot ad_slot = 1;
+}
+
+message CreateSlotRequest {
+    string slot_id = 1;
+}
+
+message CreateSlotResponse {
+    oneof _error {
+        string error = 1;
+    }
+}
+
+message SubSlotRequest {
+    string slot_id = 1;
+    
+    oneof _format {
+        AdFormat format = 2;
+    }
+}
+
+message SubSlotResponse {
+    AdSlotEvent ad_slot_event = 1;
+}
+
+message PrepareSlotRequest {
+    string slot_id = 1;
+    map<string, string> targeting_map = 2;
+}
+
+message PrepareSlotResponse {
+    oneof _error {
+        string error = 1;
+    }
+}
+
+message TriggerSlotRequest {
+    string slot_id = 1;
+}
+
+message TriggerSlotResponse {
+    oneof _error {
+        string error = 1;
+    }
+}
+
+message ClearSlotRequest {
+    string slot_id = 1;
+    
+    oneof _clear_reason {
+        string clear_reason = 2;
+    }
+}

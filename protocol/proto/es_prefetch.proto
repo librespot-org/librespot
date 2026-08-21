@@ -1,0 +1,36 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.prefetch_esperanto.proto;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+option objc_class_prefix = "ESP";
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.prefetch_esperanto.proto";
+
+service Prefetch {
+    rpc GetQueue(google.protobuf.Empty) returns (GetQueueResponse);
+    rpc GetEventHistory(google.protobuf.Empty) returns (GetEventHistoryResponse);
+}
+
+message Track {
+    string uri = 1;
+    string uid = 2;
+}
+
+message Event {
+    google.protobuf.Any event = 1;
+    google.protobuf.Timestamp timestamp = 2;
+}
+
+message GetQueueResponse {
+    repeated Track tracks = 1;
+}
+
+message GetEventHistoryResponse {
+    repeated Event events = 1;
+}

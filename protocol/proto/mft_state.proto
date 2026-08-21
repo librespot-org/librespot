@@ -1,0 +1,72 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.list_player.proto;
+
+import "item_reporting_context.proto";
+
+option optimize_for = CODE_SIZE;
+
+message SequenceSpecEntry {
+    SequenceSpecItemType type = 1;
+    string id = 2;
+    bool exempt_from_sequencing_rules = 3;
+}
+
+message SequenceSpec {
+    repeated SequenceSpecEntry entries = 2;
+}
+
+message PlayedItemsInfo {
+    oneof _sequence_spec_id {
+        string sequence_spec_id = 1;
+    }
+}
+
+message PlayedItemsCurrentItem {
+    string list_item_uid = 1;
+    string uri = 2;
+    PlayedItemsSource source = 3;
+    
+    oneof _reporting_context {
+        timeline_reporter.proto.ItemReportingContext reporting_context = 4;
+    }
+}
+
+message PlayedItems {
+    map<string, PlayedItemsInfo> items = 1;
+    repeated string ordered_list_item_uids = 3;
+    
+    oneof _current_item {
+        PlayedItemsCurrentItem current_item = 2;
+    }
+}
+
+message MftState {
+    oneof _list_uri {
+        string list_uri = 1;
+    }
+    
+    oneof _sequence_spec {
+        SequenceSpec sequence_spec = 2;
+    }
+    
+    oneof _played_items {
+        PlayedItems played_items = 3;
+    }
+}
+
+enum SequenceSpecItemType {
+    SEQUENCE_SPEC_ITEM_TYPE_UNKNOWN = 0;
+    SEQUENCE_SPEC_ITEM_TYPE_LIST = 1;
+    SEQUENCE_SPEC_ITEM_TYPE_RECOMMENDATION = 2;
+}
+
+enum PlayedItemsSource {
+    PLAYED_ITEMS_SOURCE_UNKNOWN = 0;
+    PLAYED_ITEMS_SOURCE_LIST = 1;
+    PLAYED_ITEMS_SOURCE_QUEUE = 2;
+    PLAYED_ITEMS_SOURCE_AUTOPLAY = 3;
+    PLAYED_ITEMS_SOURCE_MFT = 4;
+}

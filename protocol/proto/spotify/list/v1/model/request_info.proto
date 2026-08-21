@@ -1,0 +1,60 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.list.v1.model;
+
+import "spotify/list/v1/model/additional_responses_options.proto";
+import "spotify/list/v1/model/lenses.proto";
+import "spotify/list/v1/model/list_sync_reason.proto";
+import "spotify/list/v1/model/pagination.proto";
+import "spotify/list/v1/model/parameters.proto";
+import "spotify/list/v1/model/requested_fields.proto";
+import "spotify/list/v1/model/sorting.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "RequestInfoProto";
+option java_package = "com.spotify.list.v1.model";
+
+message RequestInfo {
+    reserved 1;
+}
+
+message RequestOptions {
+    oneof _requested_fields {
+        RequestedFields requested_fields = 4;
+    }
+    
+    oneof _pagination {
+        Pagination pagination = 6;
+    }
+    
+    oneof _sorting {
+        Sorting sorting = 7;
+    }
+    
+    oneof _lens_options {
+        LensOptions lens_options = 8;
+    }
+    
+    oneof _sync_reason {
+        ListSyncReason sync_reason = 9;
+    }
+    
+    oneof _parameters {
+        Parameters parameters = 10;
+    }
+    
+    oneof _additional_responses_options {
+        AdditionalResponsesOptions additional_responses_options = 11;
+    }
+    
+    reserved 1, 2, 3, 5;
+}
+
+message MultiListRequestOptions {
+    oneof _additional_responses_options {
+        AdditionalResponsesOptions additional_responses_options = 1;
+    }
+}

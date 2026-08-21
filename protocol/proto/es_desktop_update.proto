@@ -1,0 +1,47 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.desktop.update_esperanto.proto;
+
+import "google/protobuf/empty.proto";
+
+option optimize_for = CODE_SIZE;
+
+service DesktopUpdate {
+    rpc SubscribeStatus(google.protobuf.Empty) returns (stream SubscribeStatusResponse);
+    rpc TriggerDownload(TriggerDownloadRequest) returns (TriggerDownloadResponse);
+    rpc ApplyUpdate(ApplyUpdateRequest) returns (ApplyUpdateResponse);
+}
+
+message SubscribeStatusResponse {
+    UpdateState state = 1;
+    
+    oneof _version {
+        string version = 2;
+    }
+}
+
+message TriggerDownloadRequest {
+    bool apply_after_download = 1;
+}
+
+message TriggerDownloadResponse {
+    
+}
+
+message ApplyUpdateRequest {
+    
+}
+
+message ApplyUpdateResponse {
+    
+}
+
+enum UpdateState {
+    UPDATE_STATE_UNSPECIFIED = 0;
+    UPDATE_STATE_NONE = 1;
+    UPDATE_STATE_PENDING = 2;
+    UPDATE_STATE_PROCESSING = 3;
+    UPDATE_STATE_READY = 4;
+}

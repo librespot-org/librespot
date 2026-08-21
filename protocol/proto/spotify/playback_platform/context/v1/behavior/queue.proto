@@ -1,0 +1,47 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playback_platform.context.v1.behavior;
+
+import "spotify/playback_platform/context/v1/sequence_query.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.playback_platform.context.v1.behavior";
+
+message Queue {
+    SequenceQuery include = 7;
+    
+    oneof _display_children {
+        bool display_children = 1;
+    }
+    
+    oneof _reorder {
+        bool reorder = 2;
+    }
+    
+    oneof _remove {
+        bool remove = 3;
+    }
+    
+    oneof _restore {
+        bool restore = 4;
+    }
+    
+    oneof _insert {
+        bool insert = 5;
+    }
+    
+    oneof _migrate {
+        bool migrate = 6;
+    }
+    
+    oneof _clear_user_queue_when_loading {
+        bool clear_user_queue_when_loading = 8;
+    }
+    
+    oneof _display {
+        bool display = 9;
+    }
+}

@@ -1,0 +1,15 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message SuperConnectSandboxSetup {
+    optional string flow_id = 1;
+    optional string state = 2;
+    optional string stage = 3;
+    optional string sc_version = 4;
+    optional string error_type = 5;
+}

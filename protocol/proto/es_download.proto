@@ -1,0 +1,195 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.download.esperanto.proto;
+
+import "esperanto_options.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/wrappers.proto";
+
+option objc_class_prefix = "ESP";
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.download.esperanto.proto";
+
+service Download {
+    rpc CreateProgressiveFileStreamer(ProgressiveFileStreamerParams) returns (FileStreamerId);
+    rpc DestroyFileStreamer(FileStreamerId) returns (google.protobuf.Empty);
+    rpc RequestData(RequestDataParams) returns (stream RequestDataResponse);
+    rpc IsFileFullyCached(IsFileFullyCachedParams) returns (google.protobuf.BoolValue);
+    rpc GetFirstCachedSegmentIndex(GetFirstCachedSegmentIndexParams) returns (GetFirstCachedSegmentIndexResponse);
+    rpc GetFirstCachedSegmentIndexAsync(GetFirstCachedSegmentIndexParams) returns (GetFirstCachedSegmentIndexResponse);
+    rpc CreateSegmentFileStreamer(SegmentFileStreamerParams) returns (SegmentFileStreamerId);
+    rpc DestroySegmentFileStreamer(SegmentFileStreamerId) returns (google.protobuf.Empty);
+    rpc RequestSegmentData(RequestSegmentDataParams) returns (stream RequestDataResponse);
+    rpc FinishSegmentDataRequest(FinishSegmentDataRequestParams) returns (google.protobuf.Empty);
+    rpc GetMediaManifest(MediaManifestParams) returns (MediaManifestResponse);
+    rpc GetMediaHandleId(GetMediaHandleParams) returns (stream GetMediaHandleIdResponse);
+    rpc SubscribeVideoBandwidth(google.protobuf.Empty) returns (stream VideoBandwidthResponse);
+}
+
+message FileStreamerId {
+    uint32 id = 1;
+}
+
+message RequestDataParams {
+    FileStreamerId file_streamer = 1;
+    uint64 start = 2;
+    uint64 end = 3;
+}
+
+message RequestDataResponse {
+    uint64 position = 1;
+    uint64 total_size = 2;
+    bool final = 3;
+    Error error = 4;
+    bytes data = 5;
+    uint64 previously_cached = 6;
+    uint64 from_network = 7;
+    bool had_cache_error = 8;
+}
+
+message SegmentFileStreamerId {
+    uint32 id = 1;
+}
+
+message SegmentFileStreamerParams {
+    string media_url = 1;
+    string playback_id = 2;
+    string session_id = 3;
+    ContentType content_type = 4;
+    ContentForm content_form = 5;
+}
+
+message SegmentRequestMetadata {
+    int32 profile_index = 1;
+    int32 time_offset = 2;
+    ContentType content_type = 3;
+}
+
+message RequestSegmentDataParams {
+    SegmentFileStreamerId segment_file_streamer = 1;
+    string url_path = 2;
+    repeated string cdn_base_url = 3;
+    uint64 start = 4;
+    uint64 end = 5;
+    SegmentRequestMetadata metadata = 6;
+}
+
+message FinishSegmentDataRequestParams {
+    SegmentFileStreamerId segment_file_streamer = 1;
+    string url_path = 2;
+}
+
+message MediaManifestParams {
+    string manifest_id = 1;
+    string playback_id = 2;
+    string session_id = 3;
+    MediaManifestRequestType request_type = 4;
+    
+    MediaType media_type = 5;
+    enum MediaType {
+        VIDEO = 0;
+        AUDIO = 1;
+    }
+}
+
+message MediaManifestResponse {
+    bytes manifest_data = 1;
+    bool had_cache_error = 2;
+    uint64 bytes_from_network = 3;
+    MediaManifestError manifest_error = 4;
+    string manifest_url = 5;
+}
+
+message ProgressiveFileStreamerParams {
+    string url = 1;
+    string playback_id = 2;
+    string session_id = 3;
+    bool disable_range_requests = 4;
+}
+
+message IsFileFullyCachedParams {
+    oneof file {
+        ProgressiveFileParams progressive_file = 1;
+        SegmentFileParams segment_file = 2;
+    }
+    
+    message ProgressiveFileParams {
+        string url = 1;
+    }
+    
+    message SegmentFileParams {
+        string url_path = 1;
+        ContentForm content_form = 2;
+    }
+}
+
+message GetFirstCachedSegmentIndexParams {
+    repeated string url_paths = 1;
+    ContentType content_type = 2;
+    ContentForm content_form = 3;
+}
+
+message GetFirstCachedSegmentIndexResponse {
+    int32 index = 1;
+}
+
+message GetMediaHandleParams {
+    MediaType media_type = 1;
+    enum MediaType {
+        VIDEO = 0;
+        AUDIO = 1;
+    }
+    
+    string id = 2;
+}
+
+message GetMediaHandleIdResponse {
+    uint32 handle_id = 1;
+    
+    oneof _status {
+        VerificationStatus status = 2;
+    }
+}
+
+message VideoBandwidthResponse {
+    uint64 advised_max_bitrate = 1;
+}
+
+enum Error {
+    SUCCESS = 0;
+    GENERIC = 1;
+}
+
+enum VerificationStatus {
+    OK = 0;
+    FAILED = 1;
+    SUNSET = 2;
+}
+
+enum ContentType {
+    VIDEO = 0;
+    AUDIO = 1;
+    SUBTITLE = 2;
+}
+
+enum ContentForm {
+    LONG = 0;
+    SHORT = 1;
+}
+
+enum MediaManifestRequestType {
+    INTERACTIVE = 0;
+    PREFETCH = 1;
+    OTHER = 2;
+}
+
+enum MediaManifestError {
+    MEDIA_MANIFEST_SUCCESS = 0;
+    MEDIA_MANIFEST_INVALID_MANIFEST_ID = 1;
+    MEDIA_MANIFEST_CONNECTION_ERROR = 2;
+    MEDIA_MANIFEST_HTTP_ERROR = 3;
+    MEDIA_MANIFEST_CONNECTION_TIMEOUT = 4;
+    MEDIA_MANIFEST_HTTP_FORBIDDEN = 5;
+}

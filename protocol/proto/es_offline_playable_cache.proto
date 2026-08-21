@@ -1,0 +1,193 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.offline_playable_cache_esperanto.proto;
+
+import "google/protobuf/duration.proto";
+import "policy/playlist_track_decoration_policy.proto";
+import "playlist_track_state.proto";
+import "metadata/track_metadata.proto";
+
+option objc_class_prefix = "ESP";
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.offline_playable_cache_esperanto.proto";
+
+service OfflinePlayableCache {
+    rpc HasEnoughTracks(HasEnoughTracksRequest) returns (HasEnoughTracksResponse);
+    rpc SubscribeHasEnoughTracks(HasEnoughTracksRequest) returns (stream HasEnoughTracksResponse);
+    rpc GetTracks(GetTracksRequest) returns (GetTracksResponse);
+    rpc SubscribeTracks(GetTracksRequest) returns (stream GetTracksResponse);
+    rpc RemoveTrack(RemoveTrackRequest) returns (RemoveTrackResponse);
+}
+
+message Item {
+    oneof _add_time {
+        uint32 add_time = 1;
+    }
+    
+    oneof _metadata {
+        cosmos_util.proto.TrackMetadata metadata = 2;
+    }
+    
+    oneof _collection_state {
+        playlist.cosmos.proto.TrackCollectionState collection_state = 3;
+    }
+    
+    oneof _row_id {
+        string row_id = 4;
+    }
+    
+    oneof _relevance {
+        int32 relevance = 5;
+    }
+    
+    oneof _cluster {
+        string cluster = 6;
+    }
+}
+
+message Concept {
+    string concept_uri = 1;
+    string localized_term = 2;
+}
+
+message Response {
+    repeated Item item = 1;
+    repeated Concept available_concepts = 6;
+    bool is_loading = 7;
+    
+    oneof _unfiltered_length {
+        uint32 unfiltered_length = 2;
+    }
+    
+    oneof _total_content_duration {
+        google.protobuf.Duration total_content_duration = 3;
+    }
+    
+    oneof _response_content_duration {
+        google.protobuf.Duration response_content_duration = 5;
+    }
+    
+    reserved 4;
+}
+
+message ResponseStatus {
+    int32 status_code = 1;
+    string reason = 2;
+}
+
+message Range {
+    int32 start = 1;
+    int32 length = 2;
+}
+
+message SmartSortParameters {
+    oneof _num_descriptors {
+        int32 num_descriptors = 1;
+    }
+    
+    oneof _min_tracks_per_decriptor {
+        int32 min_tracks_per_decriptor = 2;
+    }
+    
+    oneof _tracks_subset {
+        int32 tracks_subset = 3;
+    }
+    
+    oneof _max_iterations {
+        int32 max_iterations = 4;
+    }
+    
+    oneof _convergence_criteria {
+        int32 convergence_criteria = 5;
+    }
+    
+    oneof _damping {
+        float damping = 6;
+    }
+    
+    oneof _median_factor {
+        float median_factor = 7;
+    }
+    
+    oneof _weight_threshold {
+        float weight_threshold = 8;
+    }
+}
+
+message Query {
+    string text_filter = 1;
+    
+    SortBy sort_by = 2;
+    enum SortBy {
+        NO_SORT = 0;
+        ALBUM_ARTIST_NAME_ASC = 1;
+        ALBUM_ARTIST_NAME_DESC = 2;
+        TRACK_NUMBER_ASC = 3;
+        TRACK_NUMBER_DESC = 4;
+        DISC_NUMBER_ASC = 5;
+        DISC_NUMBER_DESC = 6;
+        ALBUM_NAME_ASC = 7;
+        ALBUM_NAME_DESC = 8;
+        ARTIST_NAME_ASC = 9;
+        ARTIST_NAME_DESC = 10;
+        NAME_ASC = 11;
+        NAME_DESC = 12;
+        ADD_TIME_ASC = 13;
+        ADD_TIME_DESC = 14;
+        LENGTH_ASC = 15;
+        LENGTH_DESC = 16;
+        RELEVANCE = 17;
+        SMART = 18;
+    }
+    
+    Range range = 3;
+    uint32 min_length = 4;
+    bool remove_duplicate_links = 5;
+    bool ignore_drm = 6;
+    repeated string descriptor_filter = 7;
+    uint32 min_items = 12;
+    uint32 max_items = 8;
+    bool remove_no_descriptor = 10;
+    
+    oneof _smart_sort_parameters {
+        SmartSortParameters smart_sort_parameters = 9;
+    }
+    
+    oneof _filter_weight_threshold {
+        float filter_weight_threshold = 11;
+    }
+    
+    oneof _max_concepts {
+        uint32 max_concepts = 13;
+    }
+}
+
+message GetTracksRequest {
+    Query query = 1;
+    playlist.cosmos.proto.PlaylistTrackDecorationPolicy policy = 2;
+    int32 update_throttling_ms = 3;
+}
+
+message GetTracksResponse {
+    ResponseStatus status = 1;
+    Response data = 2;
+}
+
+message RemoveTrackRequest {
+    string uri = 1;
+}
+
+message RemoveTrackResponse {
+    ResponseStatus status = 1;
+}
+
+message HasEnoughTracksRequest {
+    uint32 min_items = 1;
+    int32 update_throttling_ms = 2;
+}
+
+message HasEnoughTracksResponse {
+    bool has_enough_tracks = 1;
+}

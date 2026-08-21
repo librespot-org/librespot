@@ -1,0 +1,33 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message AdDetectionResult {
+    optional string episode_uri = 1;
+    optional string audio_uri = 2;
+    optional bytes playback_id = 3;
+    optional int64 user_audio_length_ms = 4;
+    repeated int32 low_precision_ad_break_start_ms = 5;
+    repeated int32 low_precision_ad_break_duration_ms = 6;
+    repeated int32 high_precision_ad_break_start_ms = 7;
+    repeated int32 high_precision_ad_break_duration_ms = 8;
+    optional bool has_variable_bitrate_toc_header = 9;
+    optional bool cbr_in_disguise = 10;
+    optional double used_r2_threshold = 11;
+    optional double calculated_r2_value = 12;
+    optional bool cache_fingerprinted_audio = 13;
+    optional bool cache_detection_result = 14;
+    optional bool has_aborted = 15;
+    optional int32 abort_reason = 16;
+    optional bool has_missing_ad_break = 17;
+    optional bool detection_is_high_precision = 18;
+    optional bool content_uses_dai = 19;
+    optional bool detection_used_search = 20;
+    optional bool loaded_from_cache = 21;
+    optional int64 quick_detection_latency_ms = 22;
+    optional int64 full_detection_latency_ms = 23;
+}

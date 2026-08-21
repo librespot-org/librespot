@@ -1,0 +1,175 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.list.v1.model.attributes;
+
+import "spotify/list/v1/model/attribute_kinds.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "CapabilitiesProto";
+option java_package = "com.spotify.list.v1.model.attributes";
+
+message Permission {
+    oneof _revision {
+        bytes revision = 1;
+    }
+    
+    oneof _permission_level {
+        PermissionLevel permission_level = 2;
+    }
+}
+
+message GrantableLevels {
+    repeated PermissionLevel base = 1;
+    repeated PermissionLevel member = 2;
+}
+
+message AdministratePermissionCapabilities {
+    oneof _can_set {
+        bool can_set = 1;
+    }
+    
+    oneof _can_remove {
+        bool can_remove = 2;
+    }
+    
+    oneof _can_remove_own {
+        bool can_remove_own = 3;
+    }
+}
+
+message AdministratePermissionKindCapabilities {
+    oneof _base {
+        AdministratePermissionCapabilities base = 1;
+    }
+    
+    oneof _member {
+        AdministratePermissionCapabilities member = 2;
+    }
+    
+    oneof _grant {
+        AdministratePermissionCapabilities grant = 6;
+    }
+    
+    reserved 3, 4, 5;
+    
+    reserved "abuse", "profile", "authorized";
+}
+
+message AttributeCapabilities {
+    oneof _can_edit {
+        bool can_edit = 1;
+    }
+}
+
+message AttributeKindCapabilities {
+    oneof _attribute_kind {
+        AttributeKind attribute_kind = 1;
+    }
+    
+    oneof _capabilities {
+        AttributeCapabilities capabilities = 2;
+    }
+}
+
+message ListAttributeCapabilities {
+    oneof _name {
+        AttributeCapabilities name = 1;
+    }
+    
+    oneof _description {
+        AttributeCapabilities description = 2;
+    }
+    
+    oneof _picture {
+        AttributeCapabilities picture = 3;
+    }
+    
+    oneof _collaborative {
+        AttributeCapabilities collaborative = 4;
+    }
+    
+    oneof _deleted_by_owner {
+        AttributeCapabilities deleted_by_owner = 6;
+    }
+    
+    oneof _ai_curation_reference_id {
+        AttributeCapabilities ai_curation_reference_id = 15;
+    }
+}
+
+message Capabilities {
+    repeated PermissionLevel grantable_level = 3 [deprecated = true];
+    repeated AttributeKindCapabilities attribute_kind_capabilities = 9;
+    
+    oneof _can_view {
+        bool can_view = 1;
+    }
+    
+    oneof _can_administrate_permissions {
+        bool can_administrate_permissions = 2 [deprecated = true];
+    }
+    
+    oneof _can_edit_metadata {
+        bool can_edit_metadata = 4 [deprecated = true];
+    }
+    
+    oneof _can_edit_items {
+        bool can_edit_items = 5;
+    }
+    
+    oneof _can_cancel_membership {
+        bool can_cancel_membership = 6;
+    }
+    
+    oneof _grantable_levels {
+        GrantableLevels grantable_levels = 7;
+    }
+    
+    oneof _list_attribute_capabilities {
+        ListAttributeCapabilities list_attribute_capabilities = 8 [deprecated = true];
+    }
+    
+    oneof _can_mix_playlist {
+        bool can_mix_playlist = 10;
+    }
+    
+    oneof _can_send_messages {
+        bool can_send_messages = 11;
+    }
+    
+    oneof _administrate_permission_kind_capabilities {
+        AdministratePermissionKindCapabilities administrate_permission_kind_capabilities = 12;
+    }
+    
+    oneof _can_delete {
+        bool can_delete = 13;
+    }
+    
+    oneof _can_abuse_report {
+        bool can_abuse_report = 14;
+    }
+    
+    oneof _can_modify_speed_playlist {
+        bool can_modify_speed_playlist = 17;
+    }
+    
+    oneof _can_edit_prompt {
+        bool can_edit_prompt = 19;
+    }
+    
+    oneof _can_add_prompt {
+        bool can_add_prompt = 20;
+    }
+}
+
+enum PermissionLevel {
+    UNKNOWN = 0;
+    BLOCKED = 1;
+    VIEWER = 2;
+    CONTRIBUTOR = 3;
+    MADE_FOR = 4;
+    ADMIN = 5;
+}

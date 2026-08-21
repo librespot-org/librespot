@@ -1,0 +1,21 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message EventSenderCanaryNonAuth {
+    optional string batch_uuid = 1;
+    optional int64 event_id = 2;
+    optional int64 batch_size = 3;
+    optional string sending_system = 4;
+    optional bool sent_as_pending_event = 5;
+    optional int64 batch_start_time_ms = 6;
+    optional int64 event_time_ms = 7;
+    optional string configuration = 8;
+    optional string experiment_variant = 9;
+    optional int64 mutation_count = 10;
+    optional int64 expected_mutation_count = 11;
+}

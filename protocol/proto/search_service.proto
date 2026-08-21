@@ -1,0 +1,29 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.search_esperanto.proto;
+
+import "search.proto";
+
+option objc_class_prefix = "SPTSearchEsperanto";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.search.esperanto.proto";
+
+service OfflineSearchService {
+    rpc Query(OfflineSearchRequest) returns (OfflineSearchResponse);
+}
+
+message OfflineSearchRequest {
+    string query = 1;
+    int32 limit = 2;
+    bool include_chapters = 3;
+}
+
+message OfflineSearchResponse {
+    repeated search.proto.OfflineAlbum albums = 1;
+    repeated search.proto.OfflineAudioEpisode audio_episodes = 2;
+    repeated search.proto.OfflinePlaylist playlists = 3;
+    repeated search.proto.OfflineTrack tracks = 4;
+}

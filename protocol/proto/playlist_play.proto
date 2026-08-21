@@ -1,0 +1,119 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playlist.proto;
+
+import "es_logging_params.proto";
+import "es_play_origin.proto";
+import "playlist_item_reporting_context.proto";
+import "playlist_play_options.proto";
+import "playlist_play_state.proto";
+import "playlist_query.proto";
+import "playlist_resolved_list.proto";
+import "playlist_signal_request.proto";
+
+option optimize_for = CODE_SIZE;
+
+message PlaylistPlayRequest {
+    string uri = 1;
+    PlayOptions play_options = 4;
+    player.esperanto.proto.LoggingParams logging_params = 5;
+    player.esperanto.proto.PlayOrigin play_origin = 6;
+    
+    Source source = 7;
+    enum Source {
+        PLAYLIST_PLAY_REQUEST_SOURCE_UNKNOWN = 0;
+        PLAYLIST_PLAY_REQUEST_SOURCE_PLAYLIST_ESPERANTO = 1;
+        PLAYLIST_PLAY_REQUEST_SOURCE_PLAYLIST_COSMOS = 2;
+        PLAYLIST_PLAY_REQUEST_SOURCE_CONTEXT_PLAYER_ESPERANTO = 3;
+        PLAYLIST_PLAY_REQUEST_SOURCE_STATE_RESTORE = 4;
+        PLAYLIST_PLAY_REQUEST_SOURCE_CONNECT_TRANSFER = 5;
+        PLAYLIST_PLAY_REQUEST_SOURCE_CONNECT_PLAY = 6;
+    }
+    
+    PlayState play_state = 8;
+    ReasonStart reason_start = 9;
+    string play_context_decision_id = 10;
+    string agentic_product_type = 11;
+    string custom_reporting_attribution = 13;
+    string reporting_uri = 14;
+    
+    oneof list {
+        playlist_esperanto.proto.PlaylistQuery playlist_query = 2;
+        ResolvedList resolved_list = 3;
+    }
+    
+    oneof _raw_signal {
+        playlist_esperanto.proto.Signal raw_signal = 12;
+    }
+    
+    oneof _transferred_queue_items {
+        TransferredQueueInfo transferred_queue_items = 15;
+    }
+}
+
+message SyntheticItemInfo {
+    SyntheticSource synthetic_source = 1;
+    enum SyntheticSource {
+        SYNTHETIC_SOURCE_UNKNOWN = 0;
+        SYNTHETIC_SOURCE_LIST = 1;
+        SYNTHETIC_SOURCE_QUEUE = 2;
+        SYNTHETIC_SOURCE_AUTOPLAY = 3;
+        SYNTHETIC_SOURCE_MFT = 4;
+        SYNTHETIC_SOURCE_AUTOMIX_PREVIEW = 5;
+        SYNTHETIC_SOURCE_SPEED_PREVIEW = 6;
+        SYNTHETIC_SOURCE_AUDIOBOOK_CAPPING_NOTIFICATION = 7;
+    }
+}
+
+message TransferredQueueItem {
+    string uid = 1;
+    string uri = 2;
+    ItemReportingContext item_reporting_context = 3;
+    string queued_by = 5;
+    string original_list_item_uid = 6;
+    bool hidden_in_queue = 7;
+    
+    oneof _synthetic_item_info {
+        SyntheticItemInfo synthetic_item_info = 4;
+    }
+}
+
+message TransferredQueueAnchor {
+    string uid = 1;
+    
+    Position position = 2;
+    enum Position {
+        POSITION_UNKNOWN = 0;
+        POSITION_AFTER = 1;
+        POSITION_BEFORE = 2;
+        POSITION_AFTER_LIST = 3;
+    }
+}
+
+message TransferredQueueInfo {
+    repeated TransferredQueueItem items = 1;
+    
+    oneof _anchor {
+        TransferredQueueAnchor anchor = 2;
+    }
+}
+
+message ResponseStatus {
+    int32 status_code = 1;
+    string reason = 2;
+}
+
+message PlaylistPlayResponse {
+    ResponseStatus status = 1;
+}
+
+enum ReasonStart {
+    REASON_START_UNKNOWN = 0;
+    REASON_START_CONNECT_PLAY = 1;
+    REASON_START_CONNECT_TRANSFER = 2;
+    REASON_START_CONNECT_RESTORE = 3;
+    REASON_START_STATE_RESTORE = 4;
+    REASON_START_LOCAL_PLAY = 5;
+}

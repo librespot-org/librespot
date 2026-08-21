@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
@@ -7,49 +7,30 @@ package socialconnect;
 option optimize_for = CODE_SIZE;
 
 message Session {
-    reserved 8;
     int64 timestamp = 1;
     string session_id = 2;
-    string join_session_token = 3;
-    string join_session_url = 4;
-    string session_owner_id = 5;
     repeated SessionMember session_members = 6;
-    string join_session_uri = 7;
     bool is_session_owner = 9;
-    bool is_listening = 10;
-    bool is_controlling = 11;
-    bool is_discoverable = 12;
-    SessionType initial_session_type = 13;
-    optional string host_active_device_id = 14;
+    optional string host_active_device_id = 14; // copied from older proto
+    bool active = 17;
+    bool redirect_commands = 25;
+    
+    reserved 8, 12, 22;
+    
+    reserved "type", "is_discoverable", "quick_blend";
 }
 
 message SessionMember {
-    int64 timestamp = 1;
     string id = 2;
     string username = 3;
     string display_name = 4;
     string image_url = 5;
-    string large_image_url = 6;
-    bool is_listening = 7;
-    bool is_controlling = 8;
+    bool is_current_user = 10;
 }
 
 message SessionUpdate {
     Session session = 1;
     SessionUpdateReason reason = 2;
-    repeated SessionMember updated_session_members = 3;
-}
-
-message DevicesExposure {
-    int64 timestamp = 1;
-    map<string, DeviceExposureStatus> devices_exposure = 2;
-}
-
-enum SessionType {
-    UNKNOWN_SESSION_TYPE = 0;
-    IN_PERSON = 3;
-    REMOTE = 4;
-    REMOTE_V2 = 5;
 }
 
 enum SessionUpdateReason {
@@ -61,13 +42,11 @@ enum SessionUpdateReason {
     YOU_LEFT = 5;
     YOU_WERE_KICKED = 6;
     YOU_JOINED = 7;
-    PARTICIPANT_PROMOTED_TO_HOST = 8;
-    DISCOVERABILITY_CHANGED = 9;
     USER_KICKED = 10;
-}
-
-enum DeviceExposureStatus {
-    NOT_EXPOSABLE = 0;
-    NOT_EXPOSED = 1;
-    EXPOSED = 2;
+    VOLUME_CONTROL_PERMISSIONS_CHANGED = 11;
+    QUEUE_ONLY_MODE_CONTROL_CHANGED = 12;
+    WIFI_BROADCAST_CHANGED = 13;
+    ACTIVE_DEVICE_CHANGED = 14;
+    SESSION_MEMBER_UPDATED = 16;
+    SESSION_ACTIVATED = 17;
 }

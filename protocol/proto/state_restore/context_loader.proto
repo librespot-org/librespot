@@ -1,10 +1,13 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
 syntax = "proto2";
 
 package spotify.player.proto.state_restore;
 
 import "context.proto";
 
-message ContextLoader {
-  required Context context = 1;
-}
+option optimize_for = CODE_SIZE;
 
+message ContextLoader {
+    required Context context = 1;
+}

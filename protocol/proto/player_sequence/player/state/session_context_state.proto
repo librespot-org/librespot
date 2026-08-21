@@ -1,0 +1,16 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.player.sequence.proto;
+
+import "player_sequence/player/state/context_stack.proto";
+import "player_sequence/player/state/context_tree.proto";
+
+option optimize_for = CODE_SIZE;
+
+message SessionContextState {
+    string root_context_id = 1;
+    ContextStack stack = 2;
+    ContextTree context_tree = 3;
+}

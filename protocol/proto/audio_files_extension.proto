@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
@@ -15,10 +15,10 @@ message NormalizationParams {
 }
 
 message ExtendedAudioFile {
-    reserved 2;
-    reserved 3;
     metadata.AudioFile file = 1;
     int32 average_bitrate = 4;
+    
+    reserved 2, 3;
 }
 
 message AudioFilesExtensionResponse {

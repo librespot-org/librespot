@@ -1,20 +1,20 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto2";
 
-import "state_restore/player_session.proto";
-
 package spotify.player.proto.state_restore;
+
+import "state_restore/player_session.proto";
 
 option optimize_for = CODE_SIZE;
 
 message QueuedSession {
+    optional Trigger trigger = 1;
     enum Trigger {
         DID_GO_PAST_TRACK = 1;
         DID_GO_PAST_CONTEXT = 2;
     }
-
-    optional QueuedSession.Trigger trigger = 1;
+    
     optional PlayerSession session = 2;
 }
 
@@ -23,4 +23,3 @@ message PlayerSessionQueue {
     repeated PlayerSession pushed = 2;
     repeated QueuedSession queued = 3;
 }
-

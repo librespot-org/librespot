@@ -1,0 +1,20 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message TimeMeasurement {
+    optional string category = 1;
+    map<string, string> dimensions = 2;
+    map<string, int64> point_timestamps = 3;
+    map<string, int64> point_durations = 4;
+    map<string, string> point_feature_ids = 5;
+    optional string feature_id = 6;
+    optional string measurement_id = 7;
+    optional string parent_measurement_id = 8;
+    optional int64 parent_epoch_offset = 9;
+    map<string, string> metadata = 10;
+}

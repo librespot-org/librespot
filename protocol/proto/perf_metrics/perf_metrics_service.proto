@@ -1,0 +1,21 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.perf_metrics.esperanto.proto;
+
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.performance.perfmetricsproto";
+
+service PerfMetricsService {
+    rpc TerminateState(PerfMetricsRequest) returns (PerfMetricsResponse);
+}
+
+message PerfMetricsRequest {
+    string terminal_state = 1;
+    bool foreground_startup = 2;
+}
+
+message PerfMetricsResponse {
+    bool success = 1;
+}

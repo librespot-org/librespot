@@ -1,0 +1,21 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.nextepisode;
+
+option optimize_for = CODE_SIZE;
+
+message NextEpisode {
+    string uri = 1;
+    double score = 2;
+}
+
+message NextEpisodes {
+    repeated NextEpisode next = 1;
+}
+
+message NextEpisodeRecs {
+    string show_uri = 1;
+    NextEpisodes next_episodes = 2;
+}

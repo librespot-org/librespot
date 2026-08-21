@@ -1,0 +1,29 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message CoreShuffleStateEvent {
+    optional string event_reason = 1;
+    optional string cmd_id = 2;
+    optional string cmd_type = 3;
+    optional bool cmd_shuffle = 4;
+    optional string cmd_sms_mode = 5;
+    optional bool cmd_url_has_sms_lens = 6;
+    optional bool state_shuffled = 7;
+    optional string state_sms_mode = 8;
+    optional bool state_url_has_sms_lens = 9;
+    optional bool state_context_is_enhanced = 10;
+    optional int32 state_first_rec_index = 11;
+    optional int32 state_first_autoplay_index = 12;
+    optional string state_decision_id = 13;
+    optional string state_uri_type = 14;
+    optional string state_format_type = 15;
+    optional string state_internal_shuffle = 16;
+    optional bool state_is_enhance_lens_applied_context_metadata = 17;
+    optional bool playback_settings_shuffled = 18;
+    optional string playback_settings_sms_mode = 19;
+}

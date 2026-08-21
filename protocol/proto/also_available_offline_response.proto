@@ -1,0 +1,73 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.your_library.proto;
+
+import "your_library_config.proto";
+import "your_library_decorated_entity.proto";
+
+option objc_class_prefix = "ESP";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.your_library_esperanto.proto";
+
+message AlsoAvailableOfflineSuggestion {
+    YourLibraryDecoratedEntity entity = 1;
+    AlsoAvailableOfflineSuggestionType type = 2;
+    int32 cached_track_count = 3;
+    int32 total_track_count = 4;
+    float cached_percentage = 5;
+    int32 cached_duration_seconds = 6;
+}
+
+message AlsoAvailableOfflineDebugStats {
+    int32 songs_in_cache = 1;
+    int32 songs_accessible = 2;
+    int32 songs_not_surfaced = 3;
+    int32 artists_hidden_no_name = 4;
+    int32 playlists_hidden_no_name = 5;
+    int32 albums_hidden_no_name = 6;
+    int32 opc_missing_metadata = 8;
+    int32 opc_missing_audio_index = 9;
+    int32 opc_missing_files = 10;
+    int32 opc_missing_keys = 11;
+    int32 opc_expired_metadata = 12;
+    int32 total_playlists = 13;
+    int32 total_albums = 14;
+    int32 total_artists = 15;
+    int32 artists_below_threshold = 16;
+    int32 playlists_below_threshold = 17;
+    int32 albums_below_threshold = 18;
+    int32 tracks_lost_to_threshold = 19;
+}
+
+message AlsoAvailableOfflineData {
+    repeated AlsoAvailableOfflineSuggestion suggestions = 1;
+    YourLibraryFilters filter_augmentation = 2;
+}
+
+message AlsoAvailableOfflineError {
+    int32 status_code = 1;
+    string error = 2;
+}
+
+message AlsoAvailableOfflineResponse {
+    oneof result {
+        Loading loading = 1;
+        AlsoAvailableOfflineData data = 2;
+        AlsoAvailableOfflineError error_result = 3;
+    }
+    
+    message Loading {
+        
+    }
+}
+
+enum AlsoAvailableOfflineSuggestionType {
+    ALSO_AVAILABLE_OFFLINE_SUGGESTION_TYPE_UNSPECIFIED = 0;
+    ALSO_AVAILABLE_OFFLINE_SUGGESTION_TYPE_OFFLINE_BACKUP = 1;
+    ALSO_AVAILABLE_OFFLINE_SUGGESTION_TYPE_OFFLINE_ARTIST = 2;
+    ALSO_AVAILABLE_OFFLINE_SUGGESTION_TYPE_CACHED_PLAYLIST = 3;
+    ALSO_AVAILABLE_OFFLINE_SUGGESTION_TYPE_CACHED_ALBUM = 4;
+}

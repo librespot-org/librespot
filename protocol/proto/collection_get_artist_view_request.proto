@@ -1,0 +1,27 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.collection_cosmos.proto;
+
+import "collection_decoration_policy.proto";
+import "collection_item.proto";
+import "status.proto";
+
+option objc_class_prefix = "ESP";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.collection.esperanto.proto";
+
+message CollectionGetArtistViewRequest {
+    string artist_uri = 1;
+    uint32 update_throttling = 2;
+    CollectionArtistDecorationPolicy artist_policy = 3;
+    CollectionAlbumDecorationPolicy album_policy = 4;
+    CollectionTrackDecorationPolicy track_policy = 5;
+}
+
+message CollectionGetArtistViewResponse {
+    Status status = 1;
+    CollectionArtist artist = 2;
+}

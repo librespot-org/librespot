@@ -1,0 +1,106 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playback_platform.media.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "spotify/playback_platform/common/v1/audio_format.proto";
+import "spotify/playback_platform/common/v1/duration.proto";
+import "spotify/playback_platform/common/v1/video_format.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.playback_platform.media.v1";
+
+message TrackManifest {
+    bytes manifest = 1;
+    common.v1.StochasticDuration duration = 10;
+    
+    reserved 2 to 9;
+}
+
+message AudioManifest {
+    bytes manifest = 1;
+    common.v1.StochasticDuration duration = 10;
+    
+    reserved 2 to 9;
+}
+
+message VideoManifest {
+    bytes manifest = 1;
+    common.v1.StochasticDuration duration = 10;
+    
+    reserved 2 to 9;
+}
+
+message GeneratedAudioStream {
+    string url = 1;
+    google.protobuf.Timestamp expiry = 2;
+    common.v1.AudioFormat format = 3;
+    common.v1.StochasticDuration duration = 4;
+    
+    oneof _size_lower_bound {
+        uint64 size_lower_bound = 5;
+    }
+    
+    oneof _size_upper_bound {
+        uint64 size_upper_bound = 6;
+    }
+    
+    oneof _latency_lower_bound {
+        google.protobuf.Duration latency_lower_bound = 7;
+    }
+    
+    oneof _latency_upper_bound {
+        google.protobuf.Duration latency_upper_bound = 8;
+    }
+}
+
+message GeneratedVideoStream {
+    string url = 1;
+    google.protobuf.Timestamp expiry = 2;
+    common.v1.VideoFormat format = 3;
+    common.v1.StochasticDuration duration = 4;
+    
+    oneof _size_lower_bound {
+        uint64 size_lower_bound = 5;
+    }
+    
+    oneof _size_upper_bound {
+        uint64 size_upper_bound = 6;
+    }
+    
+    oneof _latency_lower_bound {
+        google.protobuf.Duration latency_lower_bound = 7;
+    }
+    
+    oneof _latency_upper_bound {
+        google.protobuf.Duration latency_upper_bound = 8;
+    }
+}
+
+message GeneratedAudioManifest {
+    repeated GeneratedAudioStream streams = 1;
+    
+    oneof _audio_fallback {
+        AudioManifest audio_fallback = 2;
+    }
+}
+
+message GeneratedVideoManifest {
+    repeated GeneratedVideoStream streams = 1;
+    
+    oneof _video_fallback {
+        VideoManifest video_fallback = 2;
+    }
+}
+
+message StreamingAudioManifest {
+    
+}
+
+message StreamingVideoManifest {
+    
+}

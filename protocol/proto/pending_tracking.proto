@@ -1,0 +1,21 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.ads.proto;
+
+option optimize_for = CODE_SIZE;
+
+message SavedTrackingRequest {
+    string event_type = 1;
+    string url = 2;
+    string ad_id = 3;
+    string request_id = 4;
+    string slot_id = 5;
+    string lineitem_id = 6;
+    string payload = 7;
+}
+
+message SavedPendingTracking {
+    repeated SavedTrackingRequest requests = 1;
+}

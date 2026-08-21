@@ -1,9 +1,12 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
 syntax = "proto2";
 
 package spotify.show_cosmos.proto;
 
-message ShowOfflineState {
-  optional string offline_state = 1;
-  optional uint32 sync_progress = 2;
-}
+option optimize_for = CODE_SIZE;
 
+message ShowOfflineState {
+    optional string offline_state = 1;
+    optional uint32 sync_progress = 2;
+}

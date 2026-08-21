@@ -1,0 +1,38 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.list.v1.model;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "SortingProto";
+option java_package = "com.spotify.list.v1.model";
+
+message Sorting {
+    oneof _type {
+        SortingType type = 1;
+    }
+    
+    oneof _order {
+        SortingOrder order = 2;
+    }
+}
+
+enum SortingOrder {
+    SORTING_ORDER_UNSPECIFIED = 0;
+    SORTING_ORDER_ASCENDING = 1;
+    SORTING_ORDER_DESCENDING = 2;
+}
+
+enum SortingType {
+    SORTING_TYPE_UNSPECIFIED = 0;
+    SORTING_TYPE_NONE = 1;
+    SORTING_TYPE_NAME = 2;
+    SORTING_TYPE_CONTRIBUTOR = 3;
+    SORTING_TYPE_CONTENT_HIERARCHY_PARENT = 4;
+    SORTING_TYPE_DURATION = 5;
+    SORTING_TYPE_ADD_TIME = 6;
+    SORTING_TYPE_RECENTLY_PLAYED = 7;
+    SORTING_TYPE_RELEASE_DATE = 8;
+}

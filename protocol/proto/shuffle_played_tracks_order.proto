@@ -1,0 +1,19 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.player.proto;
+
+option optimize_for = CODE_SIZE;
+
+message ShuffleTrack {
+    optional string uid = 1;
+    optional string uri = 2;
+}
+
+message ShufflePlayedTracksOrder {
+    optional string context_id = 1;
+    optional string shuffle_seed = 2;
+    repeated ShuffleTrack backward_tracks = 3;
+    repeated ShuffleTrack forward_tracks = 4;
+}

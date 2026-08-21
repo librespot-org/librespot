@@ -1,0 +1,15 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message DesktopEnterpriseManagementNonAuth {
+    optional string mdm_enrollment = 1;
+    optional string azure_ad_join_type = 2;
+    optional string domain_join_status = 3;
+    optional bool has_group_policy = 4;
+    optional string network_check_type = 5;
+}

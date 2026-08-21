@@ -1,0 +1,18 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.player.proto;
+
+option optimize_for = CODE_SIZE;
+
+message VideoSwitchNode {
+    optional bool switched_to_audio = 1;
+    
+    optional MediaType persisted_media_type = 2;
+    enum MediaType {
+        UNKNOWN = 0;
+        AUDIO = 1;
+        VIDEO = 2;
+    }
+}

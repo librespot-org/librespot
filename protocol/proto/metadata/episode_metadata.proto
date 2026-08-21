@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto2";
 
@@ -19,9 +19,6 @@ message EpisodeShowMetadata {
 }
 
 message EpisodeMetadata {
-    reserved 20;
-    reserved 21;
-
     optional EpisodeShowMetadata show = 1;
     optional string link = 2;
     optional string name = 3;
@@ -33,20 +30,20 @@ message EpisodeMetadata {
     optional ImageGroup freeze_frames = 9;
     optional string language = 10;
     optional bool available = 11;
-
+    
     optional MediaType media_type_enum = 12;
     enum MediaType {
         VODCAST = 0;
         AUDIO = 1;
         VIDEO = 2;
     }
-
+    
     optional int32 number = 13;
     optional bool backgroundable = 14;
     optional string preview_manifest_id = 15;
     optional bool is_explicit = 16;
     optional string preview_id = 17;
-
+    
     optional EpisodeType episode_type = 18;
     enum EpisodeType {
         UNKNOWN = 0;
@@ -54,12 +51,13 @@ message EpisodeMetadata {
         TRAILER = 2;
         BONUS = 3;
     }
-
+    
     optional bool is_music_and_talk = 19;
     repeated Extension extension = 22;
     optional bool is_19_plus_only = 23;
     optional bool is_book_chapter = 24;
     optional bool is_podcast_short = 25;
     optional bool is_curated = 26;
+    
+    reserved 20, 21;
 }
-

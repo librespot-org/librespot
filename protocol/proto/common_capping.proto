@@ -1,0 +1,94 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.common_capping.impl.common_capping_proto;
+
+import "google/protobuf/empty.proto";
+
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.common_capping.esperanto.proto";
+
+service CommonCapping {
+    rpc IsCapped(IsCappedRequest) returns (IsCappedResponse);
+    rpc ReportConsumption(ReportConsumptionRequest) returns (google.protobuf.Empty);
+    rpc ObserveCapStateChanged(ObserveCapStateChangedRequest) returns (stream ObserveCapStateChangedResponse);
+    rpc ObserveCapInfo(ObserveCapInfoRequest) returns (stream ObserveCapInfoResponse);
+    rpc GetCapInfo(GetCapInfoRequest) returns (GetCapInfoResponse);
+    rpc Refresh(RefreshRequest) returns (google.protobuf.Empty);
+    rpc GetQuotaStateAt(GetQuotaStateAtRequest) returns (GetQuotaStateAtResponse);
+}
+
+message IsCappedRequest {
+    Feature feature = 1;
+}
+
+message IsCappedResponse {
+    bool is_capped = 1;
+}
+
+message ReportConsumptionRequest {
+    Feature feature = 1;
+    string event_id = 2;
+    int64 consumption_value = 3;
+    string event_details = 4;
+}
+
+message ObserveCapStateChangedRequest {
+    Feature feature = 1;
+}
+
+message ObserveCapStateChangedResponse {
+    bool is_capped = 1;
+    bool is_change_from_local_consumption = 2;
+}
+
+message ObserveCapInfoRequest {
+    Feature feature = 1;
+}
+
+message ObserveCapInfoResponse {
+    bool is_capped = 1;
+    int64 consumption = 2;
+    int64 allowance = 3;
+    bool is_capping_enabled = 4;
+}
+
+message GetCapInfoRequest {
+    Feature feature = 1;
+}
+
+message GetCapInfoResponse {
+    bool is_capped = 1;
+    int64 consumption = 2;
+    int64 allowance = 3;
+    bool is_capping_enabled = 4;
+}
+
+message RefreshRequest {
+    
+}
+
+message GetQuotaStateAtRequest {
+    Feature feature = 1;
+    int32 days_offset = 2;
+}
+
+message GetQuotaStateAtResponse {
+    QuotaState quota_state = 1;
+}
+
+enum Feature {
+    PICK_AND_SHUFFLE = 0;
+    AUDIOBOOKS = 1;
+    LYRICS = 2;
+    BLUEJAY = 3;
+    KALLAX = 4;
+    SUPER_CONNECT = 5;
+}
+
+enum QuotaState {
+    NO_QUOTA_DATA = 0;
+    HAS_REMAINING_QUOTA = 1;
+    QUOTA_FULLY_CONSUMED = 2;
+}

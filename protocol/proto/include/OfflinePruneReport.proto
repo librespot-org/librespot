@@ -1,0 +1,19 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message OfflinePruneReport {
+    optional int64 track_keys_removed = 1;
+    optional int64 track_keys_moved_to_cache = 2;
+    optional int64 episode_keys_removed = 3;
+    optional int64 episode_keys_moved_to_cache = 4;
+    optional int64 abp_chapter_keys_removed = 5;
+    optional int64 abp_chapter_keys_moved_to_cache = 6;
+    optional int64 keys_removed_from_cache = 7;
+    optional int64 keys_left_in_cache = 8;
+    optional int64 max_cached_keys = 9;
+}

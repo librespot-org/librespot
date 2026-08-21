@@ -1,20 +1,29 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
-syntax = "proto2";
+syntax = "proto3";
 
-package spotify.player.proto.transfer;
+package spotify.list_player.proto;
+
+import "google/protobuf/timestamp.proto";
 
 option optimize_for = CODE_SIZE;
 
 message PlayHistory {
-  message Item {
-    optional string context_id = 1;
-    optional string uid = 2;
-    optional bool disliked = 3;
-    repeated transfer.PlayHistory.Item children = 4;
-  }
-
-  repeated transfer.PlayHistory.Item backward_items = 1;
-  repeated transfer.PlayHistory.Item forward_items = 2;
+    repeated Item items = 1;
+    message Item {
+        string uri = 1;
+        string list_uri = 2;
+        string uid = 3;
+        google.protobuf.Timestamp played_at = 4;
+        string play_request_id = 6;
+        uint64 mft_played_at = 8;
+        
+        oneof _shuffle_seed {
+            string shuffle_seed = 7;
+        }
+        
+        reserved 5;
+    }
+    
+    reserved 2;
 }
-

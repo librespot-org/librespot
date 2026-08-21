@@ -1,0 +1,61 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playlist_esperanto.proto;
+
+option objc_class_prefix = "ESP";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.playlist.esperanto.proto";
+
+message RootlistRange {
+    int32 start = 1;
+    int32 length = 2;
+}
+
+message SourceRestriction {
+    int32 max_first_n_items = 1;
+}
+
+message RootlistQuery {
+    string folder_uri = 1;
+    
+    repeated BoolPredicate bool_predicates = 2;
+    enum BoolPredicate {
+        ROOTLIST_ITEM_NO_FILTER = 0;
+        ROOTLIST_ITEM_AVAILABLE_OFFLINE = 1;
+        ROOTLIST_ITEM_IS_WRITABLE = 2;
+    }
+    
+    string text_filter = 3;
+    
+    SortBy sort_by = 4;
+    enum SortBy {
+        NO_SORT = 0;
+        NAME_ASC = 1;
+        NAME_DESC = 2;
+        ADD_TIME_ASC = 3;
+        ADD_TIME_DESC = 4;
+        RECENTLY_PLAYED_RANK_ASC = 5;
+        RECENTLY_PLAYED_RANK_DESC = 6;
+        FRECENCY_SCORE_ASC = 7;
+        FRECENCY_SCORE_DESC = 8;
+        OFFLINE_STATE_ASC = 9;
+        OFFLINE_STATE_DESC = 10;
+    }
+    
+    RootlistRange range = 5;
+    SourceRestriction source_restriction = 6;
+    RootlistItemType item_type = 7;
+    bool group = 8;
+    bool delta_updates = 9;
+    bool flatten_tree = 10;
+    int32 update_throttling_ms = 11;
+}
+
+enum RootlistItemType {
+    ALL_ROOTLIST_ITEMS = 0;
+    PLAYLISTS_IN_ROOTLIST = 1;
+    FOLDERS_IN_ROOTLIST = 2;
+}

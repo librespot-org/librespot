@@ -1,0 +1,184 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.desktop.super_connect.proto;
+
+option optimize_for = CODE_SIZE;
+
+service DesktopSuperConnect {
+    rpc GetOrchestratorToken(GetOrchestratorTokenRequest) returns (GetOrchestratorTokenResponse);
+    rpc SubscribePermissionRequests(SubscribePermissionRequestsRequest) returns (stream PermissionEvent);
+    rpc ResolvePermission(ResolvePermissionRequest) returns (ResolvePermissionResponse);
+    rpc GetVersions(GetVersionsRequest) returns (GetVersionsResponse);
+    rpc CheckStudioInstalled(CheckStudioInstalledRequest) returns (CheckStudioInstalledResponse);
+    rpc SubscribeStudioInstallStatus(SubscribeStudioInstallStatusRequest) returns (stream CheckStudioInstalledResponse);
+    rpc InstallStudio(InstallStudioRequest) returns (stream InstallStudioEvent);
+    rpc OpenStudio(OpenStudioRequest) returns (OpenStudioResponse);
+    rpc CheckSandboxStatus(CheckSandboxStatusRequest) returns (CheckSandboxStatusResponse);
+    rpc RunSandboxSetup(RunSandboxSetupRequest) returns (stream RunSandboxSetupEvent);
+    rpc GetKeepAwakeStatus(GetKeepAwakeStatusRequest) returns (GetKeepAwakeStatusResponse);
+}
+
+message GetOrchestratorTokenRequest {
+    
+}
+
+message GetOrchestratorTokenResponse {
+    string token = 1;
+    int32 orchestrator_port = 2;
+}
+
+message PermissionEvent {
+    oneof event {
+        PermissionRequest request = 1;
+        PermissionResolved resolved = 2;
+    }
+}
+
+message PermissionRequest {
+    string request_id = 1;
+    string command = 2;
+    string permission_type = 3;
+    string origin = 4;
+}
+
+message PermissionResolved {
+    string request_id = 1;
+    
+    oneof _granted {
+        bool granted = 2;
+    }
+}
+
+message ResolvePermissionRequest {
+    string request_id = 1;
+    
+    oneof _granted {
+        bool granted = 2;
+    }
+}
+
+message ResolvePermissionResponse {
+    bool success = 1;
+}
+
+message SubscribePermissionRequestsRequest {
+    
+}
+
+message GetVersionsRequest {
+    
+}
+
+message GetVersionsResponse {
+    string super_connect_version = 1;
+    string upload_to_spotify_version = 2;
+    string super_connect_version_hash = 3;
+}
+
+message CheckStudioInstalledRequest {
+    
+}
+
+message CheckStudioInstalledResponse {
+    bool installed = 1;
+    string install_path = 2;
+    bool unsupported_architecture = 3;
+}
+
+message SubscribeStudioInstallStatusRequest {
+    
+}
+
+message OpenStudioRequest {
+    
+}
+
+message OpenStudioResponse {
+    Status status = 1;
+    enum Status {
+        FAILED = 0;
+        LAUNCHED = 1;
+        NOT_INSTALLED = 3;
+    }
+    
+    string error = 2;
+}
+
+message CheckSandboxStatusRequest {
+    
+}
+
+message CheckSandboxStatusResponse {
+    Status status = 1;
+    enum Status {
+        STATUS_UNSPECIFIED = 0;
+        NOT_APPLICABLE = 1;
+        NOT_SET_UP = 2;
+        SET_UP = 3;
+    }
+    
+    bool warmup_pending = 2;
+}
+
+message RunSandboxSetupRequest {
+    
+}
+
+message RunSandboxSetupEvent {
+    Status status = 1;
+    enum Status {
+        STATUS_UNSPECIFIED = 0;
+        RUNNING = 1;
+        SUCCEEDED = 2;
+        FAILED = 3;
+        USER_CANCELLED = 4;
+    }
+    
+    string error = 2;
+    
+    Phase phase = 3;
+    enum Phase {
+        PHASE_UNSPECIFIED = 0;
+        ACCOUNT_SETUP = 1;
+        WARMUP = 2;
+        PROVISIONING = 3;
+    }
+}
+
+message InstallStudioRequest {
+    
+}
+
+message InstallStudioEvent {
+    Status status = 1;
+    enum Status {
+        STATUS_UNSPECIFIED = 0;
+        DOWNLOADING = 1;
+        EXTRACTING = 2;
+        INSTALLING = 3;
+        SUCCEEDED = 4;
+        ALREADY_INSTALLED = 5;
+        FAILED = 6;
+        UNSUPPORTED_ARCHITECTURE = 7;
+    }
+    
+    int64 bytes_received = 2;
+    int64 bytes_total = 3;
+    string error = 4;
+}
+
+message GetKeepAwakeStatusRequest {
+    
+}
+
+message GetKeepAwakeStatusResponse {
+    Status status = 1;
+    enum Status {
+        STATUS_UNSPECIFIED = 0;
+        SUPPORTED = 1;
+        MANAGED_DISABLED = 2;
+        UNSUPPORTED = 3;
+    }
+}

@@ -1,0 +1,43 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.cappingapi.storage;
+
+import "google/protobuf/timestamp.proto";
+
+option optimize_for = CODE_SIZE;
+
+message Quota {
+    google.protobuf.Timestamp valid_from = 1;
+    google.protobuf.Timestamp expires_on = 2;
+    int32 priority = 3;
+    int64 allowance = 4;
+    int64 consumption = 5;
+}
+
+message QuotaInfo {
+    Feature feature = 1;
+    bool is_capping_enabled = 2;
+    google.protobuf.Timestamp refreshes_at = 3;
+    repeated Quota quotas = 4;
+}
+
+message ConsumptionEvent {
+    Feature feature = 1;
+    int64 consumption_value = 2;
+    string consumption_details = 3;
+    string deduplication_id = 4;
+    google.protobuf.Timestamp timestamp = 5;
+    bool is_sending = 6;
+}
+
+enum Feature {
+    UNDEFINED = 0;
+    AUDIOBOOK_SUBSCRIPTION = 1;
+    PICK_AND_SHUFFLE = 2;
+    LYRICS = 3;
+    BLUEJAY = 4;
+    KALLAX = 5;
+    SUPER_CONNECT = 6;
+}

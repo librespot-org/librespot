@@ -1,0 +1,30 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.your_library_tags_esperanto.proto;
+
+option objc_class_prefix = "ESP";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.your_library_tags_esperanto.proto";
+
+message DecoratedTag {
+    string tag_uri = 1;
+    string tag_name = 3;
+    int32 entity_count = 4;
+}
+
+message DecoratedClass {
+    string class_uri = 1;
+    string class_name = 2;
+    repeated DecoratedTag tag = 3;
+}
+
+message YourLibraryTagsResponse {
+    repeated DecoratedClass class_group = 3;
+}
+
+message YourLibraryTagsRequest {
+    int32 update_throttling = 1;
+}

@@ -1,0 +1,39 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playback_platform.timeline.v1.behavior;
+
+import "spotify/playback_platform/common/v1/restriction.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.playback_platform.timeline.v1.behavior";
+
+message Restrictions {
+    repeated common.v1.Restriction peek_at_prev = 1;
+    repeated common.v1.Restriction peek_at_next = 2;
+    repeated common.v1.Restriction pause = 3;
+    repeated common.v1.Restriction resume = 4;
+    repeated common.v1.Restriction signal = 5;
+    repeated common.v1.Restriction seek_by_duration = 6;
+    repeated common.v1.Restriction seek_to_position = 7;
+    repeated common.v1.Restriction seek_to_live = 8;
+    repeated common.v1.Restriction seek_to_prev = 9;
+    repeated common.v1.Restriction seek_to_next = 10;
+    repeated common.v1.Restriction auto_to_prev = 11;
+    repeated common.v1.Restriction auto_to_next = 12;
+    repeated common.v1.Restriction skip_to_prev = 13;
+    repeated common.v1.Restriction skip_to_next = 14;
+    repeated common.v1.Restriction set_sequence_options = 32;
+    repeated common.v1.Restriction set_shuffling_context = 33;
+    repeated common.v1.Restriction set_repeating_context = 34;
+    repeated common.v1.Restriction set_repeating_current = 35;
+    repeated common.v1.Restriction set_timeline_options = 36;
+    repeated common.v1.Restriction set_playback_speed = 37;
+    repeated common.v1.Restriction set_queue = 48;
+    repeated common.v1.Restriction add_to_queue = 49;
+    repeated common.v1.Restriction transfer = 50;
+    
+    reserved 38 to 47;
+}

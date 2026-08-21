@@ -1,0 +1,112 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playlist.proto;
+
+import "playlist_item_reporting_context.proto";
+import "auxiliary_media.proto";
+
+option optimize_for = CODE_SIZE;
+
+message ShuffleListMetadata {
+    bool shuffle_enabled = 1;
+}
+
+message ListHeader {
+    string uri = 1;
+    ShuffleListMetadata shuffle = 2;
+    string list_license = 3;
+    string list_revision = 4;
+    bool is_audiobook = 5;
+    AuxiliaryMedia auxiliary_media = 6;
+    bool is_interruptible = 7;
+    EndOfListAction end_of_list_action = 8;
+    bool fully_cached_files_only = 9;
+    bool is_on_demand_playback_allowed = 10;
+    string reporting_uri = 11;
+    bool requires_explicit_content_allowed = 12;
+    string interaction_id = 13;
+    string page_instance_id = 14;
+}
+
+message ShuffleItemMetadata {
+    string distribution = 1;
+    string group_shuffle = 2;
+    string partition_shuffle = 3;
+    
+    ShuffleRemove remove = 4;
+    enum ShuffleRemove {
+        UNKNOWN = 0;
+        NEVER = 1;
+        ALWAYS = 2;
+    }
+    
+    string group_forward = 5;
+    string partition_forward = 6;
+}
+
+message FormatAttributes {
+    bool is_trailer = 1;
+    
+    oneof _speed {
+        double speed = 2;
+    }
+    
+    oneof _pitch {
+        double pitch = 3;
+    }
+}
+
+message MediaSlice {
+    int64 start_ms = 1;
+    
+    oneof _end_ms {
+        int64 end_ms = 2;
+    }
+    
+    oneof _transition_start_ms {
+        int64 transition_start_ms = 3;
+    }
+}
+
+message ListItem {
+    string uri = 1;
+    string uid = 2;
+    
+    Provider provider = 3;
+    enum Provider {
+        PROVIDER_UNKNOWN = 0;
+        PROVIDER_LIST = 1;
+        PROVIDER_QUEUE = 2;
+        PROVIDER_AUTOPLAY = 3;
+        PROVIDER_MFT = 4;
+    }
+    
+    ShuffleItemMetadata shuffle_item_metadata = 4;
+    AuxiliaryMedia auxiliary_media = 5;
+    ItemReportingContext item_reporting_context = 6;
+    
+    MediaPreference media_preference = 7;
+    enum MediaPreference {
+        MEDIA_PREFERENCE_UNKNOWN = 0;
+        MEDIA_PREFERENCE_AUDIO = 1;
+        MEDIA_PREFERENCE_VIDEO = 2;
+    }
+    
+    FormatAttributes format_attributes = 8;
+    bool hidden_in_queue = 9;
+    MediaSlice slice = 10;
+}
+
+message ResolvedList {
+    ListHeader header = 1;
+    repeated ListItem items = 2;
+}
+
+enum EndOfListAction {
+    UNKNOWN = 0;
+    RESTART_PAUSED = 1;
+    STOP = 2;
+    WAIT = 3;
+}

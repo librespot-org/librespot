@@ -1,0 +1,54 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.desktop.version_esperanto.proto;
+
+option optimize_for = CODE_SIZE;
+
+service DesktopVersion {
+    rpc GetVersionInfo(GetVersionRequest) returns (VersionInfoResponse);
+}
+
+message VersionInfoResponse {
+    string version = 1;
+    BuildType buildType = 2;
+    Platform platform = 3;
+    string cefVersion = 4;
+    CefRuntime cefRuntime = 5;
+    BuildConfiguration buildConfiguration = 7;
+}
+
+message GetVersionRequest {
+    
+}
+
+enum BuildType {
+    BUILD_TYPE_UNSPECIFIED = 0;
+    BUILD_TYPE_MASTER = 1;
+    BUILD_TYPE_RELEASE = 2;
+    BUILD_TYPE_PR = 3;
+    BUILD_TYPE_LOCAL = 4;
+}
+
+enum BuildConfiguration {
+    BUILD_CONFIG_UNSPECIFIED = 0;
+    BUILD_CONFIG_STANDARD = 1;
+    BUILD_CONFIG_INTERNAL = 2;
+}
+
+enum Platform {
+    PLATFORM_UNKNOWN = 0;
+    PLATFORM_WIN32 = 1;
+    PLATFORM_WIN32_X86_64 = 2;
+    PLATFORM_WIN32_ARM64 = 3;
+    PLATFORM_OSX = 4;
+    PLATFORM_OSX_ARM64 = 5;
+    PLATFORM_LINUX = 6;
+}
+
+enum CefRuntime {
+    CEF_RUNTIME_UNSPECIFIED = 0;
+    CEF_RUNTIME_CHROME = 1;
+    CEF_RUNTIME_ALLOY = 2;
+}

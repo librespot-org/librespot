@@ -1,0 +1,59 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.mdata_debug_esperanto.proto;
+
+import "extension_kind.proto";
+import "google/protobuf/any.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.mdata.debug.esperanto.proto";
+
+message ListAllInCacheRequest {
+    
+}
+
+message ListAllInCacheResponse {
+    repeated Entry entries = 1;
+    message Entry {
+        extendedmetadata.ExtensionKind extension_kind = 1;
+        string entity_uri = 2;
+    }
+    
+    string error = 2;
+}
+
+message PurgeAllInCacheRequest {
+    
+}
+
+message PurgeAllInCacheResponse {
+    string error = 1;
+}
+
+message PeekCacheEntryRequest {
+    extendedmetadata.ExtensionKind extension_kind = 1;
+    string entity_uri = 2;
+}
+
+message PeekCacheEntryResponse {
+    Status status = 1;
+    enum Status {
+        STATUS_UNKNOWN = 0;
+        STATUS_OK = 1;
+        STATUS_NOT_RESOLVED = 2;
+        STATUS_NOT_FOUND = 3;
+        STATUS_UNAVAILABLE_FOR_LEGAL_REASONS = 4;
+    }
+    
+    string etag = 2;
+    int64 online_expiry_timestamp = 3;
+    int64 offline_expiry_timestamp = 4;
+    int32 status_code = 5;
+    int64 last_modified_timestamp = 6;
+    bool is_online_fresh = 7;
+    bool is_offline_fresh = 8;
+    google.protobuf.Any extension_data = 9;
+}

@@ -1,0 +1,215 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playbacksettings;
+
+import "media.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.playbacksettings.model";
+
+service PlaybackSettingsService {
+    rpc GetDeviceSettings(GetDeviceSettingsRequest) returns (GetDeviceSettingsResponse);
+    rpc WriteDeviceValue(WriteDeviceValueRequest) returns (WriteDeviceValueResponse);
+    rpc GetContentSettings(GetContentSettingsRequest) returns (GetContentSettingsResponse);
+    rpc WriteContentValue(WriteContentValueRequest) returns (WriteContentValueResponse);
+    rpc GetAllStoredContentValues(GetAllStoredContentValuesRequest) returns (GetAllStoredContentValuesResponse);
+    rpc GetSettingsDeviceSelection(GetSettingsDeviceSelectionRequest) returns (GetSettingsDeviceSelectionResponse);
+}
+
+message GetDeviceSettingsRequest {
+    repeated Device devices = 1;
+}
+
+message GetDeviceSettingsResponse {
+    repeated Device devices = 1;
+    repeated DeviceSettings device_settings = 2;
+}
+
+message WriteDeviceValueRequest {
+    DeviceDescriptor device_descriptor = 1;
+    repeated Field field = 2;
+}
+
+message WriteDeviceValueResponse {
+    
+}
+
+message Device {
+    DeviceDescriptor device_descriptor = 1;
+    
+    oneof _device_capabilities {
+        DeviceCapabilities device_capabilities = 2;
+    }
+}
+
+message DeviceDescriptor {
+    string device_id = 1;
+    string device_name = 2;
+    string client_id = 3;
+    string device_model = 4;
+}
+
+message DeviceSettings {
+    common.media.AudioQuality audio_quality = 1;
+    bool social_discoverable = 2;
+    MediaMode media_mode = 7;
+    bool normalize = 12;
+    int32 normalize_level = 13;
+    bool equalizer_enabled = 14;
+    float equalizer_low_shelf_gain = 15;
+    float equalizer_low_peak_gain = 16;
+    float equalizer_low_mid_peak_gain = 17;
+    float equalizer_high_mid_peak_gain = 18;
+    float equalizer_high_peak_gain = 19;
+    float equalizer_high_shelf_gain = 20;
+}
+
+message GetContentSettingsRequest {
+    repeated string content_identifiers = 1;
+    
+    oneof _device_capabilities {
+        DeviceCapabilities device_capabilities = 2;
+    }
+}
+
+message GetContentSettingsResponse {
+    repeated string content_identifiers = 1;
+    repeated ContentSettings content_settings = 2;
+}
+
+message WriteContentValueRequest {
+    string content_identifier = 1;
+    repeated Field field = 2;
+}
+
+message WriteContentValueResponse {
+    
+}
+
+message GetAllStoredContentValuesRequest {
+    uint32 limit = 1;
+}
+
+message GetAllStoredContentValuesResponse {
+    repeated string content_identifiers = 1;
+    
+    repeated Fields stored_fields = 2;
+    message Fields {
+        repeated FieldId ids = 1;
+        repeated FieldValue values = 2;
+    }
+}
+
+message ContentSettings {
+    float playback_speed = 3;
+    bool shuffle = 4;
+    ContextEnhancement context_enhancement = 5;
+    bool skip_finished_episodes = 8;
+    string translation_language = 21;
+}
+
+message WriteUserSettingValueRequest {
+    repeated Field user_settings = 1;
+}
+
+message WriteUserSettingValueResponse {
+    
+}
+
+message UserSettings {
+    bool disable_smart_shuffle = 6;
+    bool gapless = 9;
+    bool crossfade = 10;
+    int32 crossfade_duration_ms = 11;
+    string audio_language = 22;
+    string subtitle_language = 23;
+}
+
+message GetSettingsDeviceSelectionRequest {
+    repeated FieldId requested_setting_fields = 2;
+    repeated string content_identifiers = 4;
+    
+    oneof _device_capabilities {
+        DeviceCapabilities device_capabilities = 1;
+    }
+    
+    oneof _device_descriptor {
+        DeviceDescriptor device_descriptor = 3;
+    }
+    
+    oneof _include_user_settings {
+        bool include_user_settings = 5;
+    }
+}
+
+message GetSettingsDeviceSelectionResponse {
+    map<string, ContentSettings> content_settings = 2;
+    
+    oneof _device_settings {
+        DeviceSettings device_settings = 1;
+    }
+    
+    oneof _user_settings {
+        UserSettings user_settings = 3;
+    }
+}
+
+message DeviceCapabilities {
+    common.media.AudioQuality supported_audio_quality = 1;
+    bool supports_playback_speed = 2;
+}
+
+message FieldValue {
+    oneof value {
+        string string_value = 1;
+        bool bool_value = 2;
+        int32 int_value = 3;
+        float float_value = 4;
+    }
+}
+
+message Field {
+    FieldId id = 1;
+    FieldValue value = 2;
+}
+
+enum MediaMode {
+    DEFAULT = 0;
+    AUDIO = 1;
+    VIDEO = 2;
+}
+
+enum ContextEnhancement {
+    NOT_ENHANCED = 0;
+    RECOMMENDATION = 1;
+}
+
+enum FieldId {
+    UNKNOWN_FIELD_ID = 0;
+    AUDIO_QUALITY = 1;
+    SOCIAL_DISCOVERABLE = 2;
+    PLAYBACK_SPEED = 3;
+    SHUFFLE = 4;
+    CONTEXT_ENHANCEMENT = 5;
+    DISABLE_SMART_SHUFFLE = 6;
+    MEDIA_MODE = 7;
+    SKIP_FINISHED_EPISODES = 8;
+    GAPLESS = 9;
+    CROSSFADE = 10;
+    CROSSFADE_DURATION_MS = 11;
+    NORMALIZE = 12;
+    NORMALIZE_LEVEL = 13;
+    EQUALIZER_ENABLED = 14;
+    EQUALIZER_LOW_SHELF_GAIN = 15;
+    EQUALIZER_LOW_PEAK_GAIN = 16;
+    EQUALIZER_LOW_MID_PEAK_GAIN = 17;
+    EQUALIZER_HIGH_MID_PEAK_GAIN = 18;
+    EQUALIZER_HIGH_PEAK_GAIN = 19;
+    EQUALIZER_HIGH_SHELF_GAIN = 20;
+    TRANSLATION_LANGUAGE = 21;
+    AUDIO_LANGUAGE = 22;
+    SUBTITLE_LANGUAGE = 23;
+}

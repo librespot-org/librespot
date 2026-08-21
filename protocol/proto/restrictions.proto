@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto2";
 
@@ -15,8 +15,6 @@ message RestrictionReasons {
 }
 
 message Restrictions {
-    reserved 24;
-
     repeated string disallow_pausing_reasons = 1;
     repeated string disallow_resuming_reasons = 2;
     repeated string disallow_seeking_reasons = 3;
@@ -42,5 +40,20 @@ message Restrictions {
     repeated string disallow_setting_playback_speed = 23;
     map<string, ModeRestrictions> disallow_setting_modes = 25;
     map<string, RestrictionReasons> disallow_signals = 26;
+    repeated string disallow_play_as_next_in_queue_reasons = 27;
+    repeated string disallow_sleep_timer_clear_reasons = 28;
+    repeated string disallow_sleep_timer_duration_reasons = 29;
+    repeated string disallow_sleep_timer_end_of_track_reasons = 30;
+    repeated string disallow_add_to_queue_track_reasons = 31;
+    repeated string disallow_tap_to_play_track_in_next_tracks_reasons = 32;
+    repeated string disallow_reordering_track_in_next_tracks_reasons = 33;
+    repeated string disallow_reordering_episode_in_next_tracks_reasons = 34;
+    repeated string disallow_reordering_enqueued_track_in_next_tracks_reasons = 35;
+    repeated string disallow_reordering_enqueued_episode_in_next_tracks_reasons = 36;
+    repeated string disallow_viewing_queue_reasons = 37;
+    repeated string disallow_viewing_ordered_tracks_in_next_tracks_reasons = 38;
+    repeated string disallow_swipe_next_reasons = 39;
+    repeated string disallow_swipe_prev_reasons = 40;
+    
+    reserved 24;
 }
-

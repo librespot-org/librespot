@@ -1,0 +1,128 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.desktop.local_jam.proto;
+
+option optimize_for = CODE_SIZE;
+
+service DesktopLocalJam {
+    rpc StartScanning(StartScanRequest) returns (stream ScanResponse);
+    rpc StopScanning(StopScanRequest) returns (StopScanResponse);
+    rpc StartBroadcasting(StartBroadcastRequest) returns (StartBroadcastResponse);
+    rpc StopBroadcasting(StopBroadcastRequest) returns (StopBroadcastResponse);
+    rpc StartBleBroadcasting(StartBleBroadcastRequest) returns (StartBleBroadcastResponse);
+    rpc StopBleBroadcasting(StopBleBroadcastRequest) returns (StopBleBroadcastResponse);
+    rpc SubNetworkInterfaces(SubNetworkInterfacesRequest) returns (stream NetworkInterfacesResponse);
+}
+
+message LocalNetDevice {
+    Tech tech = 1;
+    Type type = 2;
+    string title = 3;
+    string token = 4;
+    string device_id = 5;
+}
+
+message LocalBleDevice {
+    string token = 1;
+}
+
+message NetworkInterface {
+    int32 prefix_length = 1;
+    IpVersion ip_version = 2;
+}
+
+message StartScanRequest {
+    
+}
+
+message ScanResponse {
+    repeated LocalNetDevice devices = 1;
+}
+
+message StopScanRequest {
+    
+}
+
+message StopScanResponse {
+    
+}
+
+message StartBroadcastRequest {
+    LocalNetDevice device = 1;
+}
+
+message StartBroadcastResponse {
+    
+}
+
+message StartBleBroadcastRequest {
+    LocalBleDevice device = 1;
+}
+
+message StartBleBroadcastResponse {
+    
+}
+
+message StopBroadcastRequest {
+    
+}
+
+message StopBroadcastResponse {
+    
+}
+
+message StopBleBroadcastRequest {
+    
+}
+
+message StopBleBroadcastResponse {
+    
+}
+
+message SubNetworkInterfacesRequest {
+    
+}
+
+message NetworkInterfacesResponse {
+    repeated NetworkInterface network_interfaces = 1;
+}
+
+enum Tech {
+    UNSPECIFIED_TECH = 0;
+    CONNECT = 1;
+    CAST_JS = 2;
+    CAST = 3;
+    BLUETOOTH = 4;
+    AIRPLAY = 5;
+    CARPLAY = 6;
+    WIRED = 7;
+}
+
+enum Type {
+    UNKNOWN_TYPE = 0;
+    COMPUTER = 1;
+    TABLET = 2;
+    SMARTPHONE = 3;
+    SPEAKER = 4;
+    SPEAKER_GROUP = 5;
+    TV = 6;
+    AVR = 7;
+    STB = 8;
+    AUDIO_DONGLE = 9;
+    GAME_CONSOLE = 10;
+    CAST_VIDEO = 11;
+    CAST_AUDIO = 12;
+    AUTOMOBILE = 13;
+    SMARTWATCH = 14;
+    CARTHING = 15;
+    HOMETHING = 16;
+    MAYBE_HEADPHONES = 17;
+}
+
+enum IpVersion {
+    UNSPECIFIED_VERSION = 0;
+    V4 = 1;
+    V6 = 2;
+}

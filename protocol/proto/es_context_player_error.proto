@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
@@ -9,6 +9,7 @@ option optimize_for = CODE_SIZE;
 option java_package = "com.spotify.player.esperanto.proto";
 
 message ContextPlayerError {
+    ErrorCode code = 1;
     enum ErrorCode {
         SUCCESS = 0;
         PLAYBACK_STUCK = 1;
@@ -53,9 +54,14 @@ message ContextPlayerError {
         CONTEXT_LOADING_FAILED = 40;
         AUDIOBOOK_NOT_PLAYABLE = 41;
         SIGNAL_NOT_AVAILABLE = 42;
+        SET_SLEEP_TIMER_RESTRICTED = 43;
+        PLAYBACK_START_SLOW = 44;
+        PLAYBACK_START_TIMEOUT = 45;
+        PLAYBACK_STUCK_TIMEOUT = 46;
+        PLAYBACK_CLIENT_VERSION_IS_SUNSETTED = 47;
+        PLAYBACK_AUDIO_FORMAT_NEGOTIATION_FAIL = 48;
     }
-
-    ErrorCode code = 1;
+    
     string message = 2;
     map<string, string> data = 3;
 }

@@ -1,0 +1,29 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.player.proto;
+
+import "context.proto";
+import "logging_params.proto";
+import "play_origin.proto";
+import "prepare_play_options.proto";
+import "track_instantiator.proto";
+import "player_sequence/player/state/session_context_state.proto";
+
+option optimize_for = CODE_SIZE;
+
+message SequencePlayerNode {
+    optional Context context = 1;
+    
+    optional SequenceSession sequence_session = 2;
+    message SequenceSession {
+        required sequence.proto.SessionContextState session_context_state = 1;
+        required sint32 iteration = 2;
+    }
+    
+    optional TrackInstantiator instantiate = 3;
+    optional PlayOrigin play_origin = 4;
+    optional PreparePlayOptions prepare_options = 5;
+    optional LoggingParams logging_params = 6;
+}

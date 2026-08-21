@@ -1,0 +1,56 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.list.v1.model;
+
+import "spotify/list/v1/model/attributes.proto";
+import "spotify/list/v1/model/response_info.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "ListEntityProto";
+option java_package = "com.spotify.list.v1.model";
+
+message MetaItem {
+    oneof _attributes {
+        Attributes attributes = 1;
+    }
+    
+    oneof _info {
+        ResponseInfo info = 2;
+    }
+}
+
+message Item {
+    oneof _id {
+        bytes id = 1;
+    }
+    
+    oneof _attributes {
+        Attributes attributes = 2;
+    }
+}
+
+message ListEntity {
+    repeated Item items = 2;
+    map<string, MetaItem> meta_items = 3;
+    
+    oneof _attributes {
+        Attributes attributes = 1;
+    }
+    
+    oneof _lens_effect {
+        LensEffect lens_effect = 4;
+    }
+}
+
+message LensEffect {
+    oneof _lens_removed_items {
+        LensRemovedItems lens_removed_items = 1;
+    }
+}
+
+message LensRemovedItems {
+    repeated Item items = 1;
+}

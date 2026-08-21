@@ -1,0 +1,38 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.concerts.metadata.v1;
+
+option optimize_for = CODE_SIZE;
+
+message Image {
+    bytes file_id = 1;
+    
+    Size size = 2;
+    enum Size {
+        SIZE_UNKNOWN = 0;
+        SIZE_DEFAULT = 1;
+        SIZE_SMALL = 2;
+        SIZE_LARGE = 3;
+        SIZE_XLARGE = 4;
+    }
+    
+    oneof _pixel_width {
+        int32 pixel_width = 3;
+    }
+    
+    oneof _pixel_height {
+        int32 pixel_height = 4;
+    }
+}
+
+message ImageGroup {
+    repeated Image image = 1;
+}
+
+message Marketing {
+    oneof _cover_image {
+        ImageGroup cover_image = 1;
+    }
+}

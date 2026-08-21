@@ -1,0 +1,44 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.desktop.remote_config_esperanto.proto;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+import "rcs.proto";
+
+option optimize_for = CODE_SIZE;
+
+service DesktopRemoteConfig {
+    rpc GetProperties(google.protobuf.Empty) returns (GetPropertiesResponse);
+    rpc GetConfiguration(google.protobuf.Empty) returns (GetConfigurationResponse);
+    rpc GetOverrides(google.protobuf.Empty) returns (GetOverridesResponse);
+    rpc SetOverride(SetOverrideRequest) returns (SetOverrideResponse);
+    rpc ClearOverrides(google.protobuf.Empty) returns (ClearOverridesResponse);
+}
+
+message GetPropertiesResponse {
+    remote_config.proto.ClientPropertySet properties = 1;
+}
+
+message GetConfigurationResponse {
+    remote_config.proto.GranularConfiguration configuration = 1;
+}
+
+message GetOverridesResponse {
+    remote_config.proto.GranularConfiguration overrides = 1;
+}
+
+message SetOverrideRequest {
+    remote_config.proto.GranularConfiguration.AssignedPropertyValue property = 1;
+    google.protobuf.Timestamp expiry = 2;
+}
+
+message SetOverrideResponse {
+    bool success = 1;
+}
+
+message ClearOverridesResponse {
+    bool success = 1;
+}
