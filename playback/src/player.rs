@@ -965,27 +965,32 @@ impl PlayerTrackLoader {
 
     fn stream_data_rate(&self, format: AudioFileFormat) -> Option<usize> {
         let kbps = match format {
-            AudioFileFormat::OGG_VORBIS_96 => 12.,
-            AudioFileFormat::OGG_VORBIS_160 => 20.,
-            AudioFileFormat::OGG_VORBIS_320 => 40.,
-            AudioFileFormat::MP3_256 => 32.,
-            AudioFileFormat::MP3_320 => 40.,
-            AudioFileFormat::MP3_160 => 20.,
-            AudioFileFormat::MP3_96 => 12.,
-            AudioFileFormat::MP3_160_ENC => 20.,
-            AudioFileFormat::AAC_24 => 3.,
-            AudioFileFormat::AAC_48 => 6.,
-            AudioFileFormat::AAC_160 => 20.,
-            AudioFileFormat::AAC_320 => 40.,
-            AudioFileFormat::MP4_128 => 16.,
-            AudioFileFormat::OTHER5 => 40.,
-            AudioFileFormat::FLAC_FLAC => 112., // assume 900 kbit/s on average
-            AudioFileFormat::XHE_AAC_12 => 1.5,
-            AudioFileFormat::XHE_AAC_16 => 2.,
-            AudioFileFormat::XHE_AAC_24 => 3.,
-            AudioFileFormat::FLAC_FLAC_24BIT => 3.,
+            AudioFileFormat::OGG_VORBIS_96 => 96.,
+            AudioFileFormat::OGG_VORBIS_160 => 160.,
+            AudioFileFormat::OGG_VORBIS_320 => 320.,
+            AudioFileFormat::MP3_256 => 256.,
+            AudioFileFormat::MP3_320 => 320.,
+            AudioFileFormat::MP3_160 => 160.,
+            AudioFileFormat::MP3_96 => 96.,
+            AudioFileFormat::MP3_160_ENC => 160.,
+            AudioFileFormat::AAC_24 => 24.,
+            AudioFileFormat::AAC_48 => 48.,
+            AudioFileFormat::AAC_160 => 160.,
+            AudioFileFormat::AAC_320 => 320.,
+            AudioFileFormat::MP4_128 => 128.,
+            AudioFileFormat::OTHER5 => 320.,
+            AudioFileFormat::FLAC_FLAC => 900., // assume 900 kbit/s on average
+            AudioFileFormat::XHE_AAC_12 => 12.,
+            AudioFileFormat::XHE_AAC_16 => 16.,
+            AudioFileFormat::XHE_AAC_24 => 24.,
+            AudioFileFormat::FLAC_FLAC_24BIT => 1200., // assume 1200 kbit/s on average
+
+            // TODO: unknown formats
+            AudioFileFormat::PHONO_LOW => 1.,
+            AudioFileFormat::PHONO_HIGH => 2.,
+            AudioFileFormat::PHONO_CLEAR => 3.,
         };
-        let data_rate: f32 = kbps * 1024.;
+        let data_rate: f32 = kbps / 8. * 1024.; // bytes per second
         Some(data_rate.ceil() as usize)
     }
 
