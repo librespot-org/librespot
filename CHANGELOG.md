@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - [core] Made `SpotifyId::to_base62`, `SpotifyId::to_base16`, `FileId::to_base16`, `SpotifyUri::to_id`, `SpotifyUri::to_uri` infallible (breaking)
+- [protocol] Update protobuf definitions and Spotify versions
+- [metadata] Playlists are moved to the `playlist_api` protobuf (breaking)
 
 ### Fixed
 
