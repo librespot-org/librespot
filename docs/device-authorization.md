@@ -137,6 +137,33 @@ and `user-top-read` — and the iOS client does not recognise `user-personalized
 attempting this flow on those platforms surfaces as `invalid_scope`, which points at the
 scopes rather than at the real problem.
 
+### Other clients Spotify enables
+
+Spotify also enables the flow for clients librespot does not ship an ID for. These were
+probed against the live endpoints on 2026-08-18.
+
+Only the pairing exchange was tested for each: that a device code is issued and that
+approving it returns tokens. Whether a session built from those tokens can stream was
+not tested for any of them.
+
+| Client | Client ID | Rejects from `OAUTH_SCOPES` |
+| --- | --- | --- |
+| Spotify for Desktop (`KEYMASTER_CLIENT_ID`) | `65b708073fc0480ea92a077233ca87bd` | — |
+| Spotify PlayStation | `9b18101888dd42948afd0b8792122bec` | — |
+| PlayStation®Network | `cdee0485c0b143de91bb71a853594f9a` | — |
+| Spotify for Microsoft Xbox | `1fc2d01aa9074dde950e8d3dc0eb1729` | — |
+| Spotify for Samsung Tizen TV | `568a50c7e7f64fe3b44a3316ef5590fd` | — |
+| Spotify for Android TV | `756a522d9f1648b89e76e80be654456a` | `user-personalized` |
+| Samsung Wearable | `88197451c42e4c5d96b00be2e4e30713` | `user-personalized` |
+| Spotify for LG TV | `3e29cb18c4c34d60837ec94cf31e9f3e` | `user-personalized`, `user-read-birthdate` |
+| Spotify for Wear OS by Google | `407d482703b9480899f54656c3ed7728` | `user-personalized`, `user-read-birthdate` |
+
+Names are as the pairing API reports them.
+
+One unrecognised scope fails the whole request, so the four clients above cannot be asked
+for `OAUTH_SCOPES` as it stands. `user-personalized` is the only scope all four reject;
+without it and `user-read-birthdate` a single list would cover every client here.
+
 ## Scopes
 
 An unrecognised scope fails the whole request with `invalid_scope` rather than being
