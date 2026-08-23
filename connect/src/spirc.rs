@@ -17,14 +17,19 @@ use crate::{
         player::{Player, PlayerEvent, PlayerEventChannel, QueueTrack},
     },
     protocol::{
-        connect::{Cluster, ClusterUpdate, LogoutCommand, SetVolumeCommand},
+        connect::{
+            Cluster, ClusterUpdate, ClusterUpdateReason as ServerClusterUpdateReason,
+            LogoutCommand, SetVolumeCommand,
+        },
         context::Context,
+        devices::DeviceType,
         explicit_content_pubsub::UserAttributesUpdate,
         player::ProvidedTrack,
         playlist4_external::PlaylistModificationInfo,
         social_connect_v2::SessionUpdate,
         transfer_state::TransferState,
         user_attributes::UserAttributesMutation,
+        {context_page::ContextPage, player::PlayerState},
     },
     state::{
         context::{ContextType, ResetContext},
@@ -33,16 +38,19 @@ use crate::{
     },
 };
 use futures_util::StreamExt;
-use librespot_protocol::context_page::ContextPage;
 use protobuf::MessageField;
 use std::{
+    collections::HashMap,
     future::Future,
     sync::Arc,
     sync::atomic::{AtomicUsize, Ordering},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use thiserror::Error;
-use tokio::{sync::mpsc, time::sleep};
+use tokio::{
+    sync::{broadcast, mpsc, watch},
+    time::sleep,
+};
 
 #[derive(Debug, Error)]
 enum SpircError {
@@ -67,6 +75,111 @@ impl From<SpircError> for Error {
             UnknownEndpoint(_) => Error::unimplemented(err),
         }
     }
+}
+
+/// Information about a device in the cluster. Named to avoid colliding with
+/// `librespot_protocol::connect::DeviceInfo` under a wildcard import.
+#[derive(Debug, Clone)]
+pub struct ClusterDeviceInfo {
+    /// Unique device identifier
+    pub device_id: String,
+    /// Human-readable device name
+    pub device_alias: String,
+    /// Device type (e.g., speaker, phone)
+    pub device_type: DeviceType,
+    /// Volume level 0-100
+    pub volume: u32,
+    /// Whether this is the currently active device
+    pub is_active: bool,
+}
+
+/// Current state of the device cluster (all known devices)
+#[derive(Debug, Clone)]
+pub struct ClusterState {
+    /// Map of all known devices by device_id
+    pub devices: HashMap<String, ClusterDeviceInfo>,
+    /// Currently active device ID (if any)
+    pub active_device_id: Option<String>,
+}
+
+/// Queue information (previous and next tracks)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct QueueList {
+    /// Previous tracks in the queue (as URIs)
+    pub prev_tracks: Vec<String>,
+    /// Next tracks in the queue (as URIs)
+    pub next_tracks: Vec<String>,
+}
+
+/// Semantic reason for cluster updates
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ClusterUpdateReason {
+    /// A device joined the cluster
+    DeviceAppeared,
+    /// A device left the cluster
+    DeviceDisappeared,
+    /// Active device switched
+    ActiveDeviceChanged,
+    /// Device state changed
+    DeviceStateChanged,
+    /// Device info changed
+    DeviceInfoChanged,
+}
+
+/// Event emitted when cluster state changes
+#[derive(Debug, Clone)]
+pub struct ClusterUpdateEvent {
+    /// Device that changed, or `None` if `ActiveDeviceChanged` means nothing is active
+    pub device_id: Option<String>,
+    /// Reason for the update
+    pub reason: ClusterUpdateReason,
+}
+
+/// Semantic reasons for queue updates
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum QueueUpdateReason {
+    /// Previous tracks changed
+    PrevTracksChanged,
+    /// Next tracks changed
+    NextTracksChanged,
+}
+
+/// Event emitted when queue changes
+#[derive(Debug, Clone)]
+pub struct QueueUpdateEvent {
+    /// Reason for the queue update
+    pub reason: QueueUpdateReason,
+}
+
+/// Semantic reasons for player state updates
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum PlayerUpdateReason {
+    /// Track changed
+    TrackChanged,
+    /// Play/pause state changed
+    PlayPauseChanged,
+    /// Shuffle mode changed
+    ShuffleChanged,
+    /// Repeat mode changed
+    RepeatChanged,
+    /// Context changed
+    ContextChanged,
+    /// Queue was set or reloaded
+    QueueChanged,
+    /// Seek detected
+    SeekChanged,
+    /// Other state change
+    Other,
+}
+
+/// Emitted when player state changes
+#[derive(Debug, Clone)]
+pub struct PlayerUpdateEvent {
+    /// Reason for the player update
+    pub reason: PlayerUpdateReason,
 }
 
 struct SpircTask {
@@ -111,6 +224,16 @@ struct SpircTask {
     /// when no other future resolves, otherwise resets the delay
     update_state: bool,
 
+    player_update_sender: broadcast::Sender<PlayerUpdateEvent>,
+    cluster_update_sender: broadcast::Sender<ClusterUpdateEvent>,
+    queue_update_sender: broadcast::Sender<QueueUpdateEvent>,
+    player_state_sender: watch::Sender<Option<PlayerState>>,
+    cluster_state_sender: watch::Sender<ClusterState>,
+    queue_list_sender: watch::Sender<QueueList>,
+    last_active_device_id: Option<String>,
+    last_queue_list: QueueList,
+    last_player_state: Option<PlayerState>,
+
     spirc_id: usize,
 }
 
@@ -144,10 +267,23 @@ const CONTEXT_FETCH_THRESHOLD: usize = 2;
 const VOLUME_UPDATE_DELAY: Duration = Duration::from_millis(500);
 // to reduce updates to remote, we group some request by waiting for a set amount of time
 const UPDATE_STATE_DELAY: Duration = Duration::from_millis(200);
+// a single cluster update can emit several of these back-to-back (e.g. multiple devices
+// changing at once) with no await point in between for a receiver to drain the channel,
+// so capacity 1 would silently drop all but the last one
+const UPDATE_EVENT_CHANNEL_CAPACITY: usize = 16;
+// position drift beyond this is treated as a user seek rather than natural playback
+// progress or network jitter in the timestamp/position reporting
+const SEEK_THRESHOLD_MS: i64 = 5_000;
 
 /// The spotify connect handle
 pub struct Spirc {
     commands: mpsc::UnboundedSender<SpircCommand>,
+    player_update_sender: broadcast::Sender<PlayerUpdateEvent>,
+    cluster_update_sender: broadcast::Sender<ClusterUpdateEvent>,
+    queue_update_sender: broadcast::Sender<QueueUpdateEvent>,
+    player_state_sender: watch::Sender<Option<PlayerState>>,
+    cluster_state_sender: watch::Sender<ClusterState>,
+    queue_list_sender: watch::Sender<QueueList>,
 }
 
 impl Spirc {
@@ -225,6 +361,18 @@ impl Spirc {
         let _ = session.login5().auth_token().await?;
 
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
+        let (player_update_sender_tx, _) = broadcast::channel(UPDATE_EVENT_CHANNEL_CAPACITY);
+        let (cluster_update_sender_tx, _) = broadcast::channel(UPDATE_EVENT_CHANNEL_CAPACITY);
+        let (queue_update_sender_tx, _) = broadcast::channel(UPDATE_EVENT_CHANNEL_CAPACITY);
+        let (player_state_sender_tx, _) = watch::channel(None);
+        let (cluster_state_sender_tx, _) = watch::channel(ClusterState {
+            devices: HashMap::new(),
+            active_device_id: None,
+        });
+        let (queue_list_sender_tx, _) = watch::channel(QueueList {
+            prev_tracks: Vec::new(),
+            next_tracks: Vec::new(),
+        });
 
         let player_events = player.get_player_event_channel();
 
@@ -261,10 +409,31 @@ impl Spirc {
             update_volume: false,
             update_state: false,
 
+            player_update_sender: player_update_sender_tx.clone(),
+            cluster_update_sender: cluster_update_sender_tx.clone(),
+            queue_update_sender: queue_update_sender_tx.clone(),
+            player_state_sender: player_state_sender_tx.clone(),
+            cluster_state_sender: cluster_state_sender_tx.clone(),
+            queue_list_sender: queue_list_sender_tx.clone(),
+            last_active_device_id: None,
+            last_queue_list: QueueList {
+                prev_tracks: Vec::new(),
+                next_tracks: Vec::new(),
+            },
+            last_player_state: None,
+
             spirc_id,
         };
 
-        let spirc = Spirc { commands: cmd_tx };
+        let spirc = Spirc {
+            commands: cmd_tx,
+            player_update_sender: player_update_sender_tx,
+            cluster_update_sender: cluster_update_sender_tx,
+            queue_update_sender: queue_update_sender_tx,
+            player_state_sender: player_state_sender_tx,
+            cluster_state_sender: cluster_state_sender_tx,
+            queue_list_sender: queue_list_sender_tx,
+        };
 
         let initial_volume = task.connect_state.device_info().volume;
         task.connect_state.set_volume(0);
@@ -435,6 +604,36 @@ impl Spirc {
             .commands
             .send(SpircCommand::Transfer(transfer_request))?)
     }
+
+    /// Get a channel which sends lightweight playback state updates.
+    pub fn get_player_update_channel(&self) -> broadcast::Receiver<PlayerUpdateEvent> {
+        self.player_update_sender.subscribe()
+    }
+
+    /// Get a channel which sends device topology changes (devices appearing/disappearing, active device changes).
+    pub fn get_cluster_update_channel(&self) -> broadcast::Receiver<ClusterUpdateEvent> {
+        self.cluster_update_sender.subscribe()
+    }
+
+    /// Get a channel which sends queue change events when prev/next tracks differ.
+    pub fn get_queue_update_channel(&self) -> broadcast::Receiver<QueueUpdateEvent> {
+        self.queue_update_sender.subscribe()
+    }
+
+    /// Watch the current player state (full PlayerState)
+    pub fn watch_player_state(&self) -> watch::Receiver<Option<PlayerState>> {
+        self.player_state_sender.subscribe()
+    }
+
+    /// Watch the current cluster state (all devices and active device)
+    pub fn watch_cluster_state(&self) -> watch::Receiver<ClusterState> {
+        self.cluster_state_sender.subscribe()
+    }
+
+    /// Watch the current queue list (previous and next tracks)
+    pub fn watch_queue_list(&self) -> watch::Receiver<QueueList> {
+        self.queue_list_sender.subscribe()
+    }
 }
 
 impl SpircTask {
@@ -594,6 +793,7 @@ impl SpircTask {
             if let Err(why) = self.handle_disconnect().await {
                 error!("error during disconnecting: {why}")
             }
+            self.publish_local_activation(false);
         }
 
         // this should clear the active session id, leaving an empty state
@@ -703,6 +903,7 @@ impl SpircTask {
                 trace!("Received SpircCommand::Shutdown");
                 self.handle_pause();
                 self.handle_disconnect().await?;
+                self.publish_local_activation(false);
                 self.shutdown = true;
                 if let Some(rx) = self.commands.as_mut() {
                     rx.close()
@@ -731,7 +932,9 @@ impl SpircTask {
                 if pause {
                     self.handle_pause()
                 }
-                return self.handle_disconnect().await;
+                let result = self.handle_disconnect().await;
+                self.publish_local_activation(false);
+                return result;
             }
             SpircCommand::Play => self.handle_play(),
             SpircCommand::PlayPause => self.handle_play_pause(),
@@ -753,10 +956,23 @@ impl SpircTask {
     }
 
     fn handle_player_event(&mut self, event: PlayerEvent) -> Result<(), Error> {
-        if let PlayerEvent::TrackChanged { audio_item } = event {
+        let player_update_reason = match &event {
+            PlayerEvent::TrackChanged { .. } => Some(PlayerUpdateReason::TrackChanged),
+            PlayerEvent::Playing { .. }
+            | PlayerEvent::Paused { .. }
+            | PlayerEvent::Stopped { .. } => Some(PlayerUpdateReason::PlayPauseChanged),
+            PlayerEvent::Seeked { .. } | PlayerEvent::PositionCorrection { .. } => {
+                Some(PlayerUpdateReason::SeekChanged)
+            }
+            PlayerEvent::ShuffleChanged { .. } => Some(PlayerUpdateReason::ShuffleChanged),
+            PlayerEvent::RepeatChanged { .. } => Some(PlayerUpdateReason::RepeatChanged),
+            PlayerEvent::SetQueue { .. } => Some(PlayerUpdateReason::QueueChanged),
+            _ => None,
+        };
+
+        if let PlayerEvent::TrackChanged { audio_item } = &event {
             self.connect_state.update_duration(audio_item.duration_ms);
             self.update_state = true;
-            return Ok(());
         }
 
         // update play_request_id
@@ -765,16 +981,29 @@ impl SpircTask {
             return Ok(());
         }
 
-        let is_current_track = matches! {
-            (event.get_play_request_id(), self.play_request_id),
-            (Some(event_id), Some(current_id)) if event_id == current_id
-        };
+        let should_gate_by_play_request_id = matches!(
+            event,
+            PlayerEvent::Loading { .. }
+                | PlayerEvent::Seeked { .. }
+                | PlayerEvent::PositionCorrection { .. }
+                | PlayerEvent::Playing { .. }
+                | PlayerEvent::Paused { .. }
+                | PlayerEvent::Stopped { .. }
+                | PlayerEvent::TimeToPreloadNextTrack { .. }
+                | PlayerEvent::EndOfTrack { .. }
+                | PlayerEvent::Unavailable { .. }
+        );
 
         // we only process events if the play_request_id matches. If it doesn't, it is
         // an event that belongs to a previous track and only arrives now due to a race
         // condition. In this case we have updated the state already and don't want to
         // mess with it.
-        if !is_current_track {
+        if should_gate_by_play_request_id
+            && !matches! {
+                (event.get_play_request_id(), self.play_request_id),
+                (Some(event_id), Some(current_id)) if event_id == current_id
+            }
+        {
             return Ok(());
         }
 
@@ -872,6 +1101,16 @@ impl SpircTask {
                 self.handle_preload_next_track();
                 return Ok(());
             }
+            PlayerEvent::TrackChanged { .. }
+            | PlayerEvent::ShuffleChanged { .. }
+            | PlayerEvent::RepeatChanged { .. }
+            | PlayerEvent::SetQueue { .. } => {}
+            PlayerEvent::VolumeChanged { .. }
+            | PlayerEvent::SessionConnected { .. }
+            | PlayerEvent::SessionDisconnected { .. }
+            | PlayerEvent::SessionClientChanged { .. }
+            | PlayerEvent::AutoPlayChanged { .. }
+            | PlayerEvent::FilterExplicitContentChanged { .. } => return Ok(()),
             PlayerEvent::Unavailable { track_id, .. } => {
                 self.handle_unavailable(&track_id)?;
                 if self.connect_state.current_track(|t| &t.uri) == &track_id.to_uri() {
@@ -882,6 +1121,13 @@ impl SpircTask {
         }
 
         self.update_state = true;
+
+        if self.connect_state.is_active() {
+            // sync play_status now instead of waiting on the debounced notify()
+            self.connect_state.set_status(&self.play_status);
+            self.publish_active_state(player_update_reason);
+        }
+
         Ok(())
     }
 
@@ -889,7 +1135,7 @@ impl SpircTask {
         trace!("Received connection ID update: {connection_id:?}");
         self.session.set_connection_id(&connection_id);
 
-        let cluster = match self
+        let mut cluster = match self
             .connect_state
             .notify_new_device_appeared(&self.session)
             .await
@@ -908,6 +1154,7 @@ impl SpircTask {
         );
 
         self.connect_established = true;
+        self.sync_cluster_state(&cluster);
 
         let same_session = cluster.player_state.session_id == self.session.session_id()
             || cluster.player_state.session_id.is_empty();
@@ -916,6 +1163,9 @@ impl SpircTask {
                 "active device is <{}> with session <{}>",
                 cluster.active_device_id, cluster.player_state.session_id
             );
+            if let Some(state) = cluster.player_state.take() {
+                self.publish_remote_player_state(state);
+            }
             return Ok(());
         } else if cluster.transfer_data.is_empty() {
             debug!("got empty transfer state, do nothing");
@@ -983,6 +1233,141 @@ impl SpircTask {
         }
     }
 
+    /// Remote snapshots carry no event metadata, so reasons are inferred by diffing here.
+    /// Local updates get theirs directly from the originating `PlayerEvent` instead.
+    fn emit_player_update(&self, state: Option<PlayerState>, last_state: Option<&PlayerState>) {
+        if self.player_update_sender.receiver_count() == 0
+            && self.player_state_sender.receiver_count() == 0
+        {
+            return;
+        }
+
+        let state = state.unwrap_or_else(|| self.connect_state.player().clone());
+        let reasons = classify_player_update_reasons(&state, last_state);
+
+        let _ = self.player_state_sender.send(Some(state));
+        for reason in reasons {
+            self.emit_player_update_event(PlayerUpdateEvent { reason });
+        }
+    }
+
+    /// No-op without subscribers, so local playback doesn't warn when nobody's listening
+    fn emit_player_update_event(&self, event: PlayerUpdateEvent) {
+        if self.player_update_sender.receiver_count() == 0 {
+            return;
+        }
+
+        if let Err(why) = self.player_update_sender.send(event) {
+            warn!("couldn't emit player update because: {why}")
+        }
+    }
+
+    /// Shared by connect-time hydration and ongoing dealer updates so neither forgets it
+    fn sync_cluster_state(&mut self, cluster: &Cluster) {
+        let _ = self.cluster_state_sender.send(build_cluster_state(cluster));
+
+        let new_active_device_id = if cluster.active_device_id.is_empty() {
+            None
+        } else {
+            Some(cluster.active_device_id.clone())
+        };
+        if new_active_device_id != self.last_active_device_id {
+            self.emit_cluster_update(ClusterUpdateEvent {
+                reason: ClusterUpdateReason::ActiveDeviceChanged,
+                device_id: new_active_device_id.clone(),
+            });
+            self.last_active_device_id = new_active_device_id;
+        }
+    }
+
+    fn publish_remote_player_state(&mut self, state: PlayerState) {
+        self.publish_queue_snapshot(&state);
+        self.emit_player_update(Some(state.clone()), self.last_player_state.as_ref());
+        self.last_player_state = Some(state);
+    }
+
+    fn emit_cluster_update(&self, event: ClusterUpdateEvent) {
+        if self.cluster_update_sender.receiver_count() == 0 {
+            return;
+        }
+
+        if let Err(why) = self.cluster_update_sender.send(event) {
+            warn!("couldn't emit cluster transition because: {why}")
+        }
+    }
+
+    fn emit_queue_update(&self, event: QueueUpdateEvent) {
+        if self.queue_update_sender.receiver_count() == 0 {
+            return;
+        }
+
+        if let Err(why) = self.queue_update_sender.send(event) {
+            warn!("couldn't emit queue update because: {why}")
+        }
+    }
+
+    fn queue_list_from_player_state(player_state: &PlayerState) -> QueueList {
+        QueueList {
+            prev_tracks: player_state
+                .prev_tracks
+                .iter()
+                .map(|t| t.uri.clone())
+                .collect(),
+            next_tracks: player_state
+                .next_tracks
+                .iter()
+                .map(|t| t.uri.clone())
+                .collect(),
+        }
+    }
+
+    fn publish_queue_snapshot(&mut self, player_state: &PlayerState) {
+        if self.queue_list_sender.receiver_count() == 0
+            && self.queue_update_sender.receiver_count() == 0
+        {
+            return;
+        }
+
+        let queue_list = Self::queue_list_from_player_state(player_state);
+        let prev_queue_list = std::mem::replace(&mut self.last_queue_list, queue_list.clone());
+
+        let (prev_changed, next_changed) = queue_lists_changed(&prev_queue_list, &queue_list);
+
+        if prev_changed || next_changed {
+            let _ = self.queue_list_sender.send(queue_list);
+
+            if prev_changed {
+                self.emit_queue_update(QueueUpdateEvent {
+                    reason: QueueUpdateReason::PrevTracksChanged,
+                });
+            }
+            if next_changed {
+                self.emit_queue_update(QueueUpdateEvent {
+                    reason: QueueUpdateReason::NextTracksChanged,
+                });
+            }
+        }
+    }
+
+    fn publish_active_state(&mut self, reason: Option<PlayerUpdateReason>) {
+        let has_subscribers = self.player_update_sender.receiver_count() > 0
+            || self.player_state_sender.receiver_count() > 0
+            || self.queue_list_sender.receiver_count() > 0
+            || self.queue_update_sender.receiver_count() > 0;
+        if !has_subscribers {
+            return;
+        }
+
+        let player_state = self.connect_state.player().clone();
+        let _ = self.player_state_sender.send(Some(player_state.clone()));
+        self.publish_queue_snapshot(&player_state);
+        self.last_player_state = Some(player_state);
+
+        if let Some(reason) = reason {
+            self.emit_player_update_event(PlayerUpdateEvent { reason });
+        }
+    }
+
     async fn handle_cluster_update(
         &mut self,
         mut cluster_update: ClusterUpdate,
@@ -995,7 +1380,20 @@ impl SpircTask {
             cluster_update.cluster.active_device_id
         );
 
-        if let Some(cluster) = cluster_update.cluster.take() {
+        if let Some(mut cluster) = cluster_update.cluster.take() {
+            // published before any broadcast below, so a receiver woken by one of those
+            // events can trust watch_cluster_state() already reflects it
+            self.sync_cluster_state(&cluster);
+
+            if let Some(mapped_reason) = reason.ok().and_then(map_server_cluster_update_reason) {
+                for device_id in &cluster_update.devices_that_changed {
+                    self.emit_cluster_update(ClusterUpdateEvent {
+                        reason: mapped_reason,
+                        device_id: Some(device_id.clone()),
+                    });
+                }
+            }
+
             let became_inactive = self.connect_state.is_active()
                 && cluster.active_device_id != self.session.device_id();
             if became_inactive {
@@ -1007,6 +1405,8 @@ impl SpircTask {
                 //  background: when another device sends a connect-state update, some player's position de-syncs
                 //  tried: providing session_id, playback_id, track-metadata "track_player"
                 self.update_state = true;
+            } else if let Some(state) = cluster.player_state.take() {
+                self.publish_remote_player_state(state);
             }
         } else if self.connect_state.is_active() {
             self.connect_state.became_inactive(&self.session).await?;
@@ -1314,6 +1714,7 @@ impl SpircTask {
 
     fn handle_activate(&mut self) {
         self.connect_state.set_active(true);
+        self.publish_local_activation(true);
         self.player
             .emit_session_connected_event(self.session.connection_id(), self.session.username());
         self.player.emit_session_client_changed_event(
@@ -1925,6 +2326,46 @@ impl SpircTask {
             if self.connect_state.is_active() {
                 self.player.emit_volume_changed_event(volume);
             }
+
+            // reflect locally now; the server only echoes this back on its own schedule
+            let (device_id, info) = self.own_device_info(self.connect_state.is_active());
+            self.cluster_state_sender.send_modify(|state| {
+                state.devices.insert(device_id.clone(), info);
+            });
+            self.emit_cluster_update(ClusterUpdateEvent {
+                reason: ClusterUpdateReason::DeviceInfoChanged,
+                device_id: Some(device_id),
+            });
+        }
+    }
+
+    fn own_device_info(&self, is_active: bool) -> (String, ClusterDeviceInfo) {
+        let device_id = self.session.device_id().to_string();
+        let device_info = self.connect_state.device_info();
+        let info = ClusterDeviceInfo {
+            device_id: device_id.clone(),
+            device_alias: device_info.name.clone(),
+            device_type: device_info.device_type.enum_value_or_default(),
+            volume: device_info.volume,
+            is_active,
+        };
+        (device_id, info)
+    }
+
+    /// Local echo of an activation change, same rationale as `set_volume`'s
+    fn publish_local_activation(&mut self, active: bool) {
+        let (device_id, info) = self.own_device_info(active);
+        let new_active_device_id = active.then(|| device_id.clone());
+
+        self.cluster_state_sender
+            .send_modify(|state| apply_local_activation(state, device_id, info, active));
+
+        if new_active_device_id != self.last_active_device_id {
+            self.last_active_device_id = new_active_device_id.clone();
+            self.emit_cluster_update(ClusterUpdateEvent {
+                reason: ClusterUpdateReason::ActiveDeviceChanged,
+                device_id: new_active_device_id,
+            });
         }
     }
 }
@@ -1932,5 +2373,488 @@ impl SpircTask {
 impl Drop for SpircTask {
     fn drop(&mut self) {
         debug!("drop Spirc[{}]", self.spirc_id);
+    }
+}
+
+/// Returns whether the prev/next track lists differ between two `QueueList`s
+fn queue_lists_changed(prev: &QueueList, next: &QueueList) -> (bool, bool) {
+    (
+        prev.prev_tracks != next.prev_tracks,
+        prev.next_tracks != next.next_tracks,
+    )
+}
+
+/// Upserts one device's entry into a `ClusterState`, clearing `is_active` on whichever
+/// device previously held it
+fn apply_local_activation(
+    state: &mut ClusterState,
+    device_id: String,
+    info: ClusterDeviceInfo,
+    active: bool,
+) {
+    if active {
+        if let Some(prev_id) = &state.active_device_id {
+            if let Some(prev) = state.devices.get_mut(prev_id) {
+                prev.is_active = false;
+            }
+        }
+        state.active_device_id = Some(device_id.clone());
+    } else if state.active_device_id.as_deref() == Some(device_id.as_str()) {
+        // don't relinquish if a remote update already moved active elsewhere
+        state.active_device_id = None;
+    }
+    state.devices.insert(device_id, info);
+}
+
+/// Maps the server's cluster update reason to ours; `None` for reasons we don't
+/// broadcast a per-device event for (e.g. the active device change, handled separately)
+fn map_server_cluster_update_reason(
+    reason: ServerClusterUpdateReason,
+) -> Option<ClusterUpdateReason> {
+    match reason {
+        ServerClusterUpdateReason::DEVICE_NEW_CONNECTION
+        | ServerClusterUpdateReason::NEW_DEVICE_APPEARED => {
+            Some(ClusterUpdateReason::DeviceAppeared)
+        }
+        ServerClusterUpdateReason::DEVICES_DISAPPEARED => {
+            Some(ClusterUpdateReason::DeviceDisappeared)
+        }
+        ServerClusterUpdateReason::DEVICE_ALIAS_CHANGED
+        | ServerClusterUpdateReason::DEVICE_VOLUME_CHANGED => {
+            Some(ClusterUpdateReason::DeviceInfoChanged)
+        }
+        ServerClusterUpdateReason::DEVICE_STATE_CHANGED => {
+            Some(ClusterUpdateReason::DeviceStateChanged)
+        }
+        _ => None,
+    }
+}
+
+/// Builds the device map and active device id from a server `Cluster` snapshot
+fn build_cluster_state(cluster: &Cluster) -> ClusterState {
+    let devices = cluster
+        .device
+        .values()
+        .map(|device| {
+            let info = ClusterDeviceInfo {
+                device_id: device.device_id.clone(),
+                device_alias: device.name.clone(),
+                device_type: device.device_type.enum_value_or_default(),
+                volume: device.volume,
+                is_active: device.device_id == cluster.active_device_id,
+            };
+            (info.device_id.clone(), info)
+        })
+        .collect();
+
+    let active_device_id = if cluster.active_device_id.is_empty() {
+        None
+    } else {
+        Some(cluster.active_device_id.clone())
+    };
+
+    ClusterState {
+        devices,
+        active_device_id,
+    }
+}
+
+/// Position drift beyond `SEEK_THRESHOLD_MS` relative to natural playback progress
+fn is_seek(state: &PlayerState, last: &PlayerState) -> bool {
+    let time_diff = state.timestamp.saturating_sub(last.timestamp);
+    let expected_position = if state.is_playing {
+        last.position_as_of_timestamp + time_diff
+    } else {
+        last.position_as_of_timestamp
+    };
+    (state.position_as_of_timestamp - expected_position).abs() > SEEK_THRESHOLD_MS
+}
+
+/// Every way a remote `PlayerState` snapshot differs from the last one seen.
+/// Adding a new kind of change to track is a single entry in `checks` below.
+fn classify_player_update_reasons(
+    state: &PlayerState,
+    last_state: Option<&PlayerState>,
+) -> Vec<PlayerUpdateReason> {
+    let Some(last) = last_state else {
+        return vec![PlayerUpdateReason::Other];
+    };
+
+    fn track_uri(s: &PlayerState) -> Option<&str> {
+        s.track.as_ref().map(|t| t.uri.as_str())
+    }
+    let is_playing = |s: &PlayerState| s.is_playing && !s.is_paused;
+    let shuffle = |s: &PlayerState| s.options.as_ref().map(|o| o.shuffling_context);
+    let repeat = |s: &PlayerState| {
+        s.options
+            .as_ref()
+            .map(|o| (o.repeating_context, o.repeating_track))
+    };
+
+    let track_changed = track_uri(state) != track_uri(last);
+
+    let checks = [
+        (track_changed, PlayerUpdateReason::TrackChanged),
+        (
+            is_playing(state) != is_playing(last),
+            PlayerUpdateReason::PlayPauseChanged,
+        ),
+        (
+            shuffle(state) != shuffle(last),
+            PlayerUpdateReason::ShuffleChanged,
+        ),
+        (
+            repeat(state) != repeat(last),
+            PlayerUpdateReason::RepeatChanged,
+        ),
+        (
+            state.context_uri != last.context_uri,
+            PlayerUpdateReason::ContextChanged,
+        ),
+        // seek doesn't apply across a track change: position naturally resets then
+        (
+            !track_changed && is_seek(state, last),
+            PlayerUpdateReason::SeekChanged,
+        ),
+    ];
+
+    let mut reasons: Vec<_> = checks
+        .into_iter()
+        .filter_map(|(changed, reason)| changed.then_some(reason))
+        .collect();
+
+    if reasons.is_empty() {
+        reasons.push(PlayerUpdateReason::Other);
+    }
+
+    reasons
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn state_with(f: impl FnOnce(&mut PlayerState)) -> PlayerState {
+        let mut state = PlayerState::default();
+        f(&mut state);
+        state
+    }
+
+    fn track(uri: &str) -> ProvidedTrack {
+        let mut t = ProvidedTrack::new();
+        t.uri = uri.to_string();
+        t
+    }
+
+    #[test]
+    fn no_previous_state_is_other() {
+        let state = PlayerState::default();
+        assert_eq!(
+            classify_player_update_reasons(&state, None),
+            vec![PlayerUpdateReason::Other]
+        );
+    }
+
+    #[test]
+    fn track_change_alone() {
+        let last = state_with(|s| {
+            s.track = MessageField::some(track("spotify:track:a"));
+            s.is_playing = true;
+        });
+        let next = state_with(|s| {
+            s.track = MessageField::some(track("spotify:track:b"));
+            s.is_playing = true;
+        });
+        assert_eq!(
+            classify_player_update_reasons(&next, Some(&last)),
+            vec![PlayerUpdateReason::TrackChanged]
+        );
+    }
+
+    #[test]
+    fn track_and_play_pause_both_reported() {
+        let last = state_with(|s| {
+            s.track = MessageField::some(track("spotify:track:a"));
+            s.is_playing = true;
+        });
+        let next = state_with(|s| {
+            s.track = MessageField::some(track("spotify:track:b"));
+            s.is_playing = false;
+        });
+        assert_eq!(
+            classify_player_update_reasons(&next, Some(&last)),
+            vec![
+                PlayerUpdateReason::TrackChanged,
+                PlayerUpdateReason::PlayPauseChanged,
+            ]
+        );
+    }
+
+    #[test]
+    fn play_pause_change_detected() {
+        let last = state_with(|s| s.is_playing = false);
+        let next = state_with(|s| s.is_playing = true);
+        assert_eq!(
+            classify_player_update_reasons(&next, Some(&last)),
+            vec![PlayerUpdateReason::PlayPauseChanged]
+        );
+    }
+
+    #[test]
+    fn seek_detected_beyond_natural_progress() {
+        let last = state_with(|s| {
+            s.is_playing = true;
+            s.timestamp = 1_000;
+            s.position_as_of_timestamp = 10_000;
+        });
+        let next = state_with(|s| {
+            s.is_playing = true;
+            s.timestamp = 2_000;
+            s.position_as_of_timestamp = 50_000;
+        });
+        assert_eq!(
+            classify_player_update_reasons(&next, Some(&last)),
+            vec![PlayerUpdateReason::SeekChanged]
+        );
+    }
+
+    #[test]
+    fn natural_progress_is_not_a_seek() {
+        let last = state_with(|s| {
+            s.is_playing = true;
+            s.timestamp = 1_000;
+            s.position_as_of_timestamp = 10_000;
+        });
+        let next = state_with(|s| {
+            s.is_playing = true;
+            s.timestamp = 2_000;
+            s.position_as_of_timestamp = 11_000;
+        });
+        assert_eq!(
+            classify_player_update_reasons(&next, Some(&last)),
+            vec![PlayerUpdateReason::Other]
+        );
+    }
+
+    #[test]
+    fn track_change_suppresses_seek() {
+        // position naturally resets on a track change; that's not a seek
+        let last = state_with(|s| {
+            s.track = MessageField::some(track("spotify:track:a"));
+            s.is_playing = true;
+            s.timestamp = 1_000;
+            s.position_as_of_timestamp = 100_000;
+        });
+        let next = state_with(|s| {
+            s.track = MessageField::some(track("spotify:track:b"));
+            s.is_playing = true;
+            s.timestamp = 2_000;
+            s.position_as_of_timestamp = 0;
+        });
+        assert_eq!(
+            classify_player_update_reasons(&next, Some(&last)),
+            vec![PlayerUpdateReason::TrackChanged]
+        );
+    }
+
+    fn queue_list(prev: &[&str], next: &[&str]) -> QueueList {
+        QueueList {
+            prev_tracks: prev.iter().map(ToString::to_string).collect(),
+            next_tracks: next.iter().map(ToString::to_string).collect(),
+        }
+    }
+
+    #[test]
+    fn queue_lists_changed_detects_no_change() {
+        let a = queue_list(&["a"], &["b"]);
+        let b = queue_list(&["a"], &["b"]);
+        assert_eq!(queue_lists_changed(&a, &b), (false, false));
+    }
+
+    #[test]
+    fn queue_lists_changed_detects_prev_and_next_independently() {
+        let a = queue_list(&["a"], &["b"]);
+        assert_eq!(
+            queue_lists_changed(&a, &queue_list(&["z"], &["b"])),
+            (true, false)
+        );
+        assert_eq!(
+            queue_lists_changed(&a, &queue_list(&["a"], &["z"])),
+            (false, true)
+        );
+        assert_eq!(
+            queue_lists_changed(&a, &queue_list(&["z"], &["z"])),
+            (true, true)
+        );
+    }
+
+    fn device(
+        id: &str,
+        name: &str,
+        volume: u32,
+        device_type: DeviceType,
+    ) -> crate::protocol::connect::DeviceInfo {
+        let mut d = crate::protocol::connect::DeviceInfo::new();
+        d.device_id = id.to_string();
+        d.name = name.to_string();
+        d.volume = volume;
+        d.device_type = ::protobuf::EnumOrUnknown::new(device_type);
+        d
+    }
+
+    #[test]
+    fn build_cluster_state_maps_devices_and_marks_active() {
+        let mut cluster = Cluster::new();
+        cluster.active_device_id = "device-1".to_string();
+        cluster.device.insert(
+            "device-1".to_string(),
+            device("device-1", "Kitchen", 50, DeviceType::SPEAKER),
+        );
+        cluster.device.insert(
+            "device-2".to_string(),
+            device("device-2", "Phone", 80, DeviceType::SMARTPHONE),
+        );
+
+        let state = build_cluster_state(&cluster);
+
+        assert_eq!(state.active_device_id.as_deref(), Some("device-1"));
+        assert_eq!(state.devices.len(), 2);
+        assert!(state.devices["device-1"].is_active);
+        assert!(!state.devices["device-2"].is_active);
+        assert_eq!(state.devices["device-2"].volume, 80);
+        assert_eq!(
+            state.devices["device-2"].device_type,
+            DeviceType::SMARTPHONE
+        );
+    }
+
+    #[test]
+    fn build_cluster_state_no_active_device_is_none() {
+        let cluster = Cluster::new();
+        let state = build_cluster_state(&cluster);
+        assert_eq!(state.active_device_id, None);
+        assert!(state.devices.is_empty());
+    }
+
+    #[test]
+    fn maps_new_device_reasons_to_appeared() {
+        assert_eq!(
+            map_server_cluster_update_reason(ServerClusterUpdateReason::DEVICE_NEW_CONNECTION),
+            Some(ClusterUpdateReason::DeviceAppeared)
+        );
+        assert_eq!(
+            map_server_cluster_update_reason(ServerClusterUpdateReason::NEW_DEVICE_APPEARED),
+            Some(ClusterUpdateReason::DeviceAppeared)
+        );
+    }
+
+    #[test]
+    fn maps_disappeared_reason() {
+        assert_eq!(
+            map_server_cluster_update_reason(ServerClusterUpdateReason::DEVICES_DISAPPEARED),
+            Some(ClusterUpdateReason::DeviceDisappeared)
+        );
+    }
+
+    #[test]
+    fn maps_alias_and_volume_to_device_info_changed() {
+        assert_eq!(
+            map_server_cluster_update_reason(ServerClusterUpdateReason::DEVICE_ALIAS_CHANGED),
+            Some(ClusterUpdateReason::DeviceInfoChanged)
+        );
+        assert_eq!(
+            map_server_cluster_update_reason(ServerClusterUpdateReason::DEVICE_VOLUME_CHANGED),
+            Some(ClusterUpdateReason::DeviceInfoChanged)
+        );
+    }
+
+    #[test]
+    fn maps_state_changed_reason() {
+        assert_eq!(
+            map_server_cluster_update_reason(ServerClusterUpdateReason::DEVICE_STATE_CHANGED),
+            Some(ClusterUpdateReason::DeviceStateChanged)
+        );
+    }
+
+    #[test]
+    fn unknown_reason_has_no_per_device_event() {
+        assert_eq!(
+            map_server_cluster_update_reason(
+                ServerClusterUpdateReason::UNKNOWN_CLUSTER_UPDATE_REASON
+            ),
+            None
+        );
+    }
+
+    fn device_info(device_id: &str, is_active: bool) -> ClusterDeviceInfo {
+        ClusterDeviceInfo {
+            device_id: device_id.to_string(),
+            device_alias: "test device".to_string(),
+            device_type: DeviceType::COMPUTER,
+            volume: 50,
+            is_active,
+        }
+    }
+
+    #[test]
+    fn apply_local_activation_marks_device_active_and_clears_previous() {
+        let mut state = ClusterState {
+            devices: [("old".to_string(), device_info("old", true))].into(),
+            active_device_id: Some("old".to_string()),
+        };
+
+        apply_local_activation(
+            &mut state,
+            "new".to_string(),
+            device_info("new", true),
+            true,
+        );
+
+        assert_eq!(state.active_device_id.as_deref(), Some("new"));
+        assert!(!state.devices["old"].is_active);
+        assert!(state.devices["new"].is_active);
+    }
+
+    #[test]
+    fn apply_local_activation_deactivation_clears_active_device_id() {
+        let mut state = ClusterState {
+            devices: [("me".to_string(), device_info("me", true))].into(),
+            active_device_id: Some("me".to_string()),
+        };
+
+        apply_local_activation(
+            &mut state,
+            "me".to_string(),
+            device_info("me", false),
+            false,
+        );
+
+        assert_eq!(state.active_device_id, None);
+        assert!(!state.devices["me"].is_active);
+    }
+
+    #[test]
+    fn apply_local_activation_deactivation_does_not_clobber_newer_active_device() {
+        // a remote ClusterUpdate already made "other" active before our own
+        // deactivation got processed; we shouldn't stomp that back to None
+        let mut state = ClusterState {
+            devices: [
+                ("me".to_string(), device_info("me", false)),
+                ("other".to_string(), device_info("other", true)),
+            ]
+            .into(),
+            active_device_id: Some("other".to_string()),
+        };
+
+        apply_local_activation(
+            &mut state,
+            "me".to_string(),
+            device_info("me", false),
+            false,
+        );
+
+        assert_eq!(state.active_device_id.as_deref(), Some("other"));
+        assert!(state.devices["other"].is_active);
+        assert!(!state.devices["me"].is_active);
     }
 }
