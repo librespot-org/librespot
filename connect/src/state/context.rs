@@ -235,19 +235,36 @@ impl ConnectState {
                     && matches!(context.uri, Some(ref uri) if uri == self.context_uri())
                 {
                     if let Some(new_index) = self.find_last_index_in_new_context(&new_context) {
-                        new_context.index.track = match new_index {
-                            Ok(i) => i,
-                            Err(i) => {
-                                self.player_mut().index = MessageField::none();
-                                i
-                            }
-                        };
+                        match new_index {
+                            Ok(i) => {
+                                /*
+                                 * A same-context UpdateContext is a refresh of the context,
+                                 * not a new playback command.
+                                 *
+                                 * Keep the live next_tracks queue and the existing context fill
+                                 * position. Rebuilding them from the refreshed context can replace
+                                 * Spotify's established playback order.
+                                 */
+                                let previous_fill_index = self
+                                    .context
+                                    .as_ref()
+                                    .map(|ctx| ctx.index.track)
+                                    .unwrap_or(i);
 
-                        // enforce reloading the context
-                        if let Ok(autoplay_ctx) = self.get_context_mut(ContextType::Autoplay) {
-                            autoplay_ctx.index.track = 0
+                                debug!(
+                                    "same-context refresh mapped playback to index {}; preserving live continuation with fill index {}",
+                                    i, previous_fill_index
+                                );
+
+                                new_context.index.track = previous_fill_index;
+                            }
+                            Err(fallback_index) => {
+                                warn!(
+                                    "ignoring ambiguous same-context refresh instead of replacing playback continuation with fallback index {fallback_index}"
+                                );
+                                return Ok(None);
+                            }
                         }
-                        self.clear_next_tracks();
                     }
                 }
 
