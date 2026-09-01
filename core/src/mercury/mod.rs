@@ -237,10 +237,10 @@ impl MercuryManager {
 
         let status_code = response.status_code;
         if status_code >= 500 {
-            error!("error {} for uri {}", status_code, &response.uri);
+            error!("error {} for uri {}", status_code, response.uri);
             Err(MercuryError::Response(response).into())
         } else if status_code >= 400 {
-            error!("error {} for uri {}", status_code, &response.uri);
+            error!("error {} for uri {}", status_code, response.uri);
             if let Some(cb) = pending.callback {
                 cb.send(Err(MercuryError::Response(response.clone()).into()))
                     .map_err(|_| MercuryError::Channel)?;
@@ -282,7 +282,7 @@ impl MercuryManager {
                 trace!("mercury response <{}> is handled by dealer", response.uri);
                 Ok(())
             } else {
-                debug!("unknown subscription uri={}", &response.uri);
+                debug!("unknown subscription uri={}", response.uri);
                 trace!("response pushed over Mercury: {response:?}");
                 Err(MercuryError::Response(response).into())
             }

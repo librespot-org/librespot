@@ -19,7 +19,7 @@ use librespot::{
         player::{Player, coefficient_to_duration, duration_to_coefficient},
     },
 };
-use librespot_oauth::OAuthClientBuilder;
+use librespot_oauth::{DeviceAuthClientBuilder, OAuthClientBuilder};
 use log::{debug, error, info, trace, warn};
 use sha1::{Digest, Sha1};
 use std::{
@@ -215,6 +215,7 @@ struct Setup {
     mixer_config: MixerConfig,
     credentials: Option<Credentials>,
     enable_oauth: bool,
+    enable_device_auth: bool,
     oauth_port: Option<u16>,
     zeroconf_port: u16,
     player_event_program: Option<String>,
@@ -248,6 +249,7 @@ async fn get_setup() -> Setup {
     const DISABLE_GAPLESS: &str = "disable-gapless";
     const DITHER: &str = "dither";
     const EMIT_SINK_EVENTS: &str = "emit-sink-events";
+    const ENABLE_DEVICE_AUTH: &str = "enable-device-auth";
     const ENABLE_OAUTH: &str = "enable-oauth";
     const ENABLE_VOLUME_NORMALISATION: &str = "enable-volume-normalisation";
     const FORMAT: &str = "format";
@@ -305,6 +307,7 @@ async fn get_setup() -> Setup {
     const HELP_SHORT: &str = "h";
     const ZEROCONF_INTERFACE_SHORT: &str = "i";
     const ENABLE_OAUTH_SHORT: &str = "j";
+    const ENABLE_DEVICE_AUTH_SHORT: &str = ""; // no short flag
     const OAUTH_PORT_SHORT: &str = "K";
     const ACCESS_TOKEN_SHORT: &str = "k";
     const CACHE_SIZE_LIMIT_SHORT: &str = "M";
@@ -436,6 +439,11 @@ async fn get_setup() -> Setup {
         ENABLE_OAUTH_SHORT,
         ENABLE_OAUTH,
         "Perform interactive OAuth sign in.",
+    )
+    .optflag(
+        ENABLE_DEVICE_AUTH_SHORT,
+        ENABLE_DEVICE_AUTH,
+        "Perform OAuth sign in by pairing a code at spotify.com/pair. Needs no browser on this machine.",
     )
     .optopt(
         NAME_SHORT,
@@ -1134,6 +1142,14 @@ async fn get_setup() -> Setup {
     });
 
     let enable_oauth = opt_present(ENABLE_OAUTH);
+    let enable_device_auth = opt_present(ENABLE_DEVICE_AUTH);
+
+    if enable_oauth && enable_device_auth {
+        error!(
+            "`--{ENABLE_OAUTH}` / `-{ENABLE_OAUTH_SHORT}` and `--{ENABLE_DEVICE_AUTH}` are mutually exclusive."
+        );
+        exit(1);
+    }
 
     let cache = {
         let volume_dir = opt_str(SYSTEM_CACHE)
@@ -1189,7 +1205,7 @@ async fn get_setup() -> Setup {
             }
         };
 
-        if enable_oauth && (cache.is_none() || cred_dir.is_none()) {
+        if (enable_oauth || enable_device_auth) && (cache.is_none() || cred_dir.is_none()) {
             warn!("Credential caching is unavailable, but advisable when using OAuth login.");
         }
 
@@ -1246,12 +1262,21 @@ async fn get_setup() -> Setup {
         None
     };
 
-    if credentials.is_none() && no_discovery_reason.is_some() && !enable_oauth {
+    if credentials.is_none()
+        && no_discovery_reason.is_some()
+        && !enable_oauth
+        && !enable_device_auth
+    {
         error!("Credentials are required if discovery and oauth login are disabled.");
         exit(1);
     }
 
     let oauth_port = if opt_present(OAUTH_PORT) {
+        if enable_device_auth {
+            warn!(
+                "With the `--{ENABLE_DEVICE_AUTH}` flag set `--{OAUTH_PORT}` / `-{OAUTH_PORT_SHORT}` has no effect."
+            );
+        }
         if !enable_oauth {
             warn!(
                 "Without the `--{ENABLE_OAUTH}` / `-{ENABLE_OAUTH_SHORT}` flag set `--{OAUTH_PORT}` / `-{OAUTH_PORT_SHORT}` has no effect."
@@ -1853,6 +1878,7 @@ async fn get_setup() -> Setup {
         mixer_config,
         credentials,
         enable_oauth,
+        enable_device_auth,
         oauth_port,
         zeroconf_port,
         player_event_program,
@@ -1946,6 +1972,22 @@ async fn main() {
 
     if let Some(credentials) = setup.credentials {
         last_credentials = Some(credentials);
+        connecting = true;
+    } else if setup.enable_device_auth {
+        let client =
+            DeviceAuthClientBuilder::new(&setup.session_config.client_id, OAUTH_SCOPES.to_vec())
+                .build()
+                .unwrap_or_else(|e| {
+                    error!("Failed to create device auth client: {e}");
+                    exit(1);
+                });
+        // The async variant, because constructing a blocking reqwest client
+        // inside this tokio runtime would panic.
+        let oauth_token = client.get_access_token_async().await.unwrap_or_else(|e| {
+            error!("Failed to get Spotify access token: {e}");
+            exit(1);
+        });
+        last_credentials = Some(Credentials::with_access_token(oauth_token.access_token));
         connecting = true;
     } else if setup.enable_oauth {
         let port_str = match setup.oauth_port {
