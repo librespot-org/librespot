@@ -380,6 +380,7 @@ impl AudioFile {
     pub async fn open(
         session: &Session,
         file_id: FileId,
+        audio_format: i32,
         bytes_per_second: usize,
     ) -> Result<AudioFile, Error> {
         if let Some(file) = session.cache().and_then(|cache| cache.file(file_id)) {
@@ -391,8 +392,13 @@ impl AudioFile {
 
         let (complete_tx, complete_rx) = oneshot::channel();
 
-        let streaming =
-            AudioFileStreaming::open(session.clone(), file_id, complete_tx, bytes_per_second);
+        let streaming = AudioFileStreaming::open(
+            session.clone(),
+            file_id,
+            audio_format,
+            complete_tx,
+            bytes_per_second,
+        );
 
         let session_ = session.clone();
         session.spawn(complete_rx.map_ok(move |mut file| {
@@ -438,10 +444,13 @@ impl AudioFileStreaming {
     pub async fn open(
         session: Session,
         file_id: FileId,
+        audio_format: i32,
         complete_tx: oneshot::Sender<NamedTempFile>,
         bytes_per_second: usize,
     ) -> Result<AudioFileStreaming, Error> {
-        let cdn_url = CdnUrl::new(file_id).resolve_audio(&session).await?;
+        let cdn_url = CdnUrl::new(file_id, audio_format)
+            .resolve_audio(&session)
+            .await?;
 
         let minimum_download_size = AudioFetchParams::get().minimum_download_size;
 
