@@ -1,0 +1,113 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.ad_detection.impl.ad_detection_proto;
+
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.ad.detection.esperanto.proto";
+
+service AdDetection {
+    rpc Detect(DetectRequest) returns (stream DetectResponse);
+    rpc MapTimestamp(MapTimestampRequest) returns (MapTimestampResponse);
+    rpc SubscribeCreatorToUserTimestamp(SubscribeCreatorToUserTimestampRequest) returns (stream SubscribeCreatorToUserTimestampResponse);
+    rpc SubscribeUserToCreatorTimestamp(SubscribeUserToCreatorTimestampRequest) returns (stream SubscribeUserToCreatorTimestampResponse);
+}
+
+message DetectRequest {
+    string episode_uri = 2;
+    string playback_id = 3;
+    
+    reserved 1;
+}
+
+message DetectResponse {
+    repeated Range ad_breaks = 2;
+    message Range {
+        int32 start_ms = 1;
+        int32 end_ms = 2;
+        int32 duration_ms = 3;
+        int32 start_byte = 4;
+        int32 end_byte = 5;
+        Precision precision = 6;
+        InternalTimelineResync resync = 7;
+    }
+    
+    repeated Range degraded_ranges = 3;
+    int32 total_ad_duration = 4;
+    int32 remaining_ad_duration = 5;
+    int32 total_bytes = 6;
+    Precision precision = 7;
+    DetectStatus status = 8;
+    
+    reserved 1;
+    
+    message InternalTimelineResync {
+        int32 adjustment_ms = 1;
+    }
+}
+
+message MapTimestampRequest {
+    string episode_uri = 1;
+    int32 user_timestamp_ms = 2;
+    string playback_id = 3;
+    CreatorTimestampType creator_timestamp_type = 4;
+}
+
+message CreatorTimestamp {
+    int32 creator_timestamp_ms = 1;
+}
+
+message MapTimestampResponse {
+    bool error = 1;
+    CreatorTimestamp creator_timestamp = 2;
+}
+
+message SubscribeCreatorToUserTimestampRequest {
+    string episode_uri = 1;
+    repeated int32 creator_timestamps_ms = 2;
+    string playback_id = 3;
+}
+
+message UserTimestamp {
+    int32 user_timestamp_ms = 1;
+    bool is_fallback = 2;
+}
+
+message SubscribeCreatorToUserTimestampResponse {
+    map<int32, UserTimestamp> creator_to_user_timestamps = 1;
+    Precision precision = 2;
+    DetectStatus status = 3;
+}
+
+message SubscribeUserToCreatorTimestampRequest {
+    string episode_uri = 1;
+    int32 user_timestamp_ms = 2;
+    string playback_id = 3;
+}
+
+message SubscribeUserToCreatorTimestampResponse {
+    CreatorTimestamp creator_timestamp = 1;
+    Precision precision = 2;
+    bool error = 3;
+}
+
+enum DetectStatus {
+    DETECT_STATUS_UNKNOWN = 0;
+    DETECT_STATUS_ERROR = 1;
+    DETECT_STATUS_IN_PROGRESS = 2;
+    DETECT_STATUS_FINISHED = 3;
+    DETECT_STATUS_AUDIO_UNAVAILABLE = 4;
+    DETECT_STATUS_FINISHED_BASED_ON_METADATA_ONLY = 5;
+}
+
+enum Precision {
+    PRECISION_UNKNOWN = 0;
+    PRECISION_LOW = 1;
+    PRECISION_HIGH = 2;
+}
+
+enum CreatorTimestampType {
+    CLIENT_PRODUCED = 0;
+    INFERRED = 1;
+}

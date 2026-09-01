@@ -1,0 +1,26 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.speedpreview.proto;
+
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.speedpreview.proto";
+
+message SpeedPreview {
+    string track_uri = 1;
+    double speed_multiplier = 2;
+    string context_uri = 6;
+    
+    oneof _pitch_factor {
+        double pitch_factor = 3;
+    }
+    
+    oneof _start_position_ms {
+        int64 start_position_ms = 4;
+    }
+    
+    oneof _end_position_ms {
+        int64 end_position_ms = 5;
+    }
+}

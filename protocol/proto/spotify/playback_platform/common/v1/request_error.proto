@@ -1,0 +1,52 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playback_platform.common.v1;
+
+import "google/protobuf/duration.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.playback_platform.common.v1";
+
+message RequestError {
+    oneof error {
+        NotFound not_found = 1;
+        Disallowed disallowed = 2;
+        Unplayable unplayable = 3;
+        BadRequest bad_request = 4;
+        RequestTimeout request_timeout = 5;
+        PermanentError permanent_error = 6;
+        TemporaryError temporary_error = 7;
+    }
+    
+    message NotFound {
+        
+    }
+    
+    message Disallowed {
+        
+    }
+    
+    message Unplayable {
+        
+    }
+    
+    message BadRequest {
+        string reason = 1;
+    }
+    
+    message RequestTimeout {
+        
+    }
+    
+    message PermanentError {
+        string reason = 1;
+    }
+    
+    message TemporaryError {
+        string reason = 1;
+        google.protobuf.Duration retry_in = 2;
+    }
+}

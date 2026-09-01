@@ -1,0 +1,28 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.your_library_tags.proto;
+
+option optimize_for = CODE_SIZE;
+
+message GetSuggestionsRequest {
+    bool always_true = 1;
+}
+
+message GetSuggestionsResponse {
+    int64 ttl_in_seconds = 2;
+    repeated Tag tag = 3;
+}
+
+message Tag {
+    string tag_uri = 1;
+    string playlist_uri = 2;
+    repeated Item item = 3;
+    int32 rank = 4;
+}
+
+message Item {
+    string uri = 1;
+    int32 relevance_score = 2;
+}

@@ -1,0 +1,16 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message Login5TaskNonAuth {
+    optional string credentials_type = 1;
+    optional string protocol_version = 2;
+    repeated int32 http_response = 3;
+    repeated string login5_response = 4;
+    repeated int64 response_duration = 5;
+    optional string client_error = 6;
+}

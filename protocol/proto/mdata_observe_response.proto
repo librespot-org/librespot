@@ -1,0 +1,44 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.mdata_esperanto.proto;
+
+import "extension_kind.proto";
+import "google/protobuf/any.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.mdata.esperanto.proto";
+
+message ObserveResponse {
+    repeated ExtensionResult extension_result = 1;
+    message ExtensionResult {
+        string entity_uri = 1;
+        extendedmetadata.ExtensionKind extension_kind = 2;
+        google.protobuf.Any extension_data = 3;
+        
+        Status status = 4;
+        enum Status {
+            MISSING = 0;
+            OK = 1;
+        }
+        
+        Details details = 5;
+    }
+    
+    bool pending_response = 2;
+    
+    message Details {
+        CacheStatus cache_status = 1;
+        enum CacheStatus {
+            UNKNOWN = 0;
+            OK = 1;
+            NOT_RESOLVED = 2;
+            NOT_FOUND = 3;
+            UNAVAILABLE_FOR_LEGAL_REASONS = 4;
+        }
+        
+        bool fresh = 2;
+    }
+}

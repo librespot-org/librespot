@@ -1,0 +1,62 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.resumption.core.persistent;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/any.proto";
+import "resumption_platform.proto";
+
+option optimize_for = CODE_SIZE;
+
+message Metadata {
+    string parent_uri = 1;
+    google.protobuf.Duration content_length = 2;
+}
+
+message ListResumePoint {
+    string uri = 1;
+    
+    oneof _uid {
+        string uid = 2;
+    }
+    
+    oneof _position {
+        google.protobuf.Duration position = 3;
+    }
+    
+    oneof _shuffle_seed {
+        string shuffle_seed = 4;
+    }
+}
+
+message ResumePointRevision {
+    string resume_point_revision_id = 1 [deprecated = true];
+    google.protobuf.Timestamp create_time = 10;
+    google.protobuf.Duration ttl = 11;
+    bool is_synced_to_backend = 12;
+    
+    oneof resume_point {
+        google.protobuf.Duration position = 2;
+        google.protobuf.Empty started = 3;
+        google.protobuf.Empty finished = 4;
+        int32 counter = 5;
+        string uri = 6;
+        google.protobuf.Any custom = 7;
+        google.protobuf.Empty marked_as_finished = 8;
+        google.protobuf.Empty unmarked_as_finished = 9;
+        google.protobuf.Empty tombstone = 13;
+        v1.ListResumePoint list_resume_point = 14;
+    }
+}
+
+message ResumePointRevisions {
+    repeated ResumePointRevision revisions = 1;
+    
+    oneof _metadata {
+        Metadata metadata = 2;
+    }
+}

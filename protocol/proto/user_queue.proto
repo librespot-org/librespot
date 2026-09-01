@@ -1,0 +1,36 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.queue.proto;
+
+import "item_reporting_context.proto";
+
+option optimize_for = CODE_SIZE;
+
+message SyntheticItemInfo {
+    Source source = 1;
+}
+
+message Item {
+    string uid = 1;
+    string uri = 2;
+    timeline_reporter.proto.ItemReportingContext item_reporting_context = 3;
+    SyntheticItemInfo synthetic_info = 4;
+    string queued_by = 5;
+    string original_list_item_uid = 6;
+    bool hidden_in_queue = 7;
+}
+
+message UserQueue {
+    repeated Item items = 1;
+}
+
+enum Source {
+    SOURCE_UNKNOWN = 0;
+    SOURCE_LIST = 1;
+    SOURCE_QUEUE = 2;
+    SOURCE_AUTOPLAY = 3;
+    SOURCE_MFT = 4;
+    SOURCE_AUTOMIX_PREVIEW = 5;
+}

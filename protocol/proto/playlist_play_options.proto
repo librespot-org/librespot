@@ -1,0 +1,89 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playlist.proto;
+
+option optimize_for = CODE_SIZE;
+
+message PlayOptions {
+    SkipTo skip_to = 1;
+    message SkipTo {
+        string uri = 2;
+        
+        oneof _uid {
+            string uid = 1;
+        }
+        
+        oneof _track_index {
+            uint32 track_index = 3;
+        }
+        
+        oneof _provider {
+            string provider = 4;
+        }
+    }
+    
+    SeekTo seek_to = 2;
+    message SeekTo {
+        oneof _position_ms {
+            int64 position_ms = 1;
+        }
+    }
+    
+    bool should_start = 3;
+    string license = 4;
+    repeated string lenses = 9;
+    
+    Trigger trigger = 15;
+    enum Trigger {
+        IMMEDIATELY = 0;
+        ADVANCED_PAST_TRACK = 1;
+        ADVANCED_PAST_CONTEXT = 2;
+    }
+    
+    oneof _shuffle_list {
+        bool shuffle_list = 5;
+    }
+    
+    oneof _repeat_list {
+        bool repeat_list = 6;
+    }
+    
+    oneof _repeat_item {
+        bool repeat_item = 7;
+    }
+    
+    oneof _playback_speed {
+        float playback_speed = 8;
+    }
+    
+    oneof _session_id {
+        string session_id = 10;
+    }
+    
+    oneof _original_session_id {
+        string original_session_id = 11;
+    }
+    
+    oneof _is_video_first {
+        bool is_video_first = 12;
+    }
+    
+    oneof _focus_uid {
+        string focus_uid = 13;
+    }
+    
+    oneof _audio_stream {
+        AudioStream audio_stream = 14;
+    }
+    
+    oneof _seek_to_creator_timestamp_ms {
+        int64 seek_to_creator_timestamp_ms = 16;
+    }
+}
+
+enum AudioStream {
+    AUDIO_STREAM_DEFAULT = 0;
+    AUDIO_STREAM_ALARM = 1;
+}

@@ -1,0 +1,79 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playlist_cache.proto;
+
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.playlist.proto";
+
+message CachedPlaylistAttributes {
+    map<string, string> format_list_attributes = 10;
+    map<string, string> picture_sizes = 11;
+    repeated int32 geoblocked_attributes = 13;
+    map<int32, int32> num_items_per_link_type = 14;
+    
+    oneof _name {
+        string name = 1;
+    }
+    
+    oneof _length {
+        int32 length = 2;
+    }
+    
+    oneof _collaborative {
+        bool collaborative = 3;
+    }
+    
+    oneof _description {
+        string description = 4;
+    }
+    
+    oneof _picture {
+        string picture = 5;
+    }
+    
+    oneof _owner {
+        string owner = 6;
+    }
+    
+    oneof _revision {
+        bytes revision = 7;
+    }
+    
+    oneof _format_list_type {
+        string format_list_type = 8;
+    }
+    
+    oneof _mosaic_uri {
+        string mosaic_uri = 9;
+    }
+    
+    oneof _encoded_capabilities {
+        bytes encoded_capabilities = 12;
+    }
+    
+    oneof _ai_curation_id {
+        string ai_curation_id = 15;
+    }
+    
+    oneof _status_code {
+        int32 status_code = 16;
+    }
+    
+    oneof _item_id_algorithm {
+        int32 item_id_algorithm = 17;
+    }
+    
+    oneof _updated_at_ms {
+        int64 updated_at_ms = 18;
+    }
+    
+    oneof _deleted_by_owner {
+        bool deleted_by_owner = 19;
+    }
+    
+    oneof _is_user_created {
+        bool is_user_created = 20;
+    }
+}

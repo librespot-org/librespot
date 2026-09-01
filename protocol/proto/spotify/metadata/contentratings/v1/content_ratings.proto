@@ -1,0 +1,32 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.metadata.contentratings.v1;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "ContentRatingsProto";
+option java_package = "com.spotify.metadata.contentratings.v1";
+
+message ContentRatings {
+    repeated ContentRatingTag tags = 1;
+}
+
+message ContentRatingTagWithMarkets {
+    ContentRatingTag tag = 1;
+    repeated string markets = 2;
+}
+
+message ContentRatingsWithMarket {
+    repeated ContentRatingTagWithMarkets rating_tags_with_markets = 1;
+}
+
+enum ContentRatingTag {
+    CONTENT_RATING_TAG_UNSPECIFIED = 0;
+    CONTENT_RATING_TAG_EXPLICIT = 1;
+    CONTENT_RATING_TAG_MOGEF_19 = 2;
+    CONTENT_RATING_TAG_SPOTIFY_18_PLUS = 3;
+    CONTENT_RATING_TAG_EROTIC = 4;
+    CONTENT_RATING_TAG_NOT_FOR_CHILDREN = 5;
+}

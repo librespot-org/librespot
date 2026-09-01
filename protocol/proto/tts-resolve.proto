@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
@@ -16,9 +16,9 @@ message ResolveRequest {
         VORBIS = 4;
         MP3 = 5;
     }
-
+    
     string language = 4;
-
+    
     TtsVoice tts_voice = 5;
     enum TtsVoice {
         UNSET_TTS_VOICE = 0;
@@ -62,8 +62,63 @@ message ResolveRequest {
         VOICE38 = 38;
         VOICE39 = 39;
         VOICE40 = 40;
+        VOICE41 = 41;
+        VOICE42 = 42;
+        VOICE43 = 43;
+        VOICE44 = 44;
+        VOICE45 = 45;
+        VOICE46 = 46;
+        VOICE47 = 47;
+        VOICE48 = 48;
+        VOICE49 = 49;
+        VOICE50 = 50;
+        VOICE51 = 51;
+        VOICE52 = 52;
+        VOICE53 = 53;
+        VOICE54 = 54;
+        VOICE55 = 55;
+        VOICE56 = 56;
+        VOICE57 = 57;
+        VOICE58 = 58;
+        VOICE59 = 59;
+        VOICE60 = 60;
+        VOICE61 = 61;
+        VOICE62 = 62;
+        VOICE63 = 63;
+        VOICE64 = 64;
+        VOICE65 = 65;
+        VOICE66 = 66;
+        VOICE67 = 67;
+        VOICE68 = 68;
+        VOICE69 = 69;
+        VOICE70 = 70;
+        VOICE71 = 71;
+        VOICE72 = 72;
+        VOICE73 = 73;
+        VOICE74 = 74;
+        VOICE75 = 75;
+        VOICE76 = 76;
+        VOICE77 = 77;
+        VOICE78 = 78;
+        VOICE79 = 79;
+        VOICE80 = 80;
+        VOICE81 = 81;
+        VOICE82 = 82;
+        VOICE83 = 83;
+        VOICE84 = 84;
+        VOICE85 = 85;
+        VOICE86 = 86;
+        VOICE87 = 87;
+        VOICE88 = 88;
+        VOICE89 = 89;
+        VOICE90 = 90;
+        VOICE91 = 91;
+        VOICE92 = 92;
+        VOICE93 = 93;
+        VOICE94 = 94;
+        VOICE212 = 212;
     }
-
+    
     TtsProvider tts_provider = 6;
     enum TtsProvider {
         UNSET_TTS_PROVIDER = 0;
@@ -73,9 +128,24 @@ message ResolveRequest {
         WELL_SAID = 4;
         SONANTIC_DEPRECATED = 5;
         SONANTIC_FAST = 6;
+        OPENAI = 7;
+        SONANTIC_LARGE = 8;
+        ELEVEN_LABS = 9;
+        ADS_PUBLIC = 10;
     }
-
+    
     int32 sample_rate_hz = 7;
+    
+    TtsVoiceStyle tts_voice_style = 8;
+    enum TtsVoiceStyle {
+        NEUTRAL = 0;
+        CHILL = 1;
+        UPBEAT = 2;
+    }
+    
+    int32 tts_voice_style_percent = 9;
+    int32 seed = 10;
+    
     oneof prompt {
         string text = 1;
         string ssml = 2;
@@ -85,4 +155,14 @@ message ResolveRequest {
 message ResolveResponse {
     string url = 1;
     int64 expiry = 2;
+}
+
+message TtsPrompt {
+    string language = 3;
+    string url = 4;
+    
+    oneof tts {
+        string text = 1;
+        string ssml = 2;
+    }
 }

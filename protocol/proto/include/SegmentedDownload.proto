@@ -1,0 +1,24 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message SegmentedDownload {
+    optional bytes playback_id = 1;
+    optional int64 total_bytes_from_cdn = 2;
+    optional int64 total_bytes_from_cache = 3;
+    optional string content_type = 4;
+    optional int64 cdn_initial_latency = 5;
+    optional double cdn_avg_bw = 6;
+    optional int64 bytes_from_carrier = 7;
+    optional int64 bytes_from_unknown = 8;
+    optional int64 bytes_from_wifi = 9;
+    optional string request_type = 10;
+    optional int64 total_time = 11;
+    optional string initial_disk_state = 12;
+    optional string media_url = 13;
+    optional string session_id = 14;
+}

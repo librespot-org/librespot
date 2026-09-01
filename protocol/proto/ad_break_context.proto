@@ -1,0 +1,13 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.player.proto;
+
+option optimize_for = CODE_SIZE;
+
+message AdBreakContext {
+    optional uint64 max_seconds_remaining = 1;
+    optional uint64 position_in_current_ad_break = 2;
+    optional uint64 total_ads_in_break_estimate = 3;
+}

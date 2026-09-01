@@ -1,0 +1,26 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.read_reporting_esperanto.proto;
+
+import "endpoint/read_interval.proto";
+import "endpoint/reason_start.proto";
+
+option objc_class_prefix = "ESP";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.read_reporting_esperanto.proto";
+
+message ReadStartRequest {
+    string content_uri = 1;
+    ReadInterval interval = 2;
+    int64 wall_timestamp_ms = 4;
+    int64 monotonic_timestamp_ms = 5;
+    ReasonStart reason_start = 6;
+    int64 total_length = 7;
+    
+    oneof _is_visible {
+        bool is_visible = 8;
+    }
+}

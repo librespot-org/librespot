@@ -1,0 +1,26 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message TrackErrorBypass {
+    optional int64 error_code = 1;
+    optional string error_message = 2;
+    optional string error_category = 3;
+    optional bytes playback_id = 4;
+    optional string track_id = 5;
+    optional bytes file_id = 6;
+    optional int64 position_ms = 7;
+    optional int64 client_timestamp = 8;
+    optional string audiocodec = 9;
+    optional int64 bitrate = 10;
+    optional bool external_track = 11;
+    optional bool is_retry_event = 12;
+    optional int64 retry_count = 13;
+    optional string retry_reason = 14;
+    optional int64 max_retries = 15;
+    optional bool retries_exhausted = 16;
+}

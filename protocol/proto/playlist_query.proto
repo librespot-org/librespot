@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
@@ -30,10 +30,18 @@ message PlaylistQuery {
         UNPLAYED = 8;
         IN_PROGRESS = 9;
         NOT_FULLY_PLAYED = 10;
+        NOT_EPISODE_TRAILER = 11;
+        RECOMMENDATION = 12;
+        VIDEO_CONTENT = 13;
+        NOT_VIDEO_CONTENT = 14;
+        FINISHED = 15;
+        NOT_LOCAL_TRACK = 16;
+        NOT_PAYWALLED = 17;
+        NOT_FULLY_PLAYED_OR_IN_PROGRESS = 18;
     }
-
+    
     string text_filter = 2;
-
+    
     SortBy sort_by = 3;
     enum SortBy {
         NO_SORT = 0;
@@ -60,24 +68,27 @@ message PlaylistQuery {
         PUBLISH_DATE_ASC = 21;
         PUBLISH_DATE_DESC = 22;
     }
-
+    
     PlaylistRange range = 4;
     int32 update_throttling_ms = 5;
     bool group = 6;
     PlaylistSourceRestriction source_restriction = 7;
     bool show_unavailable = 8;
-    bool always_show_windowed = 9;
+    bool include_premium_content = 9;
     bool load_recommendations = 10;
     repeated playlist.cosmos.proto.LinkType supported_placeholder_types = 11;
     repeated string descriptor_filter = 12;
     string item_id_filter = 13;
-
+    
     repeated AttributeFilter attribute_filter = 14;
     message AttributeFilter {
         repeated string contains_one_of = 1;
     }
-
+    
     bool include_all_placeholders = 15;
+    repeated string lenses = 16;
+    bool dont_load_item_metadata = 17;
+    repeated string language_filter = 18;
 }
 
 enum PlaylistSourceRestriction {

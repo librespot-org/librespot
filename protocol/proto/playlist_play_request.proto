@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
@@ -10,6 +10,7 @@ import "es_logging_params.proto";
 import "es_prepare_play_options.proto";
 import "es_play_origin.proto";
 import "playlist_query.proto";
+import "playlist_signal_request.proto";
 import "response_status.proto";
 
 option objc_class_prefix = "ESP";
@@ -24,6 +25,10 @@ message PlaylistPlayRequest {
     player.esperanto.proto.LoggingParams logging_params = 4;
     player.esperanto.proto.PreparePlayOptions prepare_play_options = 5;
     player.esperanto.proto.PlayOrigin play_origin = 6;
+    
+    oneof _raw_signal {
+        Signal raw_signal = 7;
+    }
 }
 
 message PlaylistPlayResponse {

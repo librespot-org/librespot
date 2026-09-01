@@ -19,9 +19,9 @@ use crate::{
     protocol::{
         connect::{Cluster, ClusterUpdate, LogoutCommand, SetVolumeCommand},
         context::Context,
-        explicit_content_pubsub::UserAttributesUpdate,
+        parental_controls_pubsub::UserAttributesUpdate,
         player::ProvidedTrack,
-        playlist4_external::PlaylistModificationInfo,
+        playlist_api::PlaylistModificationInfo,
         social_connect_v2::SessionUpdate,
         transfer_state::TransferState,
         user_attributes::UserAttributesMutation,
@@ -942,7 +942,12 @@ impl SpircTask {
         let attributes: UserAttributes = update
             .pairs
             .iter()
-            .map(|(key, value)| (key.to_owned(), value.to_owned()))
+            .map(|pair| {
+                (
+                    pair.key.to_owned().unwrap_or_default(),
+                    pair.value.to_owned().unwrap_or_default(),
+                )
+            })
             .collect();
         self.session.set_user_attributes(attributes)
     }

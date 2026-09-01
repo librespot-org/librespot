@@ -1,0 +1,37 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.collection_cosmos.proto;
+
+import "collection_decoration_policy.proto";
+import "status.proto";
+import "collection_item.proto";
+
+option objc_class_prefix = "ESP";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.collection.esperanto.proto";
+
+message CollectionGetUnplayedEpisodesRequest {
+    CollectionEpisodeDecorationPolicy episode_policy = 1;
+    uint32 start = 2;
+    uint32 length = 3;
+    string sort = 4;
+    string filter = 5;
+    bool group = 6;
+    uint32 update_throttling = 7;
+}
+
+message UnplayedEpisodeItem {
+    string header = 1;
+    CollectionEpisode episode = 2;
+}
+
+message CollectionGetUnplayedEpisodesResponse {
+    Status status = 1;
+    repeated UnplayedEpisodeItem item = 2;
+    uint32 unfiltered_length = 3;
+    uint32 unranged_length = 4;
+    bool loading_content = 5;
+}

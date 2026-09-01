@@ -1,8 +1,10 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto2";
 
 package spotify.playlist.cosmos.proto;
+
+import "save_source.proto";
 
 option java_multiple_files = true;
 option optimize_for = CODE_SIZE;
@@ -14,7 +16,7 @@ message ModificationRequest {
     optional string after = 3;
     optional string name = 4;
     optional bool playlist = 5;
-
+    
     optional Attributes attributes = 6;
     message Attributes {
         optional bool published = 1;
@@ -26,13 +28,27 @@ message ModificationRequest {
         optional string ai_curation_reference_id = 7;
         optional PublishedState published_state = 8;
     }
-
+    
     repeated string uris = 7;
     repeated string rows = 8;
     optional bool contents = 9;
     optional string item_id = 10;
     repeated ListAttributeKind attributes_to_clear = 11;
     optional CreateItemKind create_item_kind = 12;
+    optional list_collection.save_source.proto.SaveSource save_source = 13;
+    optional CreationInfo creation_info = 14;
+}
+
+message CreationInfo {
+    optional OriginType origin_type = 1;
+    enum OriginType {
+        ORIGIN_TYPE_UNSPECIFIED = 0;
+        ORIGIN_TYPE_FRESH = 1;
+        ORIGIN_TYPE_CLONED = 2;
+        ORIGIN_TYPE_AGENTIC = 3;
+    }
+    
+    optional string origin_uri = 2;
 }
 
 message ModificationResponse {
@@ -54,6 +70,9 @@ enum ListAttributeKind {
     LIST_PICTURE_SIZE = 13;
     LIST_SEQUENCE_CONTEXT_TEMPLATE = 14;
     LIST_AI_CURATION_REFERENCE_ID = 15;
+    LIST_ITEM_ID_ALGORITHM = 16;
+    LIST_RECOVERABLE = 17;
+    LIST_IS_USER_CREATED = 18;
 }
 
 enum PublishedState {
@@ -67,4 +86,3 @@ enum CreateItemKind {
     CREATE_ITEM_KIND_PLAYLIST = 1;
     CREATE_ITEM_KIND_FOLDER = 2;
 }
-

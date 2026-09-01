@@ -1,0 +1,27 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message AdOpportunityEvent {
+    optional string trigger_id = 1;
+    optional string trigger_type = 2;
+    optional string decision_request_id = 3;
+    optional string trigger_state = 4;
+    optional bool focus_state = 5;
+    optional string content_uri = 6;
+    optional string playback_id = 7;
+    optional string request_id = 8;
+    optional bool did_skip = 9;
+    optional string app_startup_id = 10;
+    optional bool user_is_capped = 11;
+    optional string demand_status = 12;
+    optional string eligibility_status = 13;
+    optional string supply_status = 14;
+    optional string trigger_origin = 15;
+    repeated string trigger_states = 16;
+    optional string ad_break_id = 17;
+}

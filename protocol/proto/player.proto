@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
@@ -8,14 +8,6 @@ option optimize_for = CODE_SIZE;
 option java_package = "com.spotify.connectstate.model";
 
 message PlayerState {
-    reserved 26;
-    reserved 27;
-    reserved 28;
-    reserved 29;
-    reserved 30;
-    reserved 31;
-    reserved 34;
-
     int64 timestamp = 1;
     string context_uri = 2;
     string context_url = 3;
@@ -44,11 +36,19 @@ message PlayerState {
     PlaybackQuality playback_quality = 32;
     repeated string signals = 33;
     string session_command_id = 35;
+    
+    oneof _ad_break_context {
+        AdBreakContext ad_break_context = 37;
+    }
+    
+    oneof _sleep_timer {
+        SleepTimer sleep_timer = 38;
+    }
+    
+    reserved 26, 27, 28, 29, 30, 31, 34, 36;
 }
 
 message ProvidedTrack {
-    reserved 11;
-
     string uri = 1;
     string uid = 2;
     map<string, string> metadata = 3;
@@ -59,6 +59,8 @@ message ProvidedTrack {
     string album_uri = 8;
     repeated string disallow_reasons = 9;
     string artist_uri = 10;
+    
+    reserved 11;
 }
 
 message ContextIndex {
@@ -75,9 +77,6 @@ message RestrictionReasons {
 }
 
 message Restrictions {
-    reserved 26;
-    reserved 27;
-
     repeated string disallow_pausing_reasons = 1;
     repeated string disallow_resuming_reasons = 2;
     repeated string disallow_seeking_reasons = 3;
@@ -105,6 +104,20 @@ message Restrictions {
     repeated string disallow_setting_playback_speed_reasons = 25;
     map<string, ModeRestrictions> disallow_setting_modes = 28;
     map<string, RestrictionReasons> disallow_signals = 29;
+    repeated string disallow_play_as_next_in_queue_reasons = 30;
+    repeated string disallow_sleep_timer_clear_reasons = 31;
+    repeated string disallow_sleep_timer_duration_reasons = 32;
+    repeated string disallow_sleep_timer_end_of_track_reasons = 33;
+    repeated string disallow_add_to_queue_track_reasons = 34;
+    repeated string disallow_tap_to_play_track_in_next_tracks_reasons = 35;
+    repeated string disallow_reordering_track_in_next_tracks_reasons = 36;
+    repeated string disallow_reordering_episode_in_next_tracks_reasons = 37;
+    repeated string disallow_reordering_enqueued_track_in_next_tracks_reasons = 38;
+    repeated string disallow_reordering_enqueued_episode_in_next_tracks_reasons = 39;
+    repeated string disallow_viewing_queue_reasons = 40;
+    repeated string disallow_viewing_ordered_tracks_in_next_tracks_reasons = 41;
+    
+    reserved 26, 27;
 }
 
 message PlayOrigin {
@@ -122,8 +135,8 @@ message ContextPlayerOptions {
     bool shuffling_context = 1;
     bool repeating_context = 2;
     bool repeating_track = 3;
-    map<string, string> modes = 5;
     optional float playback_speed = 4;
+    map<string, string> modes = 5;
 }
 
 message Suppressions {
@@ -136,6 +149,42 @@ message PlaybackQuality {
     BitrateLevel target_bitrate_level = 3;
     bool target_bitrate_available = 4;
     HiFiStatus hifi_status = 5;
+    BitrateLevel highest_available_quality = 6;
+    FileOrigin file_origin = 7;
+}
+
+message AdBreakContext {
+    uint64 max_seconds_remaining = 1;
+    uint64 position_in_current_ad_break = 2;
+    uint64 total_ads_in_break_estimate = 3;
+}
+
+message SleepTimer {
+    oneof timer_type {
+        None none = 1;
+        Timestamp timestamp = 2;
+        EndOfTrack end_of_track = 3;
+    }
+    
+    message None {
+        
+    }
+    
+    message Timestamp {
+        int64 timestamp = 1;
+    }
+    
+    message EndOfTrack {
+        
+    }
+}
+
+enum FileOrigin {
+    unknown_file_origin = 0;
+    internal = 1;
+    external = 2;
+    local = 3;
+    generated = 4;
 }
 
 enum BitrateLevel {
@@ -146,6 +195,7 @@ enum BitrateLevel {
     very_high = 4;
     hifi = 5;
     hifi24 = 6;
+    petrel = 7;
 }
 
 enum BitrateStrategy {

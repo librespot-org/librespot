@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto2";
 
@@ -16,15 +16,13 @@ option objc_class_prefix = "SPTShowCosmos";
 option optimize_for = CODE_SIZE;
 
 message Item {
-    reserved 6;
-    reserved 7;
-    reserved 8;
-    reserved 9;
     optional string header_field = 1;
     optional cosmos_util.proto.EpisodeMetadata episode_metadata = 2;
     optional EpisodeCollectionState episode_collection_state = 3;
     optional EpisodeOfflineState episode_offline_state = 4;
     optional cosmos_util.proto.EpisodePlayState episode_play_state = 5;
+    
+    reserved 6, 7, 8, 9;
 }
 
 message Header {
@@ -35,9 +33,6 @@ message Header {
 }
 
 message Response {
-    reserved "online_data";
-    reserved 3;
-    reserved 9;
     repeated Item item = 1;
     optional Header header = 2;
     optional uint32 unfiltered_length = 4;
@@ -46,20 +41,20 @@ message Response {
     optional uint32 unranged_length = 7;
     optional AuxiliarySections auxiliary_sections = 8;
     optional uint32 range_offset = 10;
+    
+    reserved 3, 9;
+    
+    reserved "online_data";
 }
 
 message AuxiliarySections {
-    reserved 2;
-    reserved 4;
-    reserved 5;
-    reserved 6;
-    reserved 7;
-    reserved 8;
     optional ContinueListeningSection continue_listening = 1;
     optional TrailerSection trailer_section = 3;
     optional LatestUnplayedEpisodeSection latest_unplayed_episode_section = 9;
     optional NextBestEpisodeSection next_best_episode_section = 10;
     optional SavedEpisodesSection saved_episodes_section = 11;
+    
+    reserved 2, 4, 5, 6, 7, 8;
 }
 
 message ContinueListeningSection {
@@ -75,6 +70,7 @@ message LatestUnplayedEpisodeSection {
 }
 
 message NextBestEpisodeSection {
+    optional Label label = 1;
     enum Label {
         UNKNOWN = 0;
         TRAILER = 1;
@@ -83,8 +79,7 @@ message NextBestEpisodeSection {
         UP_NEXT = 4;
         FIRST_PUBLISHED = 5;
     }
-
-    optional Label label = 1;
+    
     optional Item item = 2;
 }
 
@@ -92,4 +87,3 @@ message SavedEpisodesSection {
     optional uint32 saved_episodes_count = 1;
     optional uint32 downloaded_episodes_count = 2;
 }
-

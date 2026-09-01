@@ -1,0 +1,23 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playlistmixing.extensions.mixbeats;
+
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "MixBeatsProto";
+option java_package = "com.spotify.playlistmixing.extensions.mixbeats.proto";
+
+message Beat {
+    float time = 1;
+    float duration = 2;
+    uint32 value = 3;
+    float beat_confidence = 4;
+    float downbeat_confidence = 5;
+}
+
+message Beats {
+    uint32 beats_per_bar = 1;
+    repeated Beat beats = 2;
+    string beats_hash = 3;
+}

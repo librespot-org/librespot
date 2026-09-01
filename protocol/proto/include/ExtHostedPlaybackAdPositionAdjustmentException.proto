@@ -1,0 +1,22 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message ExtHostedPlaybackAdPositionAdjustmentException {
+    optional bytes playback_id = 1;
+    optional int64 position_ms = 2;
+    optional bool mapping_timeout = 3;
+    optional bool seek_interruption = 4;
+    optional bool track_close_interruption = 5;
+    optional bool mapping_error = 6;
+    optional bool position_out_of_range = 7;
+    optional int64 creator_position_ms = 8;
+    optional int64 converted_position_ms = 9;
+    optional bool playback_failed = 10;
+    optional int64 fallback_position_ms = 11;
+    optional bool fallback_position_invalid = 12;
+}

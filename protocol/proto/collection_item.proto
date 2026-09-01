@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
@@ -22,10 +22,10 @@ import "played_state/track_played_state.proto";
 import "played_state/show_played_state.proto";
 import "played_state/episode_played_state.proto";
 
-option java_package = "spotify.collection.esperanto.proto";
-option java_multiple_files = true;
 option objc_class_prefix = "ESP";
+option java_multiple_files = true;
 option optimize_for = CODE_SIZE;
+option java_package = "spotify.collection.esperanto.proto";
 
 message CollectionTrack {
     uint32 index = 1;
@@ -77,4 +77,3 @@ message CollectionEpisode {
     CollectionShow show = 5;
     string link = 6;
 }
-

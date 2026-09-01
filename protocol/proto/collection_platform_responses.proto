@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
@@ -6,18 +6,10 @@ package spotify.collection_platform.proto;
 
 import "collection_platform_items.proto";
 
-option java_package = "com.spotify.collection_platform.esperanto.proto";
-option java_multiple_files = true;
 option objc_class_prefix = "ESP";
+option java_multiple_files = true;
 option optimize_for = CODE_SIZE;
-
-message CollectionPlatformSimpleResponse {
-    string error_msg = 1;
-}
-
-message CollectionPlatformItemsResponse {
-    repeated CollectionPlatformItem items = 1;
-}
+option java_package = "com.spotify.collection_platform.esperanto.proto";
 
 message CollectionPlatformContainsResponse {
     repeated bool found = 1;
@@ -37,14 +29,3 @@ message CollectionPlatformEsperantoItemsResponse {
     Status status = 1;
     repeated CollectionPlatformItem items = 2;
 }
-
-message CollectionPlatformContextItemsResponse {
-    Status status = 1;
-    repeated CollectionPlatformContextItem items = 2;
-}
-
-message CollectionPlatformContainsContextItemsResponse {
-    Status status = 1;
-    repeated bool found = 2;
-}
-

@@ -1,0 +1,24 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.ads.esperanto.proto;
+
+import "ad_common.proto";
+
+option objc_class_prefix = "ESP";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.ads.esperanto.proto";
+
+service Formats {
+    rpc SubFormat(SubFormatRequest) returns (stream SubFormatResponse);
+}
+
+message SubFormatRequest {
+    AdFormat format = 1;
+}
+
+message SubFormatResponse {
+    AdSlotEvent ad_slot_event = 1;
+}

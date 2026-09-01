@@ -1,0 +1,48 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.desktop.update_ui_esperanto.proto;
+
+option optimize_for = CODE_SIZE;
+
+service DesktopUpdateUi {
+    rpc UpdateTitlebarHeight(UpdateTitlebarHeightRequest) returns (UpdateTitlebarResponse);
+    rpc SetButtonsVisibility(SetButtonsVisibilityRequest) returns (SetButtonsVisibilityResponse);
+    rpc UpdateMenuState(UpdateMenuStateRequest) returns (UpdateMenuStateResponse);
+}
+
+message UpdateTitlebarHeightRequest {
+    int32 height = 1;
+}
+
+message UpdateTitlebarResponse {
+    
+}
+
+message SetButtonsVisibilityRequest {
+    bool show_buttons = 1;
+}
+
+message SetButtonsVisibilityResponse {
+    
+}
+
+message FieldState {
+    MenuField field = 1;
+    bool enable = 2;
+}
+
+message UpdateMenuStateRequest {
+    repeated FieldState fields = 1;
+}
+
+message UpdateMenuStateResponse {
+    
+}
+
+enum MenuField {
+    MENU_FIELD_UNSPECIFIED = 0;
+    MENU_FIELD_FILTER = 1;
+    MENU_FIELD_SCTA_INFO = 2;
+}

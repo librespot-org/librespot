@@ -12,7 +12,7 @@ use protocol::metadata::Image as ImageMessage;
 use protocol::metadata::ImageGroup;
 pub use protocol::metadata::image::Size as ImageSize;
 use protocol::playlist_annotate3::TranscodedPicture as TranscodedPictureMessage;
-use protocol::playlist4_external::PictureSize as PictureSizeMessage;
+use protocol::playlist_api::PictureSize as PictureSizeMessage;
 
 #[derive(Debug, Clone)]
 pub struct Image {

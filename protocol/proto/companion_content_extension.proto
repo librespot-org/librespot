@@ -1,0 +1,60 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.figs.companion_content.v0;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "CompanionContentProto";
+option java_package = "com.spotify.figs.companion.content.v0";
+
+message CompanionContent {
+    string uri = 1;
+    repeated Component components = 2;
+}
+
+message Component {
+    int32 start_ms = 1;
+    
+    oneof body {
+        ImageComponent image = 3;
+        LoopingVideoComponent looping_video = 4;
+    }
+    
+    oneof _end_ms {
+        int32 end_ms = 2;
+    }
+}
+
+message ImageComponent {
+    string image_url = 1;
+    string alt_text = 2;
+    
+    ViewMode view_mode = 4;
+    enum ViewMode {
+        UNSPECIFIED = 0;
+        ARTWORK = 1;
+        FULL_SCREEN = 2;
+    }
+    
+    oneof _caption {
+        string caption = 3;
+    }
+}
+
+message LoopingVideoComponent {
+    string video_url = 1;
+    string alt_text = 2;
+    
+    ViewMode view_mode = 4;
+    enum ViewMode {
+        UNSPECIFIED = 0;
+        ARTWORK = 1;
+        FULL_SCREEN = 2;
+    }
+    
+    oneof _caption {
+        string caption = 3;
+    }
+}

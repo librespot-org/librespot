@@ -1,19 +1,23 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
-package spotify.lens.model.proto;
+package spotify.lens.proto;
 
-option java_package = "com.spotify.lens.model.proto";
-option java_outer_classname = "LensModelProto";
 option optimize_for = CODE_SIZE;
+option java_outer_classname = "LensModelProto";
+option java_package = "com.spotify.lens.model.proto";
 
 message Lens {
-  string identifier = 1;
+    string identifier = 1;
+}
+
+message LensStatus {
+    int32 http_code = 1;
 }
 
 message LensState {
-  string identifier = 1;
-  bytes revision = 2;
+    string identifier = 1;
+    bytes revision = 2;
+    LensStatus status = 3;
 }
-

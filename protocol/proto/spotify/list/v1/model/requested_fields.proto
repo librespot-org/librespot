@@ -1,0 +1,82 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.list.v1.model;
+
+import "spotify/list/v1/model/attribute_kinds.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "RequestedFieldsProto";
+option java_package = "com.spotify.list.v1.model";
+
+message AttributesRequestedFields {
+    repeated AttributeKind requested_field = 1;
+}
+
+message ItemRequestedFields {
+    oneof _id {
+        bool id = 1;
+    }
+    
+    oneof _attributes {
+        AttributesRequestedFields attributes = 2;
+    }
+}
+
+message MetaItemsRequestedFields {
+    oneof _attributes {
+        AttributesRequestedFields attributes = 1;
+    }
+    
+    reserved 2;
+}
+
+message LensRemovedItemsRequestedFields {
+    oneof _items {
+        ItemRequestedFields items = 1;
+    }
+}
+
+message LensEffectRequestedFields {
+    oneof _lens_removed_items {
+        LensRemovedItemsRequestedFields lens_removed_items = 1;
+    }
+}
+
+message ListEntityRequestedFields {
+    oneof _attributes {
+        AttributesRequestedFields attributes = 1;
+    }
+    
+    oneof _items {
+        ItemRequestedFields items = 2;
+    }
+    
+    oneof _meta_items {
+        MetaItemsRequestedFields meta_items = 3;
+    }
+    
+    oneof _lens_effect {
+        LensEffectRequestedFields lens_effect = 4;
+    }
+}
+
+message ListResponseRequestedFields {
+    oneof _entity {
+        ListEntityRequestedFields entity = 1;
+    }
+    
+    reserved 2;
+}
+
+message RequestedFields {
+    oneof _all {
+        bool all = 1 [deprecated = true];
+    }
+    
+    oneof _list_response {
+        ListResponseRequestedFields list_response = 2;
+    }
+}

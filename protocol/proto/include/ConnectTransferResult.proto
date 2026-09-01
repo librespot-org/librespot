@@ -1,0 +1,36 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message ConnectTransferResult {
+    optional string result = 1;
+    optional string device_type = 2;
+    optional string discovery_class = 3;
+    optional string device_model = 4;
+    optional string device_brand = 5;
+    optional string device_software_version = 6;
+    optional int64 duration = 7;
+    optional string device_client_id = 8;
+    optional string transfer_intent_id = 9;
+    optional string transfer_debug_log = 10;
+    optional string error_code = 11;
+    optional int32 http_response_code = 12;
+    optional string initial_device_state = 13;
+    optional int32 retry_count = 14;
+    optional int32 login_retry_count = 15;
+    optional int64 login_duration = 16;
+    optional string target_device_id = 17;
+    optional bool target_device_is_local = 18;
+    optional string final_device_state = 19;
+    repeated string interaction_ids = 20;
+    optional bool target_device_is_group = 21;
+    optional string final_transfer_state = 22;
+    repeated string login_error_codes = 23;
+    optional int64 add_user_duration = 24;
+    optional string command_id = 25;
+    optional bool is_proxy_transfer = 26;
+}

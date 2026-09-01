@@ -1,0 +1,13 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message DesktopUIShellInteractionNonAuth {
+    optional string section_id = 1;
+    optional string interaction_type = 2;
+    optional string user_intent = 3;
+}

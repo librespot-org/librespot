@@ -5,7 +5,7 @@ use super::operation::PlaylistOperations;
 use librespot_core::SpotifyId;
 
 use librespot_protocol as protocol;
-use protocol::playlist4_external::Diff as DiffMessage;
+use protocol::playlist_api::Diff as DiffMessage;
 
 #[derive(Debug, Clone)]
 pub struct PlaylistDiff {

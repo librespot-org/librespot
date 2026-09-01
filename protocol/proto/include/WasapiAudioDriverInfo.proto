@@ -1,0 +1,13 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message WasapiAudioDriverInfo {
+    optional string sub_format = 1;
+    optional int32 valid_bits = 2;
+    optional int32 container_bits = 3;
+}

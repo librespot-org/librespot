@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto2";
 
@@ -6,8 +6,9 @@ package spotify.player.proto.transfer;
 
 import "context_player_options.proto";
 import "playback.proto";
-import "play_history.proto";
+import "play_history_entry.proto";
 import "session.proto";
+import "sleep_timer.proto";
 import "queue.proto";
 
 option optimize_for = CODE_SIZE;
@@ -17,5 +18,8 @@ message TransferState {
     optional Playback playback = 2;
     optional Session current_session = 3;
     optional Queue queue = 4;
-    optional PlayHistory play_history = 5;
+    repeated PlayHistoryEntry play_history_entries = 6;
+    optional SleepTimer sleep_timer = 7;
+    
+    reserved 5;
 }

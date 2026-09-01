@@ -1,0 +1,23 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message RawCoreReadPrototype {
+    optional int64 start_char_pos = 1;
+    optional int64 end_char_pos = 2;
+    optional int64 start_timestamp = 3;
+    optional int64 end_timestamp = 4;
+    optional int32 time_spent = 5;
+    optional string content_uri = 6;
+    optional string reason_start = 7;
+    optional string reason_end = 8;
+    optional bytes session_id = 9;
+    optional int64 sequence_id = 10;
+    optional bool is_last = 11;
+    optional int64 core_version = 12;
+    optional int64 total_length = 13;
+}

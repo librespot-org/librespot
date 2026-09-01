@@ -1,0 +1,29 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.list_player.impl.proto;
+
+option optimize_for = CODE_SIZE;
+
+message RecPoolLoaderState {
+    string list_uri = 1;
+    
+    oneof _next_page_url {
+        string next_page_url = 2;
+    }
+    
+    oneof _rec_pool {
+        RecPool rec_pool = 3;
+    }
+    
+    message Rec {
+        string item_uri = 1;
+        string album_uri = 2;
+        string uid = 3;
+    }
+    
+    message RecPool {
+        repeated Rec recs = 1;
+    }
+}

@@ -1,0 +1,20 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message ConnectInstallationResult {
+    optional string result = 1;
+    optional string device_type = 2;
+    optional string device_model = 3;
+    optional string device_brand = 4;
+    optional int64 duration = 5;
+    optional string installation_debug_log = 6;
+    optional string target_device_id = 7;
+    optional string final_installation_state = 8;
+    optional string error_code = 9;
+    repeated string interaction_ids = 10;
+}

@@ -1,0 +1,20 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message AudioIndexRepairReport {
+    optional int64 tracks_num_added_audio = 1;
+    optional int64 tracks_num_in_mdata = 2;
+    optional int64 tracks_num_parse_error = 3;
+    optional int64 tracks_num_missing_audio_id = 4;
+    optional int64 tracks_num_write_error = 5;
+    optional int64 episodes_num_added_audio = 6;
+    optional int64 episodes_num_in_mdata = 7;
+    optional int64 episodes_num_parse_error = 8;
+    optional int64 episodes_num_missing_audio_id = 9;
+    optional int64 episodes_num_write_error = 10;
+}

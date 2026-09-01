@@ -1,0 +1,23 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.mdata_esperanto.proto;
+
+import "extension_kind.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.mdata.esperanto.proto";
+
+message ObserveRequest {
+    repeated ExtensionQuery extension_query = 1;
+    message ExtensionQuery {
+        string entity_uri = 1;
+        extendedmetadata.ExtensionKind extension_kind = 2;
+        bool notify_on_local_cache_changes = 3;
+    }
+    
+    string feature_id = 2;
+    bool notify_on_changes = 3 [deprecated = true];
+}

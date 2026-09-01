@@ -31,6 +31,9 @@ pub enum AudioFileFormat {
     XHE_AAC_16,      // 19
     XHE_AAC_12,      // 20
     FLAC_FLAC_24BIT, // 22
+    PHONO_LOW,       // 54
+    PHONO_HIGH,      // 55
+    PHONO_CLEAR,     // 56
     // not defined in protobuf, but sometimes send
     AAC_160, // 10
     AAC_320, // 11
@@ -70,6 +73,9 @@ impl From<Format> for AudioFileFormat {
             Format::XHE_AAC_16 => AudioFileFormat::XHE_AAC_16,
             Format::XHE_AAC_12 => AudioFileFormat::XHE_AAC_12,
             Format::FLAC_FLAC_24BIT => AudioFileFormat::FLAC_FLAC_24BIT,
+            Format::PHONO_LOW => AudioFileFormat::PHONO_LOW,
+            Format::PHONO_HIGH => AudioFileFormat::PHONO_HIGH,
+            Format::PHONO_CLEAR => AudioFileFormat::PHONO_CLEAR,
         }
     }
 }

@@ -1,0 +1,47 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.bumblebee.trackcontentfilter.v1;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "TrackContentFilterProto";
+option java_package = "com.spotify.bumblebee.trackcontentfilter.v1";
+
+message TrackContentFilterData {
+    repeated Filter filters = 1;
+}
+
+enum Filter {
+    UNSPECIFIED_FILTER = 0;
+    RESTRICTED = 1;
+    ARTIFICIAL_STREAMING = 2;
+    CHILDREN = 3;
+    CHRISTMAS = 4;
+    CLASSICAL = 5;
+    DECEPTIVE = 6;
+    DEVOTIONAL = 7;
+    KARAOKE = 8;
+    LIVE = 9;
+    NON_ARTIST = 10;
+    NON_DISCOGRAPHY = 11;
+    PASS_ON_PROGRAMMING = 12;
+    SOUNDALIKE = 13;
+    STRICTLY_KIDS = 14;
+    UNOFFICIAL = 15;
+    UNPREFERRED = 16;
+    GENERIC = 17;
+    INACTIVE = 18;
+    CONTAINS_SILENCE = 19;
+    CONTAINS_SPEECH = 20;
+    RESTRICTED_FOR_TEENS = 21 [deprecated = true];
+    GATED_CONTENT = 22;
+    RETA = 23 [deprecated = true];
+    NEWS_AND_POLITICS = 24;
+    AMBIENT = 25;
+    NOT_INTERESTED = 26;
+    REPORTED = 27;
+    COST_CONTROL = 28;
+    RDC = 29;
+}

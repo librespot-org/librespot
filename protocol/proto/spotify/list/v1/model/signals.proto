@@ -1,0 +1,45 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.list.v1.model;
+
+import "spotify/list/v1/model/lenses.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "SignalsProto";
+option java_package = "com.spotify.list.v1.model";
+
+message Signal {
+    oneof _identifier {
+        string identifier = 1;
+    }
+    
+    oneof _data {
+        bytes data = 2;
+    }
+    
+    oneof _client_payload {
+        bytes client_payload = 3;
+    }
+}
+
+message SignalData {
+    oneof target {
+        string identifier = 1 [deprecated = true];
+        Lens lens = 5;
+    }
+    
+    oneof _uri {
+        string uri = 2;
+    }
+    
+    oneof _item_id {
+        bytes item_id = 3;
+    }
+    
+    oneof _additional_data {
+        bytes additional_data = 4;
+    }
+}

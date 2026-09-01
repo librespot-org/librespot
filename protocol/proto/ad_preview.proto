@@ -1,0 +1,22 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.ads.esperanto.proto;
+
+option objc_class_prefix = "ESP";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.ads.esperanto.proto";
+
+service Preview {
+    rpc Preview(PreviewRequest) returns (PreviewResponse);
+}
+
+message PreviewRequest {
+    string ad_id = 1;
+}
+
+message PreviewResponse {
+    bool success = 1;
+}

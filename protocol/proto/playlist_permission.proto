@@ -1,16 +1,37 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto2";
 
 package spotify.playlist_permission.proto;
 
+import "google/protobuf/timestamp.proto";
+
 option java_multiple_files = true;
 option optimize_for = CODE_SIZE;
 option java_package = "com.spotify.playlist.proto";
 
+message AuditMetadata {
+    optional google.protobuf.Timestamp timestamp = 1;
+    optional string username = 3;
+    
+    reserved 2;
+    
+    reserved "user_id";
+}
+
+message Audit {
+    optional AuditMetadata created = 1;
+    optional AuditMetadata modified = 2;
+    optional AuditMetadata deleted = 3;
+}
+
 message Permission {
     optional bytes revision = 1;
     optional PermissionLevel permission_level = 2;
+    optional PermissionLevelState permission_level_state = 3;
+    optional Audit audit = 6;
+    
+    reserved 4, 5;
 }
 
 message GrantableLevels {
@@ -18,8 +39,29 @@ message GrantableLevels {
     repeated PermissionLevel member = 2;
 }
 
+message AdministratePermissionCapabilities {
+    optional bool can_set = 1;
+    optional bool can_remove = 2;
+    optional bool can_remove_own = 3;
+}
+
+message AdministratePermissionKindCapabilities {
+    optional AdministratePermissionCapabilities base = 1;
+    optional AdministratePermissionCapabilities member = 2;
+    optional AdministratePermissionCapabilities grant = 6;
+    
+    reserved 3, 4, 5;
+    
+    reserved "abuse", "profile", "authorized";
+}
+
 message AttributeCapabilities {
     optional bool can_edit = 1;
+}
+
+message AttributeKindCapabilities {
+    optional AttributeKind attribute_kind = 1;
+    optional AttributeCapabilities capabilities = 2;
 }
 
 message ListAttributeCapabilities {
@@ -33,13 +75,23 @@ message ListAttributeCapabilities {
 
 message Capabilities {
     optional bool can_view = 1;
-    optional bool can_administrate_permissions = 2;
-    repeated PermissionLevel grantable_level = 3;
-    optional bool can_edit_metadata = 4;
+    optional bool can_administrate_permissions = 2 [deprecated = true];
+    repeated PermissionLevel grantable_level = 3 [deprecated = true];
+    optional bool can_edit_metadata = 4 [deprecated = true];
     optional bool can_edit_items = 5;
     optional bool can_cancel_membership = 6;
     optional GrantableLevels grantable_levels = 7;
-    optional ListAttributeCapabilities list_attribute_capabilities = 8;
+    optional ListAttributeCapabilities list_attribute_capabilities = 8 [deprecated = true];
+    repeated AttributeKindCapabilities attribute_kind_capabilities = 9;
+    optional bool can_mix_playlist = 10;
+    optional bool can_send_messages = 11;
+    optional AdministratePermissionKindCapabilities administrate_permission_kind_capabilities = 12;
+    optional bool can_delete = 13;
+    optional bool can_abuse_report = 14;
+    optional bool can_publish_to_profile = 15;
+    optional bool can_modify_speed_playlist = 17;
+    optional bool can_edit_prompt = 19;
+    optional bool can_add_prompt = 20;
 }
 
 message CapabilitiesMultiRequest {
@@ -83,6 +135,25 @@ message GetMemberPermissionsResponse {
     map<string, Permission> member_permissions = 1;
 }
 
+message SetMemberPermissionEntry {
+    optional string username = 1;
+    optional Permission permission = 2;
+}
+
+message SetMemberPermissionsRequest {
+    repeated SetMemberPermissionEntry entries = 1;
+}
+
+message SetMemberPermissionsResponse {
+    repeated SetMemberPermissionResult results = 1;
+}
+
+message SetMemberPermissionResult {
+    optional string username = 1;
+    optional ResponseStatus status = 2;
+    optional Permission resulting_permission = 3;
+}
+
 message Permissions {
     optional Permission base_permission = 1;
 }
@@ -101,27 +172,33 @@ message PermissionStatePub {
 message PermissionGrantOptions {
     optional Permission permission = 1;
     optional int64 ttl_ms = 2;
+    optional int64 max_usages = 3;
 }
 
 message PermissionGrant {
     optional string token = 1;
     optional PermissionGrantOptions permission_grant_options = 2;
+    optional google.protobuf.Timestamp created_at = 3;
+    optional string created_by_username = 4;
+    optional string created_by_user_id = 5;
 }
 
 message PermissionGrantDetails {
     optional bool permission_level_downgraded = 1;
+    optional Audit audit = 2;
 }
 
 message PermissionGrantDescription {
+    optional PermissionGrantOptions permission_grant_options = 1;
+    
+    optional ClaimFailReason claim_fail_reason = 2;
     enum ClaimFailReason {
         CLAIM_FAIL_REASON_UNSPECIFIED = 0;
         CLAIM_FAIL_REASON_ANONYMOUS = 1;
         CLAIM_FAIL_REASON_NO_GRANT_FOUND = 2;
         CLAIM_FAIL_REASON_GRANT_EXPIRED = 3;
     }
-
-    optional PermissionGrantOptions permission_grant_options = 1;
-    optional ClaimFailReason claim_fail_reason = 2;
+    
     optional bool is_effective = 3;
     optional Capabilities capabilities = 4;
     repeated PermissionGrantDetails details = 5;
@@ -160,12 +237,70 @@ message DefaultOwnerCapabilitiesResponse {
     optional Capabilities capabilities = 1;
 }
 
+message ListPermissionGrantsResponse {
+    repeated PermissionGrant permission_grant = 1;
+}
+
+message PermissionHistoryEntryUser {
+    optional string username = 1;
+}
+
+message PermissionHistoryEntry {
+    optional PermissionIdentifierKind kind = 1;
+    optional Permission permission = 2;
+    optional google.protobuf.Timestamp timestamp = 3;
+    optional PermissionHistoryEntryUser user = 4;
+}
+
+message GetPermissionHistoryResponse {
+    repeated PermissionHistoryEntry entry = 1;
+}
+
 enum PermissionLevel {
     UNKNOWN = 0;
     BLOCKED = 1;
     VIEWER = 2;
     CONTRIBUTOR = 3;
     MADE_FOR = 4;
+    ADMIN = 5;
+}
+
+enum PermissionLevelState {
+    PERMISSION_LEVEL_STATE_UNSPECIFIED = 0;
+    PERMISSION_LEVEL_STATE_PENDING = 1;
+    PERMISSION_LEVEL_STATE_ACCEPTED = 2;
+    PERMISSION_LEVEL_STATE_REJECTED = 3;
+}
+
+enum AttributeKind {
+    KIND_UNSPECIFIED = 0;
+    KIND_URI = 1;
+    KIND_NAME = 3;
+    KIND_DESCRIPTION = 4;
+    KIND_UPDATED_AT = 5;
+    KIND_ADDED_BY_USERNAME = 6;
+    KIND_OWNER_USERNAME = 7;
+    KIND_CREATED_AT = 8;
+    KIND_CAPABILITIES = 9;
+    KIND_GEOBLOCK = 10;
+    KIND_SEEN_AT = 11;
+    KIND_ABUSE_REPORTING_ENABLED = 12;
+    KIND_APPROXIMATE_LENGTH = 13;
+    KIND_AVAILABLE_SIGNALS = 14;
+    KIND_PUBLISHED_TO_PROFILE = 15;
+    KIND_RECOMMENDATION_INFO = 16;
+    KIND_AI_CURATION = 17;
+    KIND_ADDED_AT = 18;
+    KIND_DELETED_BY_OWNER = 19;
+    KIND_PICTURE_FILE_ID = 20;
+    KIND_PICTURE_SIZES = 21;
+    KIND_CLIENT_ID = 22;
+    KIND_FORMAT = 23;
+    KIND_FORMAT_LIST_ATTRIBUTES = 24;
+    KIND_ITEM_ID_ALGORITHM = 25;
+    KIND_RECOVERABLE = 26;
+    KIND_SOURCE_LENS = 27;
+    KIND_SAVE_SOURCE = 28;
 }
 
 enum PermissionIdentifierKind {
@@ -176,4 +311,3 @@ enum PermissionIdentifierKind {
     PERMISSION_IDENTIFIER_KIND_PROFILE = 4;
     PERMISSION_IDENTIFIER_KIND_AUTHORIZED = 5;
 }
-

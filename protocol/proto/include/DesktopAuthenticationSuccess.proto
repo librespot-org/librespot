@@ -1,0 +1,19 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message DesktopAuthenticationSuccess {
+    optional string action_hash = 1;
+    optional string oauth_user_agent = 2;
+    optional string auth_method = 3;
+    optional bool use_auth_client = 4;
+    optional int32 attempt = 5;
+    optional bool use_dpop = 6;
+    optional string utm_medium = 7;
+    optional string utm_source = 8;
+    optional string utm_campaign = 9;
+}
