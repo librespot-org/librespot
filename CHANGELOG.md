@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [core] Fix default permissions on credentials file and warn user if file is world readable
 - [core] Try all resolved addresses for the dealer connection instead of failing after the first one.
 - [audio] Try the next CDN URL when a fetch returns a non-206 status instead of only retrying on transport errors, fixing playback failures when the first CDN URL is reachable but does not stream audio.
+- [connect] Stop answering our own cluster update with another state update, which made the active device send state updates in a loop until the server responded with 429 Too Many Requests.
 
 ## [0.8.0] - 2025-11-10
 
