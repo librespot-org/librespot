@@ -169,7 +169,9 @@ env_logger = { version = "0.11.2", default-features = false, features = [
 ] }
 futures-util = { version = "0.3", default-features = false }
 getopts = "0.2"
+id3 = "1.5"
 log = "0.4"
+rand = { version = "0.9", features = ["thread_rng"] }
 sha1 = "0.10"
 sysinfo = { version = "0.36", default-features = false, features = ["system"] }
 thiserror = "2"
