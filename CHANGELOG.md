@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - [core] Made `SpotifyId::to_base62`, `SpotifyId::to_base16`, `FileId::to_base16`, `SpotifyUri::to_id`, `SpotifyUri::to_uri` infallible (breaking)
+- [connect] `Spirc::new` now returns a future resolving to `Option<SavedPlaybackState>` instead of `()`; pass it to `Spirc::with_saved_state` to restore playback across session reconnects (breaking)
 
 ### Fixed
 
@@ -25,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [core] Fix default permissions on credentials file and warn user if file is world readable
 - [core] Try all resolved addresses for the dealer connection instead of failing after the first one.
 - [audio] Try the next CDN URL when a fetch returns a non-206 status instead of only retrying on transport errors, fixing playback failures when the first CDN URL is reachable but does not stream audio.
+- [core] Fix dealer websocket reconnect leaving spirc hung on stale subscription channels.
+- [connect] Save and restore playback state across session reconnects.
+- [core] Add a timeout to control-plane HTTP requests so a half-open connection can't hang the spirc event loop.
+- [connect] Add a reconnect watchdog that restarts spirc if the device is not re-registered after a dealer reconnect, so it can't silently disappear from Spotify Connect.
 
 ## [0.8.0] - 2025-11-10
 
