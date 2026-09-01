@@ -136,6 +136,7 @@ enum SpircCommand {
     Transfer(Option<TransferRequest>),
     Load(LoadRequest),
     AddToQueue(SpotifyUri),
+    ClearQueue,
 }
 
 const CONTEXT_FETCH_THRESHOLD: usize = 2;
@@ -411,6 +412,17 @@ impl Spirc {
             return Err(Error::invalid_argument("uri"));
         }
         Ok(self.commands.send(SpircCommand::AddToQueue(uri))?)
+    }
+
+    /// Removes all queued tracks from the next tracks.
+    ///
+    /// Does nothing if we are not the active device.
+    ///
+    /// Only tracks added to the queue (via [Spirc::add_to_queue] or a connect client)
+    /// are removed. The current track, even if it was queued, and the tracks of the
+    /// context are kept; the next tracks are filled up from the context again.
+    pub fn clear_queue(&self) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::ClearQueue)?)
     }
 
     /// Disconnects the current device and pauses the playback according the value.
@@ -747,6 +759,10 @@ impl SpircTask {
             SpircCommand::SetVolume(volume) => self.set_volume(volume),
             SpircCommand::Load(command) => self.handle_load(command, None, None).await?,
             SpircCommand::AddToQueue(uri) => self.handle_add_to_queue(uri).await,
+            SpircCommand::ClearQueue => {
+                self.connect_state.clear_queue()?;
+                self.emit_set_queue_event();
+            }
         };
 
         self.notify().await
