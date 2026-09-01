@@ -24,7 +24,7 @@ use crate::{
     audio_backend::Sink,
     config::{Bitrate, NormalisationMethod, NormalisationType, PlayerConfig},
     convert::Converter,
-    core::{Error, Session, SpotifyId, SpotifyUri, util::SeqGenerator},
+    core::{Error, Session, SpotifyId, SpotifyUri, error::ErrorKind, util::SeqGenerator},
     decoder::{AudioDecoder, AudioPacket, AudioPacketPosition, SymphoniaDecoder},
     local_file::{LocalFileLookup, create_local_file_lookup},
     metadata::audio::{AudioFileFormat, AudioFiles, AudioItem},
@@ -1105,14 +1105,15 @@ impl PlayerTrackLoader {
 
             let stream_loader_controller = encrypted_file.get_stream_loader_controller().ok()?;
 
-            // Not all audio files are encrypted. If we can't get a key, try loading the track
-            // without decryption. If the file was encrypted after all, the decoder will fail
-            // parsing and bail out, so we should be safe from outputting ear-piercing noise.
             let key = match self.session.audio_key().request(track_id, file_id).await {
                 Ok(key) => Some(key),
-                Err(e) => {
+                Err(e) if e.kind == ErrorKind::Unavailable => {
                     warn!("Unable to load key, continuing without decryption: {e}");
                     None
+                }
+                Err(e) => {
+                    error!("Unable to load key, cannot play track: {e}");
+                    return None;
                 }
             };
 
