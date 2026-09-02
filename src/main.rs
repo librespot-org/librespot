@@ -2,6 +2,7 @@ use data_encoding::HEXLOWER;
 use futures_util::StreamExt;
 #[cfg(feature = "alsa-backend")]
 use librespot::playback::mixer::alsamixer::AlsaMixer;
+use librespot::playback::mixer::external::ExternalMixer;
 use librespot::{
     connect::{ConnectConfig, Spirc},
     core::{
@@ -15,7 +16,7 @@ use librespot::{
             AudioFormat, Bitrate, NormalisationMethod, NormalisationType, PlayerConfig, VolumeCtrl,
         },
         dither,
-        mixer::{self, MixerConfig, MixerFn},
+        mixer::{self, Mixer, MixerConfig, MixerFn},
         player::{Player, coefficient_to_duration, duration_to_coefficient},
     },
 };
@@ -213,6 +214,7 @@ struct Setup {
     session_config: SessionConfig,
     connect_config: ConnectConfig,
     mixer_config: MixerConfig,
+    external_volume_query: Option<String>,
     credentials: Option<Credentials>,
     enable_oauth: bool,
     enable_device_auth: bool,
@@ -252,6 +254,7 @@ async fn get_setup() -> Setup {
     const ENABLE_DEVICE_AUTH: &str = "enable-device-auth";
     const ENABLE_OAUTH: &str = "enable-oauth";
     const ENABLE_VOLUME_NORMALISATION: &str = "enable-volume-normalisation";
+    const EXTERNAL_VOLUME_QUERY: &str = "external-volume-query";
     const FORMAT: &str = "format";
     const HELP: &str = "help";
     const INITIAL_VOLUME: &str = "initial-volume";
@@ -320,6 +323,7 @@ async fn get_setup() -> Setup {
     const PASSTHROUGH_SHORT: &str = "P";
     const PASSWORD_SHORT: &str = "p";
     const EMIT_SINK_EVENTS_SHORT: &str = "Q";
+    const EXTERNAL_VOLUME_QUERY_SHORT: &str = ""; // no short flag
     const QUIET_SHORT: &str = "q";
     const INITIAL_VOLUME_SHORT: &str = "R";
     const ALSA_MIXER_DEVICE_SHORT: &str = "S";
@@ -344,9 +348,13 @@ async fn get_setup() -> Setup {
     // Options that have different descriptions
     // depending on what backends were enabled at build time.
     #[cfg(feature = "alsa-backend")]
-    const MIXER_TYPE_DESC: &str = "Mixer to use {alsa|softvol}. Defaults to softvol.";
+    const MIXER_TYPE_DESC: &str = "Mixer to use {alsa|external|softvol}. Defaults to softvol.";
     #[cfg(not(feature = "alsa-backend"))]
-    const MIXER_TYPE_DESC: &str = "Not supported by the included audio backend(s).";
+    const MIXER_TYPE_DESC: &str = "Mixer to use {external|softvol}. Defaults to softvol.";
+    #[cfg(feature = "alsa-backend")]
+    const MIXER_TYPE_VALUES: &str = "alsa, external, softvol";
+    #[cfg(not(feature = "alsa-backend"))]
+    const MIXER_TYPE_VALUES: &str = "external, softvol";
     #[cfg(any(
         feature = "alsa-backend",
         feature = "rodio-backend",
@@ -562,6 +570,12 @@ async fn get_setup() -> Setup {
         MIXER_TYPE,
         MIXER_TYPE_DESC,
         "MIXER",
+    )
+    .optopt(
+        EXTERNAL_VOLUME_QUERY_SHORT,
+        EXTERNAL_VOLUME_QUERY,
+        "Command to query current external volume when using `--mixer external`. Must print one raw volume integer from 0 to 65535 within 1 second.",
+        "COMMAND",
     )
     .optopt(
         DEVICE_SHORT,
@@ -866,7 +880,8 @@ async fn get_setup() -> Setup {
         };
 
     let empty_string_error_msg = |long: &str, short: &str| {
-        error!("`--{long}` / `-{short}` can not be an empty string");
+        let flag = format_flag(long, short);
+        error!("{flag} can not be an empty string");
         exit(1);
     };
 
@@ -911,22 +926,21 @@ async fn get_setup() -> Setup {
         }
     }
 
-    #[cfg(feature = "alsa-backend")]
     let mixer_type = opt_str(MIXER_TYPE);
-    #[cfg(not(feature = "alsa-backend"))]
-    let mixer_type: Option<String> = None;
 
     let mixer = mixer::find(mixer_type.as_deref()).unwrap_or_else(|| {
         invalid_error_msg(
             MIXER_TYPE,
             MIXER_TYPE_SHORT,
             &opt_str(MIXER_TYPE).unwrap_or_default(),
-            "alsa, softvol",
+            MIXER_TYPE_VALUES,
             "softvol",
         );
 
         exit(1);
     });
+
+    let is_external_mixer = matches!(mixer_type.as_deref(), Some(ExternalMixer::NAME));
 
     let is_alsa_mixer = match mixer_type.as_deref() {
         #[cfg(feature = "alsa-backend")]
@@ -943,6 +957,20 @@ async fn get_setup() -> Setup {
             }
         }
     }
+
+    let external_volume_query = if is_external_mixer {
+        opt_str(EXTERNAL_VOLUME_QUERY).inspect(|query| {
+            if query.is_empty() {
+                empty_string_error_msg(EXTERNAL_VOLUME_QUERY, EXTERNAL_VOLUME_QUERY_SHORT);
+            }
+        })
+    } else {
+        if opt_present(EXTERNAL_VOLUME_QUERY) {
+            warn!("External volume query has no effect if not using the external mixer.");
+        }
+
+        None
+    };
 
     let mixer_config = {
         let mixer_default_config = MixerConfig::default();
@@ -1549,7 +1577,8 @@ async fn get_setup() -> Setup {
         let name = name.unwrap_or(connect_default_config.name);
         let device_type = device_type.unwrap_or(connect_default_config.device_type);
         let initial_volume = initial_volume.unwrap_or(connect_default_config.initial_volume);
-        let disable_volume = matches!(mixer_config.volume_ctrl, VolumeCtrl::Fixed);
+        let disable_volume =
+            matches!(mixer_config.volume_ctrl, VolumeCtrl::Fixed) && !is_external_mixer;
         let volume_steps = volume_steps.unwrap_or(connect_default_config.volume_steps);
 
         ConnectConfig {
@@ -1878,6 +1907,7 @@ async fn get_setup() -> Setup {
         session_config,
         connect_config,
         mixer_config,
+        external_volume_query,
         credentials,
         enable_oauth,
         enable_device_auth,
@@ -2021,11 +2051,21 @@ async fn main() {
     }
 
     let mixer_config = setup.mixer_config.clone();
-    let mixer = match (setup.mixer)(mixer_config) {
-        Ok(mixer) => mixer,
-        Err(why) => {
-            error!("{why}");
-            exit(1)
+    let mixer = if let Some(volume_query) = setup.external_volume_query.clone() {
+        match ExternalMixer::open_with_volume_query(mixer_config, volume_query) {
+            Ok(mixer) => std::sync::Arc::new(mixer) as std::sync::Arc<dyn Mixer>,
+            Err(why) => {
+                error!("{why}");
+                exit(1)
+            }
+        }
+    } else {
+        match (setup.mixer)(mixer_config) {
+            Ok(mixer) => mixer,
+            Err(why) => {
+                error!("{why}");
+                exit(1)
+            }
         }
     };
     let player_config = setup.player_config.clone();
