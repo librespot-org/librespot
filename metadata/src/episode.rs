@@ -89,7 +89,7 @@ impl TryFrom<&<Self as Metadata>::Message> for Episode {
             audio_previews: episode.audio_preview.as_slice().into(),
             restrictions: episode.restriction.as_slice().into(),
             freeze_frames: episode.freeze_frame.image.as_slice().into(),
-            keywords: episode.keyword.to_vec(),
+            keywords: episode.keyword.clone(),
             allow_background_playback: episode.allow_background_playback(),
             availability: episode.availability.as_slice().try_into()?,
             external_url: episode.external_url().to_owned(),

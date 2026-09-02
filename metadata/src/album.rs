@@ -100,7 +100,7 @@ impl TryFrom<&<Self as Metadata>::Message> for Album {
             covers: album.cover_group.get_or_default().into(),
             external_ids: album.external_id.as_slice().into(),
             discs: album.disc.as_slice().try_into()?,
-            reviews: album.review.to_vec(),
+            reviews: album.review.clone(),
             copyrights: album.copyright.as_slice().into(),
             restrictions: album.restriction.as_slice().into(),
             related: album.related.as_slice().try_into()?,
