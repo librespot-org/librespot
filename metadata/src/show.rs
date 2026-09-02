@@ -32,7 +32,6 @@ pub struct Show {
     pub is_audiobook: bool,
 }
 
-#[async_trait]
 impl Metadata for Show {
     type Message = protocol::metadata::Show;
 
@@ -63,7 +62,7 @@ impl TryFrom<&<Self as Metadata>::Message> for Show {
             episodes: show.episode.as_slice().try_into()?,
             copyrights: show.copyright.as_slice().into(),
             restrictions: show.restriction.as_slice().into(),
-            keywords: show.keyword.to_vec(),
+            keywords: show.keyword.clone(),
             media_type: show.media_type(),
             consumption_order: show.consumption_order(),
             availability: show.availability.as_slice().try_into()?,
