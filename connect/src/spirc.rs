@@ -1400,12 +1400,22 @@ impl SpircTask {
             Some(ref playing_track) => Some(match playing_track {
                 PlayingTrack::Index(i) => Ok(*i as usize),
                 PlayingTrack::Uri(uri) => {
-                    let ctx = self.connect_state.get_context(ContextType::Default)?;
-                    ConnectState::find_index_in_context(ctx, |t| &t.uri == uri)
+                    match self.connect_state.get_context(ContextType::Default) {
+                        Ok(ctx) => ConnectState::find_index_in_context(ctx, |t| &t.uri == uri),
+                        Err(why) => {
+                            warn!("context unavailable when resolving track by URI, using fallback index {fallback_index:?}: {why}");
+                            Ok(fallback_index.unwrap_or_default())
+                        }
+                    }
                 }
                 PlayingTrack::Uid(uid) => {
-                    let ctx = self.connect_state.get_context(ContextType::Default)?;
-                    ConnectState::find_index_in_context(ctx, |t| &t.uid == uid)
+                    match self.connect_state.get_context(ContextType::Default) {
+                        Ok(ctx) => ConnectState::find_index_in_context(ctx, |t| &t.uid == uid),
+                        Err(why) => {
+                            warn!("context unavailable when resolving track by UID, using fallback index {fallback_index:?}: {why}");
+                            Ok(fallback_index.unwrap_or_default())
+                        }
+                    }
                 }
             }),
         }
