@@ -158,6 +158,11 @@ impl EventHandler {
                                 env_vars.insert("PLAYER_EVENT", "unavailable".to_string());
                                 env_vars.insert("TRACK_ID", track_id.to_id());
                             }
+                            PlayerEvent::AudioKeyUnavailable { track_id, .. } => {
+                                env_vars
+                                    .insert("PLAYER_EVENT", "audio_key_unavailable".to_string());
+                                env_vars.insert("TRACK_ID", track_id.to_id());
+                            }
                             PlayerEvent::VolumeChanged { volume } => {
                                 env_vars.insert("PLAYER_EVENT", "volume_changed".to_string());
                                 env_vars.insert("VOLUME", volume.to_string());
