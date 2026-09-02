@@ -95,6 +95,11 @@ mod pulseaudio;
 #[cfg(feature = "pulseaudio-backend")]
 use self::pulseaudio::PulseAudioSink;
 
+#[cfg(feature = "pipewire-backend")]
+mod pipewire;
+#[cfg(feature = "pipewire-backend")]
+use self::pipewire::PipeWireSink;
+
 #[cfg(feature = "jackaudio-backend")]
 mod jackaudio;
 #[cfg(feature = "jackaudio-backend")]
@@ -130,6 +135,8 @@ pub const BACKENDS: &[(&str, SinkBuilder)] = &[
     (PortAudioSink::NAME, mk_sink::<PortAudioSink<'_>>),
     #[cfg(feature = "pulseaudio-backend")]
     (PulseAudioSink::NAME, mk_sink::<PulseAudioSink>),
+    #[cfg(feature = "pipewire-backend")]
+    (PipeWireSink::NAME, mk_sink::<PipeWireSink>),
     #[cfg(feature = "jackaudio-backend")]
     (JackSink::NAME, mk_sink::<JackSink>),
     #[cfg(feature = "gstreamer-backend")]
