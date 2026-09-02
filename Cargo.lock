@@ -1947,7 +1947,6 @@ dependencies = [
 name = "librespot-metadata"
 version = "0.8.0"
 dependencies = [
- "async-trait",
  "bytes",
  "librespot-core",
  "librespot-protocol",
