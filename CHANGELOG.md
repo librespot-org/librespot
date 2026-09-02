@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [audio] Try the next CDN URL when a fetch returns a non-206 status instead of only retrying on transport errors, fixing playback failures when the first CDN URL is reachable but does not stream audio.
 - [core] Made `SpotifyId::to_base62`, `SpotifyId::to_base16`, `FileId::to_base16`, `SpotifyUri::to_id` infallible (breaking)
 - [metadata] Removed `async-trait`. Implementations of `Metadata` don't need the `async-trait` annotation anymore. (breaking)
+- [core] Fixed some version constants containing `VERGEN_IDEMPOTENT_OUTPUT`
 
 ## [0.8.0] - 2025-11-10
 
