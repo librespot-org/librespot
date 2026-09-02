@@ -38,7 +38,7 @@ use protobuf::MessageField;
 use std::{
     future::Future,
     sync::Arc,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use thiserror::Error;
@@ -112,6 +112,9 @@ struct SpircTask {
     update_state: bool,
 
     spirc_id: usize,
+
+    /// shared flag to preserve play state across reconnections
+    was_playing: Arc<AtomicBool>,
 }
 
 static SPIRC_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -164,6 +167,7 @@ impl Spirc {
         credentials: Credentials,
         player: Arc<Player>,
         mixer: Arc<dyn Mixer>,
+        was_playing: Arc<AtomicBool>,
     ) -> Result<(Spirc, impl Future<Output = ()>), Error> {
         fn extract_connection_id(msg: Message) -> Result<String, Error> {
             let connection_id = msg
@@ -263,6 +267,7 @@ impl Spirc {
             update_state: false,
 
             spirc_id,
+            was_playing,
         };
 
         let spirc = Spirc { commands: cmd_tx };
@@ -946,7 +951,9 @@ impl SpircTask {
         use protobuf::Message;
 
         match TransferState::parse_from_bytes(&cluster.transfer_data) {
-            Ok(transfer_state) => self.handle_transfer(transfer_state)?,
+            Ok(transfer_state) => {
+                self.handle_transfer(transfer_state, self.was_playing.load(Ordering::Relaxed))?
+            }
             Err(why) => error!("failed to take over control: {why}"),
         }
 
@@ -1083,7 +1090,7 @@ impl SpircTask {
             }
             // modification and update of the connect_state
             Transfer(transfer) => {
-                self.handle_transfer(transfer.data.expect("by condition checked"))?;
+                self.handle_transfer(transfer.data.expect("by condition checked"), false)?;
                 return self.notify().await;
             }
             Play(mut play) => {
@@ -1180,7 +1187,11 @@ impl SpircTask {
         Ok(())
     }
 
-    fn handle_transfer(&mut self, mut transfer: TransferState) -> Result<(), Error> {
+    fn handle_transfer(
+        &mut self,
+        mut transfer: TransferState,
+        force_play: bool,
+    ) -> Result<(), Error> {
         let mut ctx_uri = match transfer.current_session.context.uri {
             None => Err(SpircError::NoUri("transfer context"))?,
             // can apparently happen when a state is transferred and was started with "uris" via the api
@@ -1266,7 +1277,7 @@ impl SpircTask {
             _ => 0,
         };
 
-        let is_playing = !transfer.playback.is_paused();
+        let is_playing = force_play || !transfer.playback.is_paused();
 
         if self.connect_state.current_track(|t| t.is_autoplay()) || autoplay {
             if let Some(ctx_uri) = ctx_uri {
@@ -1549,6 +1560,8 @@ impl SpircTask {
             _ => return,
         }
 
+        self.was_playing.store(true, Ordering::Relaxed);
+
         // Synchronize the volume from the mixer. This is useful on
         // systems that can switch sources from and back to librespot.
         let current_volume = self.mixer.volume();
@@ -1588,6 +1601,7 @@ impl SpircTask {
             }
             _ => (),
         }
+        self.was_playing.store(false, Ordering::Relaxed);
     }
 
     fn handle_seek(&mut self, position_ms: u32) {
@@ -1904,6 +1918,7 @@ impl SpircTask {
         } else {
             self.play_status = SpircPlayStatus::LoadingPause { position_ms };
         }
+        self.was_playing.store(start_playing, Ordering::Relaxed);
         self.connect_state.set_status(&self.play_status);
 
         Ok(())
