@@ -13,7 +13,7 @@ edition.workspace = true
 default = ["with-libmdns", "native-tls"]
 
 # Discovery backends
-with-avahi = ["dep:serde", "dep:zbus", "futures-util/async-await-macro"]
+with-avahi = ["dep:libc", "dep:serde", "dep:zbus", "futures-util/async-await-macro"]
 with-dns-sd = ["dep:dns-sd"]
 with-libmdns = ["dep:libmdns"]
 
@@ -42,6 +42,7 @@ hyper-util = { version = "0.1", features = [
     "service",
 ] }
 libmdns = { version = "0.10", optional = true }
+libc = { version = "0.2", optional = true }
 log = "0.4"
 rand = { version = "0.9", default-features = false, features = ["thread_rng"] }
 serde = { version = "1", default-features = false, features = [
