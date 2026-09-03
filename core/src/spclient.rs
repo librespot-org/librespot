@@ -535,7 +535,7 @@ impl SpClient {
                 match network_error.kind {
                     ErrorKind::Unavailable | ErrorKind::DeadlineExceeded => {
                         // Keep trying the current access point three times before dropping it.
-                        if tries % 3 == 0 {
+                        if tries.is_multiple_of(3) {
                             self.flush_accesspoint().await
                         }
                     }
