@@ -45,7 +45,7 @@ jobs:
             target: riscv64gc-unknown-linux-gnu
 
         toolchain:
-          - "1.85" # MSRV (Minimum Supported Rust Version)
+          - "1.87" # MSRV (Minimum Supported Rust Version)
           - stable
 
     steps:

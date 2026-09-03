@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - [core] Made `SpotifyId::to_base62`, `SpotifyId::to_base16`, `FileId::to_base16`, `SpotifyUri::to_id`, `SpotifyUri::to_uri` infallible (breaking)
+- [playback] Updated `rodio` to 0.22.2 and `cpal` to 0.17
+- [core] MSRV is now 1.87
 
 ### Fixed
 
