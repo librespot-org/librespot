@@ -226,6 +226,7 @@ struct Setup {
 
 async fn get_setup() -> Setup {
     const VALID_INITIAL_VOLUME_RANGE: RangeInclusive<u16> = 0..=100;
+    const VALID_CROSSFADE_RANGE: RangeInclusive<u64> = 0..=12;
     const VALID_VOLUME_RANGE: RangeInclusive<f64> = 0.0..=100.0;
     const VALID_NORMALISATION_KNEE_RANGE: RangeInclusive<f64> = 0.0..=10.0;
     const VALID_NORMALISATION_PREGAIN_RANGE: RangeInclusive<f64> = -10.0..=10.0;
@@ -242,6 +243,7 @@ async fn get_setup() -> Setup {
     const CACHE_SIZE_LIMIT: &str = "cache-size-limit";
     const DEVICE: &str = "device";
     const DEVICE_TYPE: &str = "device-type";
+    const CROSSFADE: &str = "crossfade";
     const DEVICE_IS_GROUP: &str = "group";
     const DISABLE_AUDIO_CACHE: &str = "disable-audio-cache";
     const DISABLE_CREDENTIAL_CACHE: &str = "disable-credential-cache";
@@ -303,6 +305,7 @@ async fn get_setup() -> Setup {
     const FORMAT_SHORT: &str = "f";
     const DISABLE_AUDIO_CACHE_SHORT: &str = "G";
     const DISABLE_GAPLESS_SHORT: &str = "g";
+    const CROSSFADE_SHORT: &str = ""; // no short flag
     const DISABLE_CREDENTIAL_CACHE_SHORT: &str = "H";
     const HELP_SHORT: &str = "h";
     const ZEROCONF_INTERFACE_SHORT: &str = "i";
@@ -424,6 +427,12 @@ async fn get_setup() -> Setup {
         DISABLE_GAPLESS_SHORT,
         DISABLE_GAPLESS,
         "Disable gapless playback.",
+    )
+    .optopt(
+        CROSSFADE_SHORT,
+        CROSSFADE,
+        "Overlap one track with the next by SECONDS, from 0 to 12. Defaults to 0, which disables crossfading.",
+        "SECONDS",
     )
     .optflag(
         EMIT_SINK_EVENTS_SHORT,
@@ -1612,6 +1621,23 @@ async fn get_setup() -> Setup {
 
         let gapless = !opt_present(DISABLE_GAPLESS);
 
+        let crossfade = opt_str(CROSSFADE)
+            .map(|seconds| match seconds.parse::<u64>() {
+                Ok(value) if VALID_CROSSFADE_RANGE.contains(&value) => Duration::from_secs(value),
+                _ => {
+                    let valid_values = &format!(
+                        "{} - {}",
+                        VALID_CROSSFADE_RANGE.start(),
+                        VALID_CROSSFADE_RANGE.end()
+                    );
+
+                    invalid_error_msg(CROSSFADE, CROSSFADE_SHORT, &seconds, valid_values, "0");
+
+                    exit(1);
+                }
+            })
+            .unwrap_or_default();
+
         let normalisation = opt_present(ENABLE_VOLUME_NORMALISATION);
 
         let (
@@ -1850,6 +1876,7 @@ async fn get_setup() -> Setup {
         PlayerConfig {
             bitrate,
             gapless,
+            crossfade,
             passthrough,
             normalisation,
             normalisation_type,

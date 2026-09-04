@@ -1,5 +1,6 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, VecDeque},
+    f64::consts::FRAC_PI_2,
     fmt, fs,
     fs::File,
     future::Future,
@@ -40,9 +41,125 @@ use symphonia::core::io::MediaSource;
 use symphonia::core::probe::Hint;
 use tokio::sync::{mpsc, oneshot};
 
-use crate::SAMPLES_PER_SECOND;
+use crate::{NUM_CHANNELS, SAMPLE_RATE, SAMPLES_PER_SECOND};
 
 const PRELOAD_NEXT_TRACK_BEFORE_END_DURATION_MS: u32 = 30000;
+
+const CROSSFADE_MAX: Duration = Duration::from_secs(12);
+
+const CROSSFADE_TAIL_PACKET_FRAMES: usize = 1024;
+
+fn crossfade_frames(crossfade: Duration) -> u64 {
+    let ms = crossfade.min(CROSSFADE_MAX).as_millis() as u64;
+    u64::from(SAMPLE_RATE) * ms / 1000
+}
+
+struct Ramp {
+    left: u64,
+    total: u64,
+}
+
+impl Ramp {
+    fn new(frames: u64) -> Self {
+        Self {
+            left: frames,
+            total: frames,
+        }
+    }
+
+    fn finished(&self) -> bool {
+        self.left == 0
+    }
+
+    fn progress(&self) -> f64 {
+        if self.total == 0 {
+            1.0
+        } else {
+            1.0 - (self.left as f64 / self.total as f64)
+        }
+    }
+
+    fn out_gain(&self) -> f64 {
+        (self.progress() * FRAC_PI_2).cos()
+    }
+
+    fn in_gain(&self) -> f64 {
+        (self.progress() * FRAC_PI_2).sin()
+    }
+
+    fn advance(&mut self) {
+        self.left = self.left.saturating_sub(1);
+    }
+}
+
+fn apply_fade_in(samples: &mut [f64], ramp: &mut Ramp) {
+    for frame in samples.chunks_mut(NUM_CHANNELS as usize) {
+        let gain = ramp.in_gain();
+        for sample in frame.iter_mut() {
+            *sample *= gain;
+        }
+        ramp.advance();
+    }
+}
+
+fn mix_tail(samples: &mut [f64], tail: &[f64], ramp: &mut Ramp) {
+    let channels = NUM_CHANNELS as usize;
+    for (frame, tail_frame) in samples.chunks_mut(channels).zip(tail.chunks(channels)) {
+        let gain = ramp.out_gain();
+        for (sample, tail_sample) in frame.iter_mut().zip(tail_frame) {
+            *sample += tail_sample * gain;
+        }
+        ramp.advance();
+    }
+}
+
+struct Outgoing {
+    decoder: Decoder,
+    normalisation_factor: f64,
+    pending: VecDeque<f64>,
+    ramp: Ramp,
+    ended: bool,
+}
+
+impl Outgoing {
+    fn new(decoder: Decoder, normalisation_factor: f64, frames: u64) -> Self {
+        Self {
+            decoder,
+            normalisation_factor,
+            pending: VecDeque::new(),
+            ramp: Ramp::new(frames),
+            ended: false,
+        }
+    }
+
+    fn take(&mut self, frames: usize) -> Vec<f64> {
+        let wanted = frames * NUM_CHANNELS as usize;
+        while self.pending.len() < wanted && !self.ended {
+            match self.decoder.next_packet() {
+                Ok(Some((_, AudioPacket::Samples(samples)))) => {
+                    let factor = self.normalisation_factor;
+                    self.pending
+                        .extend(samples.iter().map(|sample| sample * factor));
+                }
+                Ok(Some(_)) | Ok(None) => self.ended = true,
+                Err(e) => {
+                    warn!("Ending the crossfade, unable to decode the outgoing track: {e:?}");
+                    self.ended = true;
+                }
+            }
+        }
+        let mut taken: Vec<f64> = self
+            .pending
+            .drain(..wanted.min(self.pending.len()))
+            .collect();
+        taken.resize(wanted, 0.0);
+        taken
+    }
+
+    fn finished(&self) -> bool {
+        self.ramp.finished() || (self.ended && self.pending.is_empty())
+    }
+}
 pub const DB_VOLTAGE_RATIO: f64 = 20.0;
 pub const PCM_AT_0DBFS: f64 = 1.0;
 
@@ -95,6 +212,11 @@ struct PlayerInternal {
     last_progress_update: Instant,
 
     local_file_lookup: Arc<LocalFileLookup>,
+
+    crossfade: Duration,
+    outgoing: Option<Outgoing>,
+    fade_in: Option<Ramp>,
+    adopting: Option<SpotifyUri>,
 }
 
 static PLAYER_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -117,6 +239,7 @@ enum PlayerCommand {
     SetSinkEventCallback(Option<SinkEventCallback>),
     EmitVolumeChangedEvent(u16),
     SetAutoNormaliseAsAlbum(bool),
+    SetCrossfade(Duration),
     EmitSessionDisconnectedEvent {
         connection_id: String,
         user_name: String,
@@ -503,6 +626,8 @@ impl Player {
             let local_file_lookup =
                 create_local_file_lookup(config.local_file_directories.as_slice());
 
+            let crossfade = config.crossfade;
+
             let internal = PlayerInternal {
                 session,
                 config,
@@ -530,6 +655,11 @@ impl Player {
                 last_progress_update: Instant::now(),
 
                 local_file_lookup: Arc::new(local_file_lookup),
+
+                crossfade: crossfade.min(CROSSFADE_MAX),
+                outgoing: None,
+                fade_in: None,
+                adopting: None,
             };
 
             // While PlayerInternal is written as a future, it still contains blocking code.
@@ -621,6 +751,10 @@ impl Player {
 
     pub fn set_auto_normalise_as_album(&self, setting: bool) {
         self.command(PlayerCommand::SetAutoNormaliseAsAlbum(setting));
+    }
+
+    pub fn set_crossfade(&self, crossfade: Duration) {
+        self.command(PlayerCommand::SetCrossfade(crossfade));
     }
 
     pub fn emit_filter_explicit_content_changed_event(&self, filter: bool) {
@@ -1577,7 +1711,12 @@ impl Future for PlayerInternal {
                     error!("PlayerInternal poll: Invalid PlayerState");
                     exit(1);
                 };
+            } else if self.outgoing.is_some() {
+                self.ensure_sink_running();
+                self.write_tail();
             }
+
+            self.maybe_begin_crossfade();
 
             if let PlayerState::Playing {
                 ref track_id,
@@ -1613,7 +1752,10 @@ impl Future for PlayerInternal {
                 }
             }
 
-            if (!self.state.is_playing()) && all_futures_completed_or_not_ready {
+            if (!self.state.is_playing())
+                && self.outgoing.is_none()
+                && all_futures_completed_or_not_ready
+            {
                 return Poll::Pending;
             }
         }
@@ -1671,6 +1813,7 @@ impl PlayerInternal {
     }
 
     fn handle_player_stop(&mut self) {
+        self.drop_crossfade();
         match self.state {
             PlayerState::Playing {
                 ref track_id,
@@ -1738,6 +1881,7 @@ impl PlayerInternal {
     }
 
     fn handle_pause(&mut self) {
+        self.drop_crossfade();
         match self.state {
             PlayerState::Paused { .. } => self.ensure_sink_stopped(false),
             PlayerState::Playing {
@@ -1767,110 +1911,272 @@ impl PlayerInternal {
         }
     }
 
+    fn crossfade(&self) -> Duration {
+        if self.config.passthrough {
+            Duration::ZERO
+        } else {
+            self.crossfade
+        }
+    }
+
+    fn crossfading(&self) -> bool {
+        self.outgoing.is_some() || self.fade_in.is_some()
+    }
+
+    fn drop_crossfade(&mut self) {
+        self.outgoing = None;
+        self.fade_in = None;
+        self.adopting = None;
+    }
+
+    fn write_packet(&mut self, packet: AudioPacket) {
+        if let Err(e) = self.sink.write(packet, &mut self.converter) {
+            error!("{e}");
+            self.handle_pause();
+        }
+    }
+
+    fn write_samples(&mut self, mut data: Vec<f64>) {
+        if let Some(ramp) = &mut self.fade_in {
+            apply_fade_in(&mut data, ramp);
+        }
+        self.fade_in.take_if(|ramp| ramp.finished());
+        self.mix_outgoing(&mut data);
+        self.apply_output_gain(&mut data);
+        self.write_packet(AudioPacket::Samples(data));
+    }
+
+    fn write_tail(&mut self) {
+        let mut data = vec![0.0; CROSSFADE_TAIL_PACKET_FRAMES * NUM_CHANNELS as usize];
+        self.mix_outgoing(&mut data);
+        self.apply_output_gain(&mut data);
+        self.write_packet(AudioPacket::Samples(data));
+    }
+
+    fn mix_outgoing(&mut self, data: &mut [f64]) {
+        let frames = data.len() / NUM_CHANNELS as usize;
+        if let Some(outgoing) = &mut self.outgoing {
+            let tail = outgoing.take(frames);
+            mix_tail(data, &tail, &mut outgoing.ramp);
+        }
+        self.outgoing.take_if(|outgoing| outgoing.finished());
+    }
+
+    fn apply_output_gain(&mut self, data: &mut [f64]) {
+        let volume = self.volume_getter.attenuation_factor();
+        match (self.config.normalisation, self.config.normalisation_method) {
+            (false, _) | (true, NormalisationMethod::Basic) => {
+                if volume < 1.0 {
+                    for sample in data.iter_mut() {
+                        *sample *= volume;
+                    }
+                }
+            }
+            (true, NormalisationMethod::Dynamic) => {
+                let threshold_db = self.config.normalisation_threshold_dbfs;
+                let knee_db = self.config.normalisation_knee_db;
+                let attack_cf = self.config.normalisation_attack_cf;
+                let release_cf = self.config.normalisation_release_cf;
+
+                for sample in data.iter_mut() {
+                    // Feedforward limiter in the log domain
+                    // After: Giannoulis, D., Massberg, M., & Reiss, J.D. (2012).
+                    // Digital Dynamic Range Compressor Design—A Tutorial and
+                    // Analysis. Journal of The Audio Engineering Society, 60,
+                    // 399-408.
+
+                    // This implementation assumes audio is stereo.
+
+                    // step 1-4: half-wave rectification and conversion into dB, and
+                    // gain computer with soft knee and subtractor
+                    let limiter_db = {
+                        // Add slight DC offset. Some samples are silence, which is
+                        // -inf dB and gets the limiter stuck. Adding a small
+                        // positive offset prevents this.
+                        *sample += f64::MIN_POSITIVE;
+
+                        let bias_db = ratio_to_db(sample.abs()) - threshold_db;
+                        let knee_boundary_db = bias_db * 2.0;
+                        if knee_boundary_db < -knee_db {
+                            0.0
+                        } else if knee_boundary_db.abs() <= knee_db {
+                            let term = knee_boundary_db + knee_db;
+                            term * term * self.normalisation_knee_factor
+                        } else {
+                            bias_db
+                        }
+                    };
+
+                    // track left/right channel
+                    let channel = self.normalisation_channel;
+                    self.normalisation_channel ^= 1;
+
+                    // step 5: smooth, decoupled peak detector for each channel
+                    // Use direct references to reduce repeated array indexing
+                    let integrator = &mut self.normalisation_integrators[channel];
+                    let peak = &mut self.normalisation_peaks[channel];
+
+                    *integrator = f64::max(
+                        limiter_db,
+                        release_cf * *integrator + (1.0 - release_cf) * limiter_db,
+                    );
+                    *peak = attack_cf * *peak + (1.0 - attack_cf) * *integrator;
+
+                    // steps 6-8: conversion into level and multiplication into gain
+                    // stage. Find maximum peak across both channels to couple the
+                    // gain and maintain stereo imaging.
+                    let max_peak =
+                        f64::max(self.normalisation_peaks[0], self.normalisation_peaks[1]);
+                    *sample *= db_to_ratio(-max_peak) * volume;
+                }
+            }
+        }
+    }
+
+    fn maybe_begin_crossfade(&mut self) {
+        let crossfade = self.crossfade();
+        if crossfade.is_zero() || self.outgoing.is_some() {
+            return;
+        }
+        let remaining = match &self.state {
+            PlayerState::Playing {
+                duration_ms,
+                stream_position_ms,
+                ..
+            } => Duration::from_millis(u64::from(duration_ms.saturating_sub(*stream_position_ms))),
+            _ => return,
+        };
+        if remaining > crossfade || !matches!(self.preload, PlayerPreload::Ready { .. }) {
+            return;
+        }
+        self.begin_crossfade(crossfade);
+    }
+
+    fn begin_crossfade(&mut self, crossfade: Duration) {
+        let (next_track_id, loaded_track) =
+            match mem::replace(&mut self.preload, PlayerPreload::None) {
+                PlayerPreload::Ready {
+                    track_id,
+                    loaded_track,
+                } => (track_id, loaded_track),
+                other => {
+                    self.preload = other;
+                    return;
+                }
+            };
+        let frames = crossfade_frames(crossfade);
+        let (track_id, play_request_id) = match self.take_outgoing(frames) {
+            Some(taken) => taken,
+            None => {
+                self.preload = PlayerPreload::Ready {
+                    track_id: next_track_id,
+                    loaded_track,
+                };
+                return;
+            }
+        };
+        self.fade_in = Some(Ramp::new(frames));
+        self.adopting = Some(next_track_id.clone());
+        self.send_event(PlayerEvent::EndOfTrack {
+            track_id,
+            play_request_id,
+        });
+        let play_request_id = self.play_request_id_generator.get();
+        self.send_event(PlayerEvent::PlayRequestIdChanged { play_request_id });
+        self.start_playback(next_track_id, play_request_id, *loaded_track, true);
+    }
+
+    fn take_outgoing(&mut self, frames: u64) -> Option<(SpotifyUri, u64)> {
+        match mem::replace(&mut self.state, PlayerState::Invalid) {
+            PlayerState::Playing {
+                track_id,
+                play_request_id,
+                decoder,
+                normalisation_factor,
+                ..
+            } => {
+                let factor = if self.config.normalisation {
+                    normalisation_factor
+                } else {
+                    1.0
+                };
+                self.outgoing = Some(Outgoing::new(decoder, factor, frames));
+                Some((track_id, play_request_id))
+            }
+            other => {
+                self.state = other;
+                None
+            }
+        }
+    }
+
+    fn begin_skip_crossfade(&mut self, next: &SpotifyUri) {
+        let crossfade = self.crossfade();
+        let leaving = match &self.state {
+            PlayerState::Playing { track_id, .. } => track_id != next,
+            _ => false,
+        };
+        if crossfade.is_zero() || !leaving {
+            return;
+        }
+        let frames = crossfade_frames(crossfade);
+        if self.take_outgoing(frames).is_some() {
+            self.state = PlayerState::Stopped;
+            self.fade_in = Some(Ramp::new(frames));
+        }
+    }
+
+    fn is_adopting(&self, track_id: &SpotifyUri, position_ms: u32) -> bool {
+        if position_ms != 0 || !self.crossfading() {
+            return false;
+        }
+        if self.adopting.as_ref() != Some(track_id) {
+            return false;
+        }
+        matches!(
+            &self.state,
+            PlayerState::Playing { track_id: playing, .. } if playing == track_id
+        )
+    }
+
+    fn adopt(&mut self, track_id: SpotifyUri, play_request_id: u64) {
+        self.adopting = None;
+        let position_ms = match &mut self.state {
+            PlayerState::Playing {
+                play_request_id: current,
+                stream_position_ms,
+                ..
+            } => {
+                *current = play_request_id;
+                *stream_position_ms
+            }
+            _ => 0,
+        };
+        self.send_event(PlayerEvent::Playing {
+            track_id,
+            play_request_id,
+            position_ms,
+        });
+    }
+
     fn handle_packet(
         &mut self,
         packet: Option<(AudioPacketPosition, AudioPacket)>,
         normalisation_factor: f64,
     ) {
         match packet {
-            Some((_, mut packet)) => {
+            Some((_, packet)) => {
                 if !packet.is_empty() {
-                    if let AudioPacket::Samples(ref mut data) = packet {
-                        // Get the volume for the packet. In the case of hardware volume control
-                        // this will always be 1.0 (no change).
-                        let volume = self.volume_getter.attenuation_factor();
-
-                        // For the basic normalisation method, a normalisation factor of 1.0
-                        // indicates that there is nothing to normalise (all samples should pass
-                        // unaltered). For the dynamic method, there may still be peaks that we
-                        // want to shave off.
-                        //
-                        // No matter the case we apply volume attenuation last if there is any.
-                        match (self.config.normalisation, self.config.normalisation_method) {
-                            (false, _) => {
-                                if volume < 1.0 {
-                                    for sample in data.iter_mut() {
-                                        *sample *= volume;
-                                    }
-                                }
-                            }
-                            (true, NormalisationMethod::Dynamic) => {
-                                // zero-cost shorthands
-                                let threshold_db = self.config.normalisation_threshold_dbfs;
-                                let knee_db = self.config.normalisation_knee_db;
-                                let attack_cf = self.config.normalisation_attack_cf;
-                                let release_cf = self.config.normalisation_release_cf;
-
+                    match packet {
+                        AudioPacket::Samples(mut data) => {
+                            if self.config.normalisation && normalisation_factor != 1.0 {
                                 for sample in data.iter_mut() {
-                                    // Feedforward limiter in the log domain
-                                    // After: Giannoulis, D., Massberg, M., & Reiss, J.D. (2012).
-                                    // Digital Dynamic Range Compressor Design—A Tutorial and
-                                    // Analysis. Journal of The Audio Engineering Society, 60,
-                                    // 399-408.
-
-                                    // This implementation assumes audio is stereo.
-
-                                    // step 0: apply gain stage
                                     *sample *= normalisation_factor;
-
-                                    // step 1-4: half-wave rectification and conversion into dB, and
-                                    // gain computer with soft knee and subtractor
-                                    let limiter_db = {
-                                        // Add slight DC offset. Some samples are silence, which is
-                                        // -inf dB and gets the limiter stuck. Adding a small
-                                        // positive offset prevents this.
-                                        *sample += f64::MIN_POSITIVE;
-
-                                        let bias_db = ratio_to_db(sample.abs()) - threshold_db;
-                                        let knee_boundary_db = bias_db * 2.0;
-                                        if knee_boundary_db < -knee_db {
-                                            0.0
-                                        } else if knee_boundary_db.abs() <= knee_db {
-                                            let term = knee_boundary_db + knee_db;
-                                            term * term * self.normalisation_knee_factor
-                                        } else {
-                                            bias_db
-                                        }
-                                    };
-
-                                    // track left/right channel
-                                    let channel = self.normalisation_channel;
-                                    self.normalisation_channel ^= 1;
-
-                                    // step 5: smooth, decoupled peak detector for each channel
-                                    // Use direct references to reduce repeated array indexing
-                                    let integrator = &mut self.normalisation_integrators[channel];
-                                    let peak = &mut self.normalisation_peaks[channel];
-
-                                    *integrator = f64::max(
-                                        limiter_db,
-                                        release_cf * *integrator + (1.0 - release_cf) * limiter_db,
-                                    );
-                                    *peak = attack_cf * *peak + (1.0 - attack_cf) * *integrator;
-
-                                    // steps 6-8: conversion into level and multiplication into gain
-                                    // stage. Find maximum peak across both channels to couple the
-                                    // gain and maintain stereo imaging.
-                                    let max_peak = f64::max(
-                                        self.normalisation_peaks[0],
-                                        self.normalisation_peaks[1],
-                                    );
-                                    *sample *= db_to_ratio(-max_peak) * volume;
                                 }
                             }
-                            (true, NormalisationMethod::Basic) => {
-                                if normalisation_factor < 1.0 || volume < 1.0 {
-                                    for sample in data.iter_mut() {
-                                        *sample *= normalisation_factor * volume;
-                                    }
-                                }
-                            }
+                            self.write_samples(data);
                         }
-                    }
-
-                    if let Err(e) = self.sink.write(packet, &mut self.converter) {
-                        error!("{e}");
-                        self.handle_pause();
+                        raw => self.write_packet(raw),
                     }
                 }
             }
@@ -1981,7 +2287,7 @@ impl PlayerInternal {
 
         self.send_event(PlayerEvent::PlayRequestIdChanged { play_request_id });
 
-        if !self.config.gapless {
+        if !self.config.gapless && self.crossfade().is_zero() {
             self.ensure_sink_stopped(play);
         }
 
@@ -1990,6 +2296,17 @@ impl PlayerInternal {
                 "Player::handle_command_load called from invalid state: {:?}",
                 self.state
             )));
+        }
+
+        if self.is_adopting(&track_id, position_ms) {
+            self.adopt(track_id, play_request_id);
+            return Ok(());
+        }
+        self.adopting = None;
+        if play {
+            self.begin_skip_crossfade(&track_id);
+        } else {
+            self.drop_crossfade();
         }
 
         // Now we check at different positions whether we already have a pre-loaded version
@@ -2232,6 +2549,7 @@ impl PlayerInternal {
     }
 
     fn handle_command_seek(&mut self, position_ms: u32) -> PlayerResult {
+        self.drop_crossfade();
         // When we are still loading, the user may immediately ask to
         // seek to another position yet the decoder won't be ready for
         // that. In this case just restart the loading process but
@@ -2369,6 +2687,8 @@ impl PlayerInternal {
             PlayerCommand::SetAutoNormaliseAsAlbum(setting) => {
                 self.auto_normalise_as_album = setting
             }
+
+            PlayerCommand::SetCrossfade(crossfade) => self.crossfade = crossfade.min(CROSSFADE_MAX),
 
             PlayerCommand::EmitSetQueueEvent {
                 context_uri,
@@ -2538,6 +2858,9 @@ impl fmt::Debug for PlayerCommand {
                 .debug_tuple("SetAutoNormaliseAsAlbum")
                 .field(&setting)
                 .finish(),
+            PlayerCommand::SetCrossfade(crossfade) => {
+                f.debug_tuple("SetCrossfade").field(&crossfade).finish()
+            }
             PlayerCommand::EmitFilterExplicitContentChangedEvent(filter) => f
                 .debug_tuple("EmitFilterExplicitContentChangedEvent")
                 .field(&filter)
@@ -2700,5 +3023,138 @@ where
 
     fn byte_len(&self) -> Option<u64> {
         Some(self.length)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::f64::consts::FRAC_1_SQRT_2;
+    use std::time::Duration;
+
+    use super::{
+        AudioPacket, AudioPacketPosition, CROSSFADE_MAX, Outgoing, Ramp, apply_fade_in,
+        crossfade_frames, mix_tail,
+    };
+    use crate::decoder::{AudioDecoder, DecoderError, DecoderResult};
+
+    struct StubDecoder {
+        packets: Vec<Vec<f64>>,
+    }
+
+    impl AudioDecoder for StubDecoder {
+        fn seek(&mut self, position_ms: u32) -> Result<u32, DecoderError> {
+            Ok(position_ms)
+        }
+
+        fn next_packet(&mut self) -> DecoderResult<Option<(AudioPacketPosition, AudioPacket)>> {
+            if self.packets.is_empty() {
+                return Ok(None);
+            }
+            let samples = self.packets.remove(0);
+            Ok(Some((
+                AudioPacketPosition {
+                    position_ms: 0,
+                    skipped: false,
+                },
+                AudioPacket::Samples(samples),
+            )))
+        }
+    }
+
+    #[test]
+    fn ramp_runs_from_one_track_to_the_other() {
+        let mut ramp = Ramp::new(100);
+        assert!((ramp.out_gain() - 1.0).abs() < 1e-9);
+        assert!(ramp.in_gain().abs() < 1e-9);
+        for _ in 0..100 {
+            ramp.advance();
+        }
+        assert!(ramp.finished());
+        assert!(ramp.out_gain().abs() < 1e-9);
+        assert!((ramp.in_gain() - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn ramp_holds_its_level_at_the_midpoint() {
+        let mut ramp = Ramp::new(100);
+        for _ in 0..50 {
+            ramp.advance();
+        }
+        assert!((ramp.out_gain() - FRAC_1_SQRT_2).abs() < 1e-6);
+        assert!((ramp.out_gain().powi(2) + ramp.in_gain().powi(2) - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn ramp_holds_its_target_once_finished() {
+        let mut ramp = Ramp::new(10);
+        for _ in 0..100 {
+            ramp.advance();
+        }
+        assert!(ramp.out_gain().abs() < 1e-9);
+    }
+
+    #[test]
+    fn fade_in_steps_once_per_frame() {
+        let mut ramp = Ramp::new(4);
+        let mut samples = vec![1.0f64; 8];
+        apply_fade_in(&mut samples, &mut ramp);
+        for frame in samples.chunks(2) {
+            assert_eq!(frame[0], frame[1]);
+        }
+        assert!(samples[0].abs() < 1e-9);
+        assert!(samples[6] > samples[4]);
+        assert!(ramp.finished());
+    }
+
+    #[test]
+    fn tail_is_mixed_frame_for_frame() {
+        let mut ramp = Ramp::new(4);
+        let mut samples = vec![0.0f64; 8];
+        mix_tail(&mut samples, &vec![1.0f64; 8], &mut ramp);
+        assert!((samples[0] - 1.0).abs() < 1e-9);
+        assert!(samples[6] < samples[4]);
+        assert!(ramp.finished());
+    }
+
+    #[test]
+    fn tail_spans_packets_of_different_lengths() {
+        let decoder = StubDecoder {
+            packets: vec![vec![1.0; 6], vec![1.0; 2], vec![1.0; 10]],
+        };
+        let mut outgoing = Outgoing::new(Box::new(decoder), 1.0, 100);
+        assert_eq!(outgoing.take(4).len(), 8);
+        assert_eq!(outgoing.take(4).len(), 8);
+    }
+
+    #[test]
+    fn tail_pads_with_silence_once_spent() {
+        let decoder = StubDecoder {
+            packets: vec![vec![1.0; 4]],
+        };
+        let mut outgoing = Outgoing::new(Box::new(decoder), 1.0, 100);
+        assert_eq!(
+            outgoing.take(4),
+            vec![1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0]
+        );
+        assert!(outgoing.finished());
+    }
+
+    #[test]
+    fn tail_carries_its_own_normalisation() {
+        let decoder = StubDecoder {
+            packets: vec![vec![1.0; 4]],
+        };
+        let mut outgoing = Outgoing::new(Box::new(decoder), 0.5, 100);
+        assert_eq!(outgoing.take(2), vec![0.5, 0.5, 0.5, 0.5]);
+    }
+
+    #[test]
+    fn crossfade_frames_follow_the_sample_rate_and_the_cap() {
+        assert_eq!(crossfade_frames(Duration::from_secs(1)), 44_100);
+        assert_eq!(crossfade_frames(Duration::ZERO), 0);
+        assert_eq!(
+            crossfade_frames(Duration::from_secs(60)),
+            crossfade_frames(CROSSFADE_MAX)
+        );
     }
 }
