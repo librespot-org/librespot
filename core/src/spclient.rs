@@ -672,6 +672,21 @@ impl SpClient {
         self.request(&Method::GET, &endpoint, None, None).await
     }
 
+    /// `length` items of a playlist starting at `from`, with the list's
+    /// revision, length, attributes, and owner decorated on. A `length` of
+    /// zero fetches that header alone, which is all a client needs to show a
+    /// playlist and to tell whether rows it already holds are current.
+    pub async fn get_playlist_range(
+        &self,
+        playlist_id: &SpotifyId,
+        from: usize,
+        length: usize,
+    ) -> SpClientResult {
+        let endpoint = playlist_range_endpoint(playlist_id, from, length);
+
+        self.request(&Method::GET, &endpoint, None, None).await
+    }
+
     pub async fn get_user_profile(
         &self,
         username: &str,
@@ -956,5 +971,30 @@ impl SpClient {
             &NO_METRICS_AND_SALT,
         )
         .await
+    }
+}
+
+fn playlist_range_endpoint(playlist_id: &SpotifyId, from: usize, length: usize) -> String {
+    format!(
+        "/playlist/v2/playlist/{}?decorate=revision,length,attributes,owner&from={from}&length={length}",
+        playlist_id.to_base62()
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_playlist_window_names_its_range_and_decorations() {
+        let id = SpotifyId::from_base62("37i9dQZF1DXbIbVYph0Zr5").unwrap();
+        assert_eq!(
+            playlist_range_endpoint(&id, 100, 50),
+            "/playlist/v2/playlist/37i9dQZF1DXbIbVYph0Zr5?decorate=revision,length,attributes,owner&from=100&length=50"
+        );
+        assert!(
+            playlist_range_endpoint(&id, 0, 0).ends_with("&from=0&length=0"),
+            "the header alone"
+        );
     }
 }
