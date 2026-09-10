@@ -713,12 +713,20 @@ impl SpircTask {
         match cmd {
             SpircCommand::Shutdown => {
                 trace!("Received SpircCommand::Shutdown");
-                self.handle_pause();
-                self.handle_disconnect().await?;
+                if let Err(error) =
+                    tokio::time::timeout(Duration::from_secs(10), self.player.stop_and_flush())
+                        .await
+                        .unwrap_or_else(|_| {
+                            Err(Error::deadline_exceeded("Listening flush timed out"))
+                        })
+                {
+                    warn!("Unable to flush listening on shutdown: {error}");
+                }
                 self.shutdown = true;
                 if let Some(rx) = self.commands.as_mut() {
                     rx.close()
                 }
+                self.handle_disconnect().await?;
             }
             SpircCommand::Transfer(request) if !self.connect_state.is_active() => {
                 let device_id = self.session.device_id();
@@ -1895,7 +1903,12 @@ impl SpircTask {
 
         let current_uri = self.connect_state.current_track(|t| &t.uri);
         let id = SpotifyUri::from_uri(current_uri)?;
-        self.player.load(id, start_playing, position_ms);
+        self.player.load_with_context(
+            id,
+            start_playing,
+            position_ms,
+            Some(self.connect_state.context_uri().clone()),
+        );
 
         self.connect_state
             .update_position(position_ms, self.now_ms());

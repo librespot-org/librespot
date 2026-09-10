@@ -16,6 +16,16 @@ fn compile() {
     let proto_dir = Path::new(&env::var("CARGO_MANIFEST_DIR").expect("env")).join("proto");
 
     let files = &[
+        proto_dir.join("RawCoreStream.proto"),
+        proto_dir.join("gabito.proto"),
+        proto_dir.join("context_client_id.proto"),
+        proto_dir.join("context_installation_id.proto"),
+        proto_dir.join("context_application_desktop.proto"),
+        proto_dir.join("context_device_desktop.proto"),
+        proto_dir.join("context_time.proto"),
+        proto_dir.join("context_monotonic_clock.proto"),
+        proto_dir.join("context_sdk.proto"),
+        proto_dir.join("audio_files_extension.proto"),
         proto_dir.join("connect.proto"),
         proto_dir.join("media.proto"),
         proto_dir.join("connectivity.proto"),

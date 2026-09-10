@@ -112,6 +112,35 @@ pub struct TransferRequest {
 }
 
 impl SpClient {
+    pub(crate) async fn publish_listening_events(&self, body: &[u8]) -> SpClientResult {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            CONTENT_TYPE,
+            HeaderValue::from_static("application/x-protobuf"),
+        );
+        headers.insert("content-encoding", HeaderValue::from_static("gzip"));
+        headers.insert(
+            "app-platform",
+            HeaderValue::from_static(match crate::config::OS {
+                "windows" => "Win32",
+                "macos" => "OSX",
+                _ => "Linux",
+            }),
+        );
+        headers.insert("spotify-app-version", HeaderValue::from_static("129600518"));
+        self.request_with_options(
+            &Method::POST,
+            "/gabo-receiver-service/v3/events/",
+            Some(headers),
+            Some(body),
+            &RequestOptions {
+                base_url: Some("https://spclient.wg.spotify.com"),
+                ..NO_METRICS_AND_SALT
+            },
+        )
+        .await
+    }
+
     pub fn set_strategy(&self, strategy: RequestStrategy) {
         self.lock(|inner| inner.strategy = strategy)
     }
