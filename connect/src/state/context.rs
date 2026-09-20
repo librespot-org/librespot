@@ -21,7 +21,7 @@ use uuid::Uuid;
 const LOCAL_FILES_IDENTIFIER: &str = "spotify:local-files";
 const SEARCH_IDENTIFIER: &str = "spotify:search";
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct StateContext {
     pub tracks: ShuffleVec<ProvidedTrack>,
     pub metadata: HashMap<String, String>,

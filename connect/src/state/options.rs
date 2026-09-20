@@ -10,7 +10,7 @@ use crate::{
 use protobuf::MessageField;
 use rand::Rng;
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub(crate) struct ShuffleState {
     pub seed: u64,
     pub initial_track: String,

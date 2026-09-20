@@ -38,6 +38,110 @@ use thiserror::Error;
 
 // these limitations are essential, otherwise to many tracks will overload the web-player
 const SPOTIFY_MAX_PREV_TRACKS_SIZE: usize = 10;
+
+#[cfg(test)]
+mod recovery_tests {
+    use super::*;
+    use crate::protocol::{
+        context::Context, context_page::ContextPage, context_track::ContextTrack,
+    };
+
+    fn state(name: &str, volume: u16) -> ConnectState {
+        let session = Session::new(Default::default(), None);
+        ConnectState::new(
+            ConnectConfig {
+                name: name.into(),
+                initial_volume: volume,
+                ..Default::default()
+            },
+            &session,
+        )
+    }
+
+    fn context(kind: &str, start: usize) -> Context {
+        Context {
+            uri: Some(format!("spotify:playlist:{kind}")),
+            pages: vec![ContextPage {
+                tracks: (start..start + 120)
+                    .map(|i| ContextTrack {
+                        uri: Some(format!("spotify:track:{i:022}")),
+                        uid: Some(format!("occurrence-{i}")),
+                        ..Default::default()
+                    })
+                    .collect(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn reconnect_preserves_exact_playback_without_copying_device_state() {
+        for shuffle in [false, true] {
+            let mut old = state("old", 10);
+            old.set_session_id("old-session".into());
+            old.update_context(context("original", 0), ContextType::Default)
+                .unwrap();
+            old.set_current_track(5).unwrap();
+            old.reset_playback_to_position(Some(5)).unwrap();
+            old.handle_set_repeat_context(true).unwrap();
+            old.handle_shuffle(shuffle).unwrap();
+            for _ in 0..3 {
+                old.add_to_queue(
+                    ProvidedTrack {
+                        uri: "spotify:track:0000000000000000000999".into(),
+                        ..Default::default()
+                    },
+                    true,
+                );
+            }
+            // The interrupted song is queued and is not in the context.
+            old.next_track().unwrap();
+            let mut restored = state("replacement", 123);
+            restored.set_session_id("new-session".into());
+            restored.restore_playback(&old);
+            assert_eq!(restored.device_info().name, "replacement");
+            assert_eq!(restored.device_info().volume, 123);
+            assert_eq!(restored.player().session_id, "new-session");
+            assert!(!restored.is_active());
+            assert_eq!(restored.player().track, old.player().track);
+            assert_eq!(restored.player().prev_tracks, old.player().prev_tracks);
+            assert_eq!(restored.player().next_tracks, old.player().next_tracks);
+            assert_eq!(restored.player().options, old.player().options);
+            assert_eq!(restored.context_uri(), old.context_uri());
+            // Exhaust the prefetched 80 rows and wrap the context. Merely
+            // saving the visible queue would fail to continue identically.
+            for _ in 0..250 {
+                assert_eq!(restored.next_track().unwrap(), old.next_track().unwrap());
+                assert_eq!(restored.player().track, old.player().track);
+            }
+            restored.handle_shuffle(false).unwrap();
+            old.handle_shuffle(false).unwrap();
+            assert_eq!(restored.player().next_tracks, old.player().next_tracks);
+        }
+    }
+
+    #[tokio::test]
+    async fn reconnect_retains_autoplay_and_single_track_repeat() {
+        let mut old = state("old", 10);
+        old.update_context(context("original", 0), ContextType::Default)
+            .unwrap();
+        old.update_context(context("autoplay", 500), ContextType::Autoplay)
+            .unwrap();
+        old.set_active_context(ContextType::Autoplay);
+        old.set_current_track(5).unwrap();
+        old.reset_playback_to_position(Some(5)).unwrap();
+        old.set_repeat_track(true);
+        let mut restored = state("new", 10);
+        restored.restore_playback(&old);
+        assert!(restored.repeat_track());
+        assert_eq!(restored.active_context, ContextType::Autoplay);
+        for _ in 0..110 {
+            assert_eq!(restored.next_track().unwrap(), old.next_track().unwrap());
+            assert_eq!(restored.player().track, old.player().track);
+        }
+    }
+}
 const SPOTIFY_MAX_NEXT_TRACKS_SIZE: usize = 80;
 
 #[derive(Debug, Error)]
@@ -108,7 +212,7 @@ impl Default for ConnectConfig {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub(super) struct ConnectState {
     /// the entire state that is updated to the remote server
     request: PutStateRequest,
@@ -137,6 +241,22 @@ pub(super) struct ConnectState {
 }
 
 impl ConnectState {
+    /// Copy playback without replacing the new connection's device identity,
+    /// volume, activation timestamps, or session id.
+    pub fn restore_playback(&mut self, previous: &Self) {
+        let session_id = self.player().session_id.clone();
+        *self.player_mut() = previous.player().clone();
+        self.set_session_id(session_id);
+        self.unavailable_uri.clone_from(&previous.unavailable_uri);
+        self.queue_count = previous.queue_count;
+        self.active_context = previous.active_context;
+        self.fill_up_context = previous.fill_up_context;
+        self.context.clone_from(&previous.context);
+        self.autoplay_context.clone_from(&previous.autoplay_context);
+        self.transfer_shuffle.clone_from(&previous.transfer_shuffle);
+        self.update_queue_revision();
+    }
+
     pub fn new(cfg: ConnectConfig, session: &Session) -> Self {
         let volume_step_size = u16::MAX.checked_div(cfg.volume_steps).unwrap_or(1024);
 
