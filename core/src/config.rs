@@ -32,6 +32,13 @@ pub struct SessionConfig {
 }
 
 impl SessionConfig {
+    // Keymaster issues desktop playback grants even when the application runs
+    // on a mobile OS. Keep client-token data and the HTTP user agent consistent
+    // with that grant; native mobile grants keep their native protocol profile.
+    pub(crate) fn http_os(&self) -> &'static str {
+        http_os_for_client(OS, &self.client_id)
+    }
+
     pub(crate) fn default_for_os(os: &str) -> Self {
         let device_id = uuid::Uuid::new_v4().as_hyphenated().to_string();
         let client_id = match os {
@@ -49,6 +56,44 @@ impl SessionConfig {
             tmp_dir: std::env::temp_dir(),
             autoplay: None,
         }
+    }
+}
+
+fn http_os_for_client<'a>(os: &'a str, client_id: &str) -> &'a str {
+    match os {
+        "android" | "ios" if client_id == KEYMASTER_CLIENT_ID => "linux",
+        _ => os,
+    }
+}
+
+#[cfg(test)]
+mod http_profile_tests {
+    use super::*;
+
+    #[test]
+    fn keymaster_mobile_grants_use_the_desktop_protocol() {
+        for os in ["android", "ios"] {
+            let profile = http_os_for_client(os, KEYMASTER_CLIENT_ID);
+            assert_eq!(profile, "linux");
+            assert_eq!(
+                SessionConfig::default_for_os(profile).client_id,
+                KEYMASTER_CLIENT_ID
+            );
+            assert_eq!(
+                crate::version::spotify_semantic_version_for_os(profile),
+                crate::version::SPOTIFY_SEMANTIC_VERSION
+            );
+        }
+    }
+
+    #[test]
+    fn native_grants_and_desktop_profiles_are_unchanged() {
+        for os in ["android", "ios", "linux", "macos", "windows", "freebsd"] {
+            let config = SessionConfig::default_for_os(os);
+            assert_eq!(http_os_for_client(os, &config.client_id), os);
+        }
+        assert_eq!(http_os_for_client("android", ANDROID_CLIENT_ID), "android");
+        assert_eq!(http_os_for_client("ios", IOS_CLIENT_ID), "ios");
     }
 }
 

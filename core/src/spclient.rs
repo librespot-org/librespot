@@ -24,7 +24,7 @@ use crate::{
     },
     token::Token,
     util,
-    version::spotify_semantic_version,
+    version::spotify_semantic_version_for_os,
 };
 use bytes::Bytes;
 use data_encoding::HEXUPPER_PERMISSIVE;
@@ -176,15 +176,16 @@ impl SpClient {
 
         let client_data = request.mut_client_data();
 
-        client_data.client_version = spotify_semantic_version();
+        let os = self.session().config().http_os();
+        client_data.client_version = spotify_semantic_version_for_os(os);
 
         // Current state of affairs: keymaster ID works on all tested platforms, but may be phased out,
         // so it seems a good idea to mimick the real clients. `self.session().client_id()` returns the
         // ID of the client that last connected, but requesting a client token with this ID only works
         // on macOS and Windows. On Android and iOS we can send a platform-specific client ID and are
         // then presented with a hash cash challenge. On Linux, we have to pass the old keymaster ID.
-        // We delegate most of this logic to `SessionConfig`.
-        let os = OS;
+        // SessionConfig also maps mobile Keymaster grants to the desktop Linux
+        // profile, matching the grant's login5 identity and HTTP user agent.
         let client_id = match os {
             "macos" | "windows" => self.session().client_id(),
             os => SessionConfig::default_for_os(os).client_id,
@@ -198,7 +199,7 @@ impl SpClient {
             .platform_specific_data
             .mut_or_insert_default();
 
-        let os_version = os_version();
+        let os_version = if os == OS { os_version() } else { "0".into() };
         let kernel_version = System::kernel_version().unwrap_or_else(|| String::from("0"));
 
         match os {

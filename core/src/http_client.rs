@@ -30,7 +30,7 @@ use crate::{
     Error,
     config::{OS, os_version},
     date::Date,
-    version::{FALLBACK_USER_AGENT, VERSION_STRING, spotify_version},
+    version::{FALLBACK_USER_AGENT, VERSION_STRING, spotify_version_for_os},
 };
 
 // The 30 seconds interval is documented by Spotify, but the calls per interval
@@ -105,10 +105,14 @@ pub struct HttpClient {
 
 impl HttpClient {
     pub fn new(proxy_url: Option<&Url>) -> Self {
+        Self::new_for_os(proxy_url, OS)
+    }
+
+    pub(crate) fn new_for_os(proxy_url: Option<&Url>, os: &str) -> Self {
         let zero_str = String::from("0");
         let os_version = os_version();
 
-        let (spotify_platform, os_version) = match OS {
+        let (spotify_platform, os_version) = match os {
             "android" => ("Android", os_version),
             "ios" => ("iOS", os_version),
             "macos" => ("OSX", zero_str),
@@ -118,7 +122,7 @@ impl HttpClient {
 
         let user_agent_str = &format!(
             "Spotify/{} {}/{} ({})",
-            spotify_version(),
+            spotify_version_for_os(os),
             spotify_platform,
             os_version,
             VERSION_STRING
@@ -297,5 +301,28 @@ impl HttpClient {
         }
 
         None
+    }
+}
+
+#[cfg(test)]
+mod profile_tests {
+    use super::*;
+    use crate::version::SPOTIFY_VERSION;
+
+    #[test]
+    fn desktop_protocol_uses_a_desktop_user_agent() {
+        let client = HttpClient::new_for_os(None, "linux");
+        assert_eq!(
+            client.user_agent.to_str().unwrap(),
+            format!("Spotify/{SPOTIFY_VERSION} Linux/0 ({VERSION_STRING})")
+        );
+    }
+
+    #[test]
+    fn default_http_client_keeps_the_native_profile() {
+        assert_eq!(
+            HttpClient::new(None).user_agent,
+            HttpClient::new_for_os(None, OS).user_agent
+        );
     }
 }
