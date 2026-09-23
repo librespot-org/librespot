@@ -26,9 +26,10 @@ pub mod http_client;
 pub mod login5;
 pub mod mercury;
 pub mod packet;
+mod proxy_connector;
 mod proxytunnel;
 pub mod session;
-mod socket;
+pub mod socket;
 #[allow(dead_code)]
 pub mod spclient;
 pub mod spotify_id;
