@@ -494,9 +494,39 @@ impl ConnectState {
 
     /// Sends the connect state for the connect session to the remote server
     pub async fn send_state(&self, session: &Session) -> SpClientResult {
-        session
-            .spclient()
-            .put_connect_state_request(&self.request)
-            .await
+        let mut request = self.request.clone();
+        if let Some(device) = request.device.as_mut() {
+            publish_bare_context_like_official_clients(device.player_state.mut_or_insert_default());
+        }
+        session.spclient().put_connect_state_request(&request).await
+    }
+}
+
+/// A list of tracks without a context is kept under a placeholder context:
+/// `spotify:web-api` for a Web API play with `uris`, `spotify:unknown` for such a session
+/// transferred in from another device. Official clients publish these sessions with an empty
+/// context instead, and one taking over the session tries to resolve a context it is given:
+/// a placeholder does not resolve, so the transfer is dropped without an error.
+fn publish_bare_context_like_official_clients(player: &mut crate::protocol::player::PlayerState) {
+    const PLACEHOLDERS: [&str; 2] = ["spotify:web-api", "spotify:unknown"];
+    if !PLACEHOLDERS.contains(&player.context_uri.as_str()) {
+        return;
+    }
+    player.context_uri.clear();
+    player.context_url.clear();
+    let tracks = player
+        .track
+        .as_mut()
+        .into_iter()
+        .chain(player.next_tracks.iter_mut())
+        .chain(player.prev_tracks.iter_mut());
+    for track in tracks {
+        for key in ["context_uri", "entity_uri"] {
+            if let Some(value) = track.metadata.get_mut(key) {
+                if PLACEHOLDERS.contains(&value.as_str()) {
+                    value.clear();
+                }
+            }
+        }
     }
 }
