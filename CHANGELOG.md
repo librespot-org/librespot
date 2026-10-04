@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- [connect] Report the volume to other devices at most 500 ms after a change instead of only once changes stop, so a client's volume slider no longer jumps back while it is scrolled
 - [core] Fixed AP login on Windows on ARM by using the supported desktop platform identifier
 - [audio] Fixed integer overflow in throughput calculation
 - [main] Fixed `--volume-ctrl fixed` not disabling volume control

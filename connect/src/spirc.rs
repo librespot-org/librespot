@@ -42,7 +42,10 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use thiserror::Error;
-use tokio::{sync::mpsc, time::sleep};
+use tokio::{
+    sync::mpsc,
+    time::{Instant, sleep, sleep_until},
+};
 
 #[derive(Debug, Error)]
 enum SpircError {
@@ -103,9 +106,12 @@ struct SpircTask {
     /// is set when transferring, and used after resolving the contexts to finish the transfer
     pub transfer_state: Option<TransferState>,
 
-    /// when set to true, it will update the volume after [VOLUME_UPDATE_DELAY],
-    /// when no other future resolves, otherwise resets the delay
-    update_volume: bool,
+    /// when set, the volume is reported to the other devices at that instant: [VOLUME_UPDATE_DELAY]
+    /// after the first unreported change. Later changes do not push it back, so a client sending
+    /// a continuous stream of changes (scrolling its volume slider) still gets the device's volume
+    /// confirmed while it scrolls, instead of only once it stops, by which time it has already
+    /// reverted its slider to the last volume the device reported
+    volume_update_at: Option<Instant>,
 
     /// when set to true, it will update the volume after [UPDATE_STATE_DELAY],
     /// when no other future resolves, otherwise resets the delay
@@ -259,7 +265,7 @@ impl Spirc {
             session,
 
             transfer_state: None,
-            update_volume: false,
+            volume_update_at: None,
             update_state: false,
 
             spirc_id,
@@ -275,7 +281,7 @@ impl Spirc {
                 task.set_volume(volume);
                 // we don't want to update the volume initially,
                 // we just want to set the mixer to the correct volume
-                task.update_volume = false;
+                task.volume_update_at = None;
             }
             Err(why) => error!("failed to update initial volume: {why}"),
         };
@@ -481,7 +487,8 @@ impl SpircTask {
 
             // when state and volume update have a higher priority than context resolving
             // because of that the context resolving has to wait, so that the other tasks can finish
-            let allow_context_resolving = !self.update_state && !self.update_volume;
+            let allow_context_resolving = !self.update_state && self.volume_update_at.is_none();
+            let volume_update_at = self.volume_update_at;
 
             tokio::select! {
                 // startup of the dealer requires a connection_id, which is retrieved at the very beginning
@@ -556,8 +563,13 @@ impl SpircTask {
                         error!("state update: {why}")
                     }
                 },
-                _ = async { sleep(VOLUME_UPDATE_DELAY).await }, if self.update_volume => {
-                    self.update_volume = false;
+                _ = async move {
+                    match volume_update_at {
+                        Some(at) => sleep_until(at).await,
+                        None => std::future::pending().await,
+                    }
+                }, if volume_update_at.is_some() => {
+                    self.volume_update_at = None;
 
                     info!("delayed volume update for all devices: volume is now {}", self.connect_state.device_info().volume);
                     if let Err(why) = self.connect_state.notify_volume_changed(&self.session).await {
@@ -1931,7 +1943,8 @@ impl SpircTask {
         let old_volume = self.connect_state.device_info().volume;
         let new_volume = volume as u32;
         if old_volume != new_volume || self.mixer.volume() != volume {
-            self.update_volume = true;
+            self.volume_update_at
+                .get_or_insert_with(|| Instant::now() + VOLUME_UPDATE_DELAY);
 
             self.connect_state.set_volume(new_volume);
             self.mixer.set_volume(volume);
