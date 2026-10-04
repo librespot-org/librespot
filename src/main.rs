@@ -212,6 +212,9 @@ struct Setup {
     player_config: PlayerConfig,
     session_config: SessionConfig,
     connect_config: ConnectConfig,
+    /// start Connect at the volume the alsa mixer is at, rather than at
+    /// `connect_config.initial_volume`, when no initial volume was given
+    initial_volume_from_mixer: bool,
     mixer_config: MixerConfig,
     credentials: Option<Credentials>,
     enable_oauth: bool,
@@ -1418,6 +1421,8 @@ async fn get_setup() -> Setup {
         .map(PathBuf::from)
         .collect::<Vec<_>>();
 
+    let initial_volume_from_mixer = is_alsa_mixer && opt_str(INITIAL_VOLUME).is_none();
+
     let connect_config = {
         let connect_default_config = ConnectConfig::default();
 
@@ -1877,6 +1882,7 @@ async fn get_setup() -> Setup {
         player_config,
         session_config,
         connect_config,
+        initial_volume_from_mixer,
         mixer_config,
         credentials,
         enable_oauth,
@@ -2091,7 +2097,13 @@ async fn main() {
                     player.set_session(session.clone());
                 }
 
-                let connect_config = setup.connect_config.clone();
+                let mut connect_config = setup.connect_config.clone();
+                // Spirc sets the mixer to the initial volume, so without this every start, and
+                // every reconnect, would reset the alsa mixer to the default instead of keeping
+                // the volume it is at, as the `--initial-volume` help promises
+                if setup.initial_volume_from_mixer {
+                    connect_config.initial_volume = mixer.volume();
+                }
 
                 let (spirc_, spirc_task_) = match Spirc::new(connect_config,
                                                                 session.clone(),
