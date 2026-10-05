@@ -6,6 +6,7 @@ use std::collections::HashMap;
 
 use data_encoding::HEXLOWER;
 use time::format_description::well_known::Iso8601;
+use url::Url;
 use zvariant::{ObjectPath, OwnedValue};
 
 use librespot::{
@@ -131,7 +132,7 @@ impl From<UniqueFields> for XesamMetadata {
                 xesam.album = album;
                 xesam.track_number = number.map(|number| number as i32);
                 xesam.disc_number = disc_number.map(|disc_number| disc_number as i32);
-                xesam.url = Some(format!("file://{}", path.display()));
+                xesam.url = Url::from_file_path(&path).ok().map(String::from);
             }
         }
 
@@ -326,5 +327,23 @@ mod tests {
 
         assert!(path.starts_with("/org/librespot/track/_"));
         assert!(ObjectPath::try_from(path).is_ok());
+    }
+
+    #[test]
+    fn local_file_url() {
+        let xesam: XesamMetadata = UniqueFields::Local {
+            artists: None,
+            album: None,
+            album_artists: None,
+            number: None,
+            disc_number: None,
+            path: "/music/AC#DC/Été 85.flac".into(),
+        }
+        .into();
+
+        assert_eq!(
+            xesam.url.as_deref(),
+            Some("file:///music/AC%23DC/%C3%89t%C3%A9%2085.flac")
+        );
     }
 }
