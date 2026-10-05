@@ -38,12 +38,14 @@ pub struct MprisEventHandler {
 impl MprisEventHandler {
     /// Connects to the D-Bus session bus and starts serving the MPRIS interfaces.
     ///
-    /// `name` is used as the MPRIS identity. If `org.mpris.MediaPlayer2.librespot` is already
+    /// `name` is used as the MPRIS identity, and `initial_volume` as the volume until the first
+    /// volume change, as Spirc only reports it once active. If `org.mpris.MediaPlayer2.librespot` is already
     /// taken (e.g. by another librespot instance), the bus name is suffixed with the process id,
     /// as recommended by the specification.
     pub async fn spawn(
         player: Arc<Player>,
         name: &str,
+        initial_volume: u16,
         desktop_entry: Option<&str>,
     ) -> zbus::Result<MprisEventHandler> {
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
@@ -55,7 +57,7 @@ impl MprisEventHandler {
 
         let connection = connection::Builder::session()?
             .serve_at(OBJECT_PATH, mpris_service)?
-            .serve_at(OBJECT_PATH, MprisPlayerService::new())?
+            .serve_at(OBJECT_PATH, MprisPlayerService::new(initial_volume))?
             .build()
             .await?;
 
