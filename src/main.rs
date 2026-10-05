@@ -42,12 +42,9 @@ mod player_event_handler;
 use player_event_handler::{EventHandler, run_program_on_sink_events};
 
 #[cfg(feature = "with-mpris")]
-mod mpris_event_handler;
+mod mpris;
 #[cfg(feature = "with-mpris")]
-use mpris_event_handler::MprisEventHandler;
-
-// Position update interval set to 400ms (Doherty threshold)
-const POSITION_UPDATE_INTERVAL_MS: Duration = Duration::from_millis(400);
+use mpris::MprisEventHandler;
 
 fn device_id(name: &str) -> String {
     HEXLOWER.encode(&Sha1::digest(name.as_bytes()))
@@ -1868,7 +1865,7 @@ async fn get_setup() -> Setup {
             normalisation_release_cf,
             normalisation_knee_db,
             ditherer,
-            position_update_interval: Some(POSITION_UPDATE_INTERVAL_MS),
+            position_update_interval: None,
             local_file_directories,
         }
     };
@@ -2059,13 +2056,12 @@ async fn main() {
         }
     }
 
+    // MPRIS is optional: headless systems usually have no D-Bus session bus.
     #[cfg(feature = "with-mpris")]
     let mpris = MprisEventHandler::spawn(player.clone(), &setup.connect_config.name, None)
         .await
-        .unwrap_or_else(|e| {
-            error!("could not initialize MPRIS: {e}");
-            exit(1);
-        });
+        .inspect_err(|e| warn!("MPRIS disabled, could not register on the D-Bus session bus: {e}"))
+        .ok();
 
     loop {
         tokio::select! {
@@ -2122,7 +2118,9 @@ async fn main() {
                 };
 
                 #[cfg(feature = "with-mpris")]
-                mpris.set_spirc(spirc_.clone());
+                if let Some(mpris) = &mpris {
+                    mpris.set_spirc(spirc_.clone());
+                }
 
                 spirc = Some(spirc_);
                 spirc_task = Some(Box::pin(spirc_task_));
@@ -2170,7 +2168,9 @@ async fn main() {
     let mut shutdown_tasks = tokio::task::JoinSet::new();
 
     #[cfg(feature = "with-mpris")]
-    shutdown_tasks.spawn(mpris.quit_and_join());
+    if let Some(mpris) = mpris {
+        shutdown_tasks.spawn(mpris.quit_and_join());
+    }
 
     // Shutdown spirc if necessary
     if let Some(spirc) = spirc {
