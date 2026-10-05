@@ -42,7 +42,9 @@ impl MprisTask {
 
         loop {
             tokio::select! {
-                Some(event) = player_events.recv() => {
+                event = player_events.recv() => {
+                    // The player is gone, there is nothing left to report or control
+                    let Some(event) = event else { break };
                     if let Err(e) = self.handle_event(event).await {
                         warn!("Error handling PlayerEvent: {e}");
                     }
@@ -60,8 +62,6 @@ impl MprisTask {
                     }
                 }
 
-                // If player_events yields None, shutdown
-                else => break,
             }
         }
 
@@ -82,12 +82,8 @@ impl MprisTask {
 
         match event {
             PlayerEvent::TrackChanged { audio_item } => {
-                // Choose biggest cover
-                let art_url = audio_item
-                    .covers
-                    .iter()
-                    .max_by_key(|cover| cover.size as u8)
-                    .map(|cover| cover.url.clone());
+                // Covers are sorted by width, the biggest first
+                let art_url = audio_item.covers.first().map(|cover| cover.url.clone());
 
                 let mut xesam: XesamMetadata = audio_item.unique_fields.into();
                 xesam.title = Some(audio_item.name);

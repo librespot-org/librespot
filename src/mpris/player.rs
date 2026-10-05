@@ -40,7 +40,7 @@ pub(super) struct MprisPlayerService {
 }
 
 impl MprisPlayerService {
-    pub(super) fn new() -> Self {
+    pub(super) fn new(volume: u16) -> Self {
         Self {
             spirc: None,
             // Values are updated upon reception of the first player events, right after the
@@ -48,7 +48,7 @@ impl MprisPlayerService {
             repeat: LoopStatus::None,
             shuffle: false,
             playback_status: PlaybackStatus::Stopped,
-            volume: u16::MAX,
+            volume,
             position: None,
             metadata: Metadata::default(),
         }
@@ -174,9 +174,9 @@ impl MprisPlayerService {
     // If `self.can_play` is `false`, attempting to call this method should have no effect.
     async fn play(&self) -> fdo::Result<()> {
         debug!("org.mpris.MediaPlayer2.Player::Play");
-        let spirc = self.current_track()?;
-        spirc.activate().map_err(spirc_error)?;
-        spirc.play().map_err(spirc_error)
+        // No `activate()`: when another device is active, it would take the session over
+        // without resuming playback.
+        self.current_track()?.play().map_err(spirc_error)
     }
 
     // Seeks forward in the current track by the specified number of microseconds.

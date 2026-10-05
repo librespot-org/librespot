@@ -2062,10 +2062,15 @@ async fn main() {
 
     // MPRIS is optional: headless systems usually have no D-Bus session bus.
     #[cfg(feature = "with-mpris")]
-    let mpris = MprisEventHandler::spawn(player.clone(), &setup.connect_config.name, None)
-        .await
-        .inspect_err(|e| warn!("MPRIS disabled, could not register on the D-Bus session bus: {e}"))
-        .ok();
+    let mpris = MprisEventHandler::spawn(
+        player.clone(),
+        &setup.connect_config.name,
+        setup.connect_config.initial_volume,
+        None,
+    )
+    .await
+    .inspect_err(|e| warn!("MPRIS disabled, could not register on the D-Bus session bus: {e}"))
+    .ok();
 
     loop {
         tokio::select! {
