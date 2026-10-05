@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- [main] Start at the alsa mixer's current volume when `--initial-volume` is not given, as its help says, instead of resetting the mixer to 50% on every start and reconnect
 - [core] Fixed AP login on Windows on ARM by using the supported desktop platform identifier
 - [audio] Fixed integer overflow in throughput calculation
 - [main] Fixed `--volume-ctrl fixed` not disabling volume control
