@@ -330,6 +330,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)] // the path below is only absolute on Unix
     fn local_file_url() {
         let xesam: XesamMetadata = UniqueFields::Local {
             artists: None,
