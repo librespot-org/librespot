@@ -1644,7 +1644,8 @@ impl SpircTask {
             }
         };
 
-        let position_ms = ((position_ms as i32) + offset_ms).max(0) as u32;
+        let position_ms =
+            (i64::from(position_ms) + i64::from(offset_ms)).clamp(0, i64::from(u32::MAX)) as u32;
 
         self.handle_seek(position_ms);
     }

@@ -2370,8 +2370,10 @@ impl PlayerInternal {
                     PlayerState::EndOfTrack {
                         play_request_id,
                         ref track_id,
-                        ..
+                        ref loaded_track,
                     } => {
+                        let audio_item = Box::new(loaded_track.audio_item.clone());
+                        let _ = sender.send(PlayerEvent::TrackChanged { audio_item });
                         let _ = sender.send(PlayerEvent::EndOfTrack {
                             play_request_id,
                             track_id: track_id.clone(),

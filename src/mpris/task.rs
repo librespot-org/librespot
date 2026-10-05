@@ -55,10 +55,8 @@ impl MprisTask {
                                 .get_mut().await
                                 .spirc = Some(spirc);
                         }
-                        Some(MprisCommand::Quit) => break,
-
-                        // Keep running if the cmd sender was dropped
-                        None => (),
+                        // Without a handler, nothing can control this task anymore
+                        Some(MprisCommand::Quit) | None => break,
                     }
                 }
 

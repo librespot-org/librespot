@@ -156,6 +156,8 @@ impl MprisPlayerService {
     // an error.
     async fn stop(&self) -> fdo::Result<()> {
         debug!("org.mpris.MediaPlayer2.Player::Stop");
+        // Spotify Connect has no stopped state keeping the current track: the closest is pausing
+        // at the beginning of the track, so the status is reported as `Paused`, not `Stopped`.
         let spirc = self.spirc()?;
         spirc.pause().map_err(spirc_error)?;
         spirc.set_position_ms(0).map_err(spirc_error)
@@ -238,6 +240,9 @@ impl MprisPlayerService {
         if !(0..=length_us).contains(&position) {
             return Ok(());
         }
+        let Ok(position_ms) = u32::try_from(position / 1000) else {
+            return Ok(());
+        };
 
         let current_track_id = self.metadata.mpris.track_id.as_ref().map(track_object_path);
         if current_track_id.as_deref() != Some(track_id.as_str()) {
@@ -245,9 +250,7 @@ impl MprisPlayerService {
             return Ok(());
         }
 
-        spirc
-            .set_position_ms((position / 1000) as u32)
-            .map_err(spirc_error)
+        spirc.set_position_ms(position_ms).map_err(spirc_error)
     }
 
     // Opens the Uri given as an argument
