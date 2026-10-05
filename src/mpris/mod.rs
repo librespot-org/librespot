@@ -3,7 +3,7 @@
 //!
 //! [MPRIS]: https://specifications.freedesktop.org/mpris-spec/latest/
 
-use std::{process, sync::Arc};
+use std::{fmt, process, sync::Arc};
 
 use librespot_connect::Spirc;
 use log::{debug, warn};
@@ -25,6 +25,26 @@ use task::MprisTask;
 const OBJECT_PATH: &str = "/org/mpris/MediaPlayer2";
 const BUS_NAME: &str = "org.mpris.MediaPlayer2.librespot";
 
+/// D-Bus bus on which the MPRIS interface is provided.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MprisBus {
+    /// The bus of the user session, where desktop environments look for media players.
+    #[default]
+    Session,
+    /// The system bus, for librespot running as a system service (e.g. on a headless device).
+    /// Requires a D-Bus policy allowing librespot to own `org.mpris.MediaPlayer2.librespot*`.
+    System,
+}
+
+impl fmt::Display for MprisBus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Session => f.write_str("session"),
+            Self::System => f.write_str("system"),
+        }
+    }
+}
+
 enum MprisCommand {
     SetSpirc(Spirc),
     Quit,
@@ -36,7 +56,7 @@ pub struct MprisEventHandler {
 }
 
 impl MprisEventHandler {
-    /// Connects to the D-Bus session bus and starts serving the MPRIS interfaces.
+    /// Connects to the given D-Bus bus and starts serving the MPRIS interfaces.
     ///
     /// `name` is used as the MPRIS identity, and `initial_volume` as the volume until the first
     /// volume change, as Spirc only reports it once active. If `org.mpris.MediaPlayer2.librespot` is already
@@ -44,6 +64,7 @@ impl MprisEventHandler {
     /// as recommended by the specification.
     pub async fn spawn(
         player: Arc<Player>,
+        bus: MprisBus,
         name: &str,
         initial_volume: u16,
         desktop_entry: Option<&str>,
@@ -55,7 +76,11 @@ impl MprisEventHandler {
             desktop_entry: desktop_entry.map(str::to_string),
         };
 
-        let connection = connection::Builder::session()?
+        let builder = match bus {
+            MprisBus::Session => connection::Builder::session()?,
+            MprisBus::System => connection::Builder::system()?,
+        };
+        let connection = builder
             .serve_at(OBJECT_PATH, mpris_service)?
             .serve_at(OBJECT_PATH, MprisPlayerService::new(initial_volume))?
             .build()
@@ -76,7 +101,7 @@ impl MprisEventHandler {
             }
             Err(e) => return Err(e),
         };
-        debug!("MPRIS interface registered on the D-Bus session bus as {bus_name}");
+        debug!("MPRIS interface registered on the D-Bus {bus} bus as {bus_name}");
 
         let mpris_task = MprisTask::new(player, connection, cmd_rx);
         let join_handle = tokio::spawn(mpris_task.run());
