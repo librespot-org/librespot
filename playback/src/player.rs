@@ -2340,18 +2340,32 @@ impl PlayerInternal {
                     PlayerState::Paused {
                         ref track_id,
                         play_request_id,
+                        ref audio_item,
                         stream_position_ms,
                         ..
                     } => {
+                        let audio_item = Box::new(audio_item.clone());
+                        let _ = sender.send(PlayerEvent::TrackChanged { audio_item });
                         let _ = sender.send(PlayerEvent::Paused {
                             play_request_id,
                             track_id: track_id.clone(),
                             position_ms: stream_position_ms,
                         });
                     }
-                    PlayerState::Playing { ref audio_item, .. } => {
+                    PlayerState::Playing {
+                        ref track_id,
+                        play_request_id,
+                        ref audio_item,
+                        stream_position_ms,
+                        ..
+                    } => {
                         let audio_item = Box::new(audio_item.clone());
                         let _ = sender.send(PlayerEvent::TrackChanged { audio_item });
+                        let _ = sender.send(PlayerEvent::Playing {
+                            play_request_id,
+                            track_id: track_id.clone(),
+                            position_ms: stream_position_ms,
+                        });
                     }
                     PlayerState::EndOfTrack {
                         play_request_id,
