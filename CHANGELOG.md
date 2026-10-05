@@ -21,8 +21,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- [playback] Newly registered player event channels receive the current player state
-- [playback] `PlayerEvent::Stopped` fields `play_request_id` and `track_id` are now optional, as there is no track when sending the initial state (breaking)
 - [core] Made `SpotifyId::to_base62`, `SpotifyId::to_base16`, `FileId::to_base16`, `SpotifyUri::to_id`, `SpotifyUri::to_uri` infallible (breaking)
 
 ### Fixed

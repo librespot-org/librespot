@@ -161,8 +161,8 @@ pub enum PlayerEvent {
     },
     // Fired when the player is stopped (e.g. by issuing a "stop" command to the player).
     Stopped {
-        play_request_id: Option<u64>,
-        track_id: Option<SpotifyUri>,
+        play_request_id: u64,
+        track_id: SpotifyUri,
     },
     // The player is delayed by loading a track.
     Loading {
@@ -293,8 +293,7 @@ impl PlayerEvent {
                 play_request_id, ..
             }
             | Stopped {
-                play_request_id: Some(play_request_id),
-                ..
+                play_request_id, ..
             }
             | PositionCorrection {
                 play_request_id, ..
@@ -729,7 +728,6 @@ enum PlayerState {
         play_request_id: u64,
         start_playback: bool,
         loader: Pin<Box<dyn FusedFuture<Output = Result<PlayerLoadedTrackData, ()>> + Send>>,
-        position_ms: u32,
     },
     Paused {
         track_id: SpotifyUri,
@@ -1383,7 +1381,6 @@ impl Future for PlayerInternal {
                 ref track_id,
                 start_playback,
                 play_request_id,
-                ..
             } = self.state
             {
                 // The loader may be terminated if we are trying to load the same track
@@ -1699,8 +1696,8 @@ impl PlayerInternal {
 
                 self.ensure_sink_stopped(false);
                 self.send_event(PlayerEvent::Stopped {
-                    track_id: Some(track_id),
-                    play_request_id: Some(play_request_id),
+                    track_id,
+                    play_request_id,
                 });
                 self.state = PlayerState::Stopped;
             }
@@ -2178,7 +2175,6 @@ impl PlayerInternal {
             play_request_id,
             start_playback: play,
             loader,
-            position_ms,
         };
 
         Ok(())
@@ -2322,73 +2318,7 @@ impl PlayerInternal {
 
             PlayerCommand::SetSession(session) => self.session = session,
 
-            PlayerCommand::AddEventSender(sender) => {
-                // Send current player state to new event listener
-                match self.state {
-                    PlayerState::Loading {
-                        ref track_id,
-                        play_request_id,
-                        position_ms,
-                        ..
-                    } => {
-                        let _ = sender.send(PlayerEvent::Loading {
-                            play_request_id,
-                            track_id: track_id.clone(),
-                            position_ms,
-                        });
-                    }
-                    PlayerState::Paused {
-                        ref track_id,
-                        play_request_id,
-                        ref audio_item,
-                        stream_position_ms,
-                        ..
-                    } => {
-                        let audio_item = Box::new(audio_item.clone());
-                        let _ = sender.send(PlayerEvent::TrackChanged { audio_item });
-                        let _ = sender.send(PlayerEvent::Paused {
-                            play_request_id,
-                            track_id: track_id.clone(),
-                            position_ms: stream_position_ms,
-                        });
-                    }
-                    PlayerState::Playing {
-                        ref track_id,
-                        play_request_id,
-                        ref audio_item,
-                        stream_position_ms,
-                        ..
-                    } => {
-                        let audio_item = Box::new(audio_item.clone());
-                        let _ = sender.send(PlayerEvent::TrackChanged { audio_item });
-                        let _ = sender.send(PlayerEvent::Playing {
-                            play_request_id,
-                            track_id: track_id.clone(),
-                            position_ms: stream_position_ms,
-                        });
-                    }
-                    PlayerState::EndOfTrack {
-                        play_request_id,
-                        ref track_id,
-                        ref loaded_track,
-                    } => {
-                        let audio_item = Box::new(loaded_track.audio_item.clone());
-                        let _ = sender.send(PlayerEvent::TrackChanged { audio_item });
-                        let _ = sender.send(PlayerEvent::EndOfTrack {
-                            play_request_id,
-                            track_id: track_id.clone(),
-                        });
-                    }
-                    PlayerState::Invalid | PlayerState::Stopped => {
-                        let _ = sender.send(PlayerEvent::Stopped {
-                            play_request_id: None,
-                            track_id: None,
-                        });
-                    }
-                }
-
-                self.event_senders.push(sender);
-            }
+            PlayerCommand::AddEventSender(sender) => self.event_senders.push(sender),
 
             PlayerCommand::SetSinkEventCallback(callback) => self.sink_event_callback = callback,
 

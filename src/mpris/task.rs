@@ -108,13 +108,7 @@ impl MprisTask {
                 let mut iface = iface_ref.get_mut().await;
 
                 iface.position = None;
-                match track_id {
-                    Some(track_id) => ensure_track(&mut iface, emitter, track_id).await?,
-                    None if iface.metadata.mpris.track_id.is_some() => {
-                        set_metadata(&mut iface, emitter, Metadata::default()).await?
-                    }
-                    None => (),
-                }
+                ensure_track(&mut iface, emitter, track_id).await?;
                 set_playback_status(&mut iface, emitter, PlaybackStatus::Stopped).await?;
             }
             PlayerEvent::Playing {
