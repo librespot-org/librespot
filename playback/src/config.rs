@@ -107,6 +107,9 @@ pub struct PlayerConfig {
     pub gapless: bool,
     pub passthrough: bool,
 
+    /// Overlap consecutive tracks by this much. `Duration::ZERO` disables crossfading.
+    pub crossfade: Duration,
+
     pub normalisation: bool,
     pub normalisation_type: NormalisationType,
     pub normalisation_method: NormalisationMethod,
@@ -140,6 +143,7 @@ impl Default for PlayerConfig {
             normalisation_release_cf: duration_to_coefficient(Duration::from_millis(100)),
             normalisation_knee_db: 5.0,
             passthrough: false,
+            crossfade: Duration::ZERO,
             ditherer: Some(mk_ditherer::<TriangularDitherer>),
             position_update_interval: None,
             local_file_directories: Vec::new(),
