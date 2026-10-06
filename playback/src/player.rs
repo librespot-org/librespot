@@ -7,11 +7,11 @@ use std::{
     mem,
     pin::Pin,
     process::exit,
-    sync::Mutex,
     sync::{
         Arc,
         atomic::{AtomicUsize, Ordering},
     },
+    sync::{Mutex, RwLock},
     task::{Context, Poll},
     thread,
     time::{Duration, Instant},
@@ -69,7 +69,7 @@ pub enum SinkStatus {
 pub type SinkEventCallback = Box<dyn Fn(SinkStatus) + Send>;
 
 struct PlayerInternal {
-    session: Session,
+    session: Arc<RwLock<Session>>,
     config: PlayerConfig,
     commands: mpsc::UnboundedReceiver<PlayerCommand>,
     load_handles: Arc<Mutex<HashMap<thread::ThreadId, thread::JoinHandle<()>>>>,
@@ -504,7 +504,7 @@ impl Player {
                 create_local_file_lookup(config.local_file_directories.as_slice());
 
             let internal = PlayerInternal {
-                session,
+                session: Arc::new(RwLock::new(session)),
                 config,
                 commands: cmd_rx,
                 load_handles: Arc::new(Mutex::new(HashMap::new())),
@@ -932,7 +932,7 @@ impl PlayerState {
 }
 
 struct PlayerTrackLoader {
-    session: Session,
+    session: Arc<RwLock<Session>>,
     config: PlayerConfig,
     local_file_lookup: Arc<LocalFileLookup>,
 }
@@ -947,9 +947,10 @@ impl PlayerTrackLoader {
         } else if let Some(alternatives) = audio_item.alternatives {
             let Tracks(alternatives_vec) = alternatives; // required to make `into_iter` able to move
 
+            let session = self.session.read().unwrap().clone();
             let alternatives: FuturesUnordered<_> = alternatives_vec
                 .into_iter()
-                .map(|alt_id| AudioItem::get_file(&self.session, alt_id))
+                .map(|alt_id| AudioItem::get_file(&session, alt_id))
                 .collect();
 
             alternatives
@@ -1019,7 +1020,8 @@ impl PlayerTrackLoader {
             }
         };
 
-        let audio_item = match AudioItem::get_file(&self.session, track_uri).await {
+        let session = self.session.read().unwrap().clone();
+        let audio_item = match AudioItem::get_file(&session, track_uri).await {
             Ok(audio) => match self.find_available_alternative(audio).await {
                 Some(audio) => audio,
                 None => {
@@ -1091,7 +1093,8 @@ impl PlayerTrackLoader {
         // This is only a loop to be able to reload the file if an error occurred
         // while opening a cached file.
         loop {
-            let encrypted_file = AudioFile::open(&self.session, file_id, bytes_per_second);
+            let session = self.session.read().unwrap().clone();
+            let encrypted_file = AudioFile::open(&session, file_id, bytes_per_second);
 
             let encrypted_file = match encrypted_file.await {
                 Ok(encrypted_file) => encrypted_file,
@@ -1108,7 +1111,8 @@ impl PlayerTrackLoader {
             // Not all audio files are encrypted. If we can't get a key, try loading the track
             // without decryption. If the file was encrypted after all, the decoder will fail
             // parsing and bail out, so we should be safe from outputting ear-piercing noise.
-            let key = match self.session.audio_key().request(track_id, file_id).await {
+            let session = self.session.read().unwrap().clone();
+            let key = match session.audio_key().request(track_id, file_id).await {
                 Ok(key) => Some(key),
                 Err(e) => {
                     warn!("Unable to load key, continuing without decryption: {e}");
@@ -1176,7 +1180,7 @@ impl PlayerTrackLoader {
                 Err(e) if is_cached => {
                     warn!("Unable to read cached audio file: {e}. Trying to download it.");
 
-                    match self.session.cache() {
+                    match self.session.read().unwrap().clone().cache() {
                         Some(cache) => {
                             if cache.remove_file(file_id).is_err() {
                                 error!("Error removing file from cache");
@@ -2316,7 +2320,7 @@ impl PlayerInternal {
 
             PlayerCommand::Stop => self.handle_player_stop(),
 
-            PlayerCommand::SetSession(session) => self.session = session,
+            PlayerCommand::SetSession(session) => *self.session.write().unwrap() = session,
 
             PlayerCommand::AddEventSender(sender) => self.event_senders.push(sender),
 
