@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto2";
 
@@ -9,6 +9,7 @@ import "context_player_options.proto";
 import "play_origin.proto";
 import "suppressions.proto";
 import "instrumentation_params.proto";
+import "playlist_play.proto";
 
 option optimize_for = CODE_SIZE;
 
@@ -22,4 +23,5 @@ message Session {
     optional string shuffle_seed = 7;
     optional Context main_context = 8;
     optional string original_session_id = 9;
+    optional playlist.proto.PlaylistPlayRequest playlist_play_request = 10;
 }

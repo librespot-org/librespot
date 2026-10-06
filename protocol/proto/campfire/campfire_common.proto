@@ -1,0 +1,88 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package campfire.v1;
+
+import "google/protobuf/timestamp.proto";
+
+message HierarchyIdentifier {
+    string hierarchy_id = 1;
+    HierarchyClass hierarchy_class = 2;
+    string uri = 3;
+}
+
+message NodeClass {
+    oneof type {
+        HierarchyClass hierarchy_class = 1;
+        ContributionClass contribution_class = 2;
+        ActivityClass activity_class = 3;
+    }
+}
+
+message FreeText {
+    string message_text = 1;
+}
+
+message TrackedShare {
+    string uri = 1;
+    string preview_id = 2;
+}
+
+message OffplatformTrackedShare {
+    string uri = 1;
+    string op_share_id = 2;
+    string destination = 3;
+    string sharing_user_id = 4;
+    string opening_user_id = 5;
+}
+
+message EventCapture {
+    google.protobuf.Timestamp occurred_at = 1;
+    string event_id = 2;
+}
+
+message AgentContext {
+    string agent_id = 1;
+    string role = 2;
+}
+
+enum HierarchyClass {
+    HIERARCHY_CLASS_UNSPECIFIED = 0;
+    HIERARCHY_CLASS_CHANNEL = 1;
+    HIERARCHY_CLASS_MEMBER = 2;
+}
+
+enum ContributionClass {
+    CONTRIBUTION_CLASS_UNSPECIFIED = 0;
+    CONTRIBUTION_CLASS_TRACKED_SHARE = 1;
+    CONTRIBUTION_CLASS_FREE_TEXT = 2;
+    CONTRIBUTION_CLASS_OP_TRACKED_SHARE = 3;
+}
+
+enum ActivityClass {
+    ACTIVITY_CLASS_UNSPECIFIED = 0;
+    ACTIVITY_CLASS_ACK = 1;
+    ACTIVITY_CLASS_RECEIPT = 2;
+    ACTIVITY_CLASS_REACTION = 3;
+}
+
+enum HierarchyType {
+    HIERARCHY_TYPE_UNSPECIFIED = 0;
+    HIERARCHY_TYPE_DM = 1;
+    HIERARCHY_TYPE_GROUP = 2;
+}
+
+enum HierarchyStatus {
+    HIERARCHY_STATUS_UNSPECIFIED = 0;
+    HIERARCHY_STATUS_DRAFT = 1;
+    HIERARCHY_STATUS_ACTIVE = 2;
+    HIERARCHY_STATUS_CANCELED = 3;
+    HIERARCHY_STATUS_DELETED = 4;
+}
+
+enum SortOrder {
+    SORT_ORDER_UNSPECIFIED = 0;
+    SORT_ORDER_ASCENDING_OCCURRED_AT = 1;
+    SORT_ORDER_DESCENDING_OCCURRED_AT = 2;
+}

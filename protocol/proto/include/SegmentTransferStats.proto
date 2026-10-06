@@ -1,0 +1,24 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message SegmentTransferStats {
+    repeated Segment segment = 1;
+    message Segment {
+        optional int32 cdn_initial_latency = 1;
+        optional float cdn_avg_bw = 2;
+        optional int32 total_time = 3;
+        optional int32 profile_index = 4;
+        optional int32 time_offset = 5;
+        optional int32 content_type = 6;
+    }
+    
+    optional string session_id = 2;
+    optional string cdn_domain = 3;
+    optional int32 errors_from_cdn = 4;
+    optional string media_url = 5;
+}

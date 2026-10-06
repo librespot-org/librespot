@@ -1,0 +1,43 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message StreamReportingApiDebug {
+    optional bytes playback_id = 1;
+    optional bytes parent_playback_id = 2;
+    optional string video_session_id = 3;
+    optional bytes media_id = 4;
+    optional string media_type = 5;
+    optional string source_start = 6;
+    optional string reason_start = 7;
+    optional bool live = 8;
+    optional bool shuffle = 9;
+    optional string play_context = 10;
+    optional string content_uri = 11;
+    optional string displayed_content_uri = 12;
+    optional bool content_is_downloaded = 13;
+    optional string provider = 14;
+    optional string referrer = 15;
+    optional string streaming_rule = 16;
+    optional string connect_controller_device_id = 17;
+    optional string page_instance_id = 18;
+    optional string interaction_id = 19;
+    optional int64 core_version = 20;
+    optional int32 ms_played_external = 21;
+    optional string local_content_uri = 22;
+    optional bool client_offline_at_stream_start = 23;
+    optional string playback_stack = 24;
+    optional string custom_reporting_attribution = 25;
+    optional string decision_id = 26;
+    optional string play_context_decision_id = 27;
+    optional string feature_uuid = 28;
+    optional bytes stream_id = 29;
+    optional bool is_repeating_track = 30;
+    optional bool is_repeating_context = 31;
+    optional string request_type = 32;
+    repeated string sequence_provider_ids = 33;
+}

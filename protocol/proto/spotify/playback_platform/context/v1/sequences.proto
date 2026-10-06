@@ -1,0 +1,39 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playback_platform.context.v1;
+
+import "spotify/playback_platform/context/v1/sequence_child.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.playback_platform.context.v1";
+
+message Sequence {
+    repeated SequenceChild children = 1;
+}
+
+message PagedSequence {
+    repeated SequencePage pages = 1;
+}
+
+message ChainSequence {
+    SequencePage page = 1;
+    
+    oneof _prev_page_id {
+        bytes prev_page_id = 2;
+    }
+    
+    oneof _next_page_id {
+        bytes next_page_id = 3;
+    }
+}
+
+message SequencePage {
+    repeated SequenceChild children = 2;
+    
+    oneof _page_id {
+        bytes page_id = 1;
+    }
+}

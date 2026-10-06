@@ -1,0 +1,54 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playback_platform.common.v1;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.playback_platform.common.v1";
+
+message Duration {
+    uint32 timescale = 2;
+    
+    oneof _value {
+        sint64 value = 1;
+    }
+}
+
+message Durations {
+    repeated sint64 values = 1;
+    uint32 timescale = 2;
+}
+
+message StochasticDuration {
+    uint32 timescale = 2;
+    
+    oneof _value_mu {
+        sint64 value_mu = 1;
+    }
+    
+    oneof _value_sd {
+        uint64 value_sd = 3;
+    }
+}
+
+message ExtrapolatedDuration {
+    uint32 timescale = 2;
+    
+    oneof _value_y0 {
+        sint64 value_y0 = 1;
+    }
+    
+    oneof _value_dy {
+        sint64 value_dy = 3;
+    }
+    
+    oneof _value_lower_bound {
+        sint64 value_lower_bound = 4;
+    }
+    
+    oneof _value_upper_bound {
+        sint64 value_upper_bound = 5;
+    }
+}

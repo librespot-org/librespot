@@ -1,0 +1,11 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.extendedmetadata.commentcount.v1;
+
+option optimize_for = CODE_SIZE;
+
+message GetCommentCountMetadataResponse {
+    int64 count = 1;
+}

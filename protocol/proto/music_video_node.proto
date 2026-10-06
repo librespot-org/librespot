@@ -1,0 +1,24 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.player.proto;
+
+import "track_instance.proto";
+import "transition_map.proto";
+
+option optimize_for = CODE_SIZE;
+
+message MusicVideoNode {
+    optional string video_gid = 1;
+    optional string associated_audio = 2;
+    optional string associated_video = 3;
+    optional TrackInstance switched_to_track = 4;
+    optional TrackInstance original_track = 5;
+    optional TransitionMap original_transition_map = 6;
+    optional bool unmapped_switched_to_audio = 7;
+    optional bool did_query = 8;
+    optional bool did_transitionmap_query = 9;
+    optional bool audio_is_filtered = 10;
+    optional bool video_is_filtered = 11;
+}

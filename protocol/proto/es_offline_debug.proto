@@ -1,0 +1,28 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.offline_esperanto.proto;
+
+import "google/protobuf/empty.proto";
+import "extension_kind.proto";
+
+option objc_class_prefix = "ESP";
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.offline_esperanto.proto";
+
+service OfflineDebug {
+    rpc OnKeyStats(google.protobuf.Empty) returns (stream KeyStatsResponse);
+    rpc SetLinkAdditionalExtensions(SetLinkAdditionalExtensionsRequest) returns (google.protobuf.Empty);
+}
+
+message KeyStatsResponse {
+    int64 cached = 1;
+    int64 offline = 2;
+    int64 memory = 3;
+}
+
+message SetLinkAdditionalExtensionsRequest {
+    string uri = 1;
+    repeated extendedmetadata.ExtensionKind extension_kinds = 2;
+}

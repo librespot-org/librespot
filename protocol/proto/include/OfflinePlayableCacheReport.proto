@@ -1,0 +1,19 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message OfflinePlayableCacheReport {
+    optional int64 num_tracks = 1;
+    optional int64 num_missing_files = 2;
+    optional int64 num_missing_keys = 3;
+    optional int64 num_missing_metadata = 4;
+    optional int64 num_expired = 5;
+    optional int64 num_missing_in_audio_index = 6;
+    optional int64 total_time = 7;
+    optional int64 num_batches = 8;
+    optional int64 num_previously_played = 9;
+}

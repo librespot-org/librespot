@@ -1,0 +1,26 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playback_platform.timeline.v1.metadata;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.playback_platform.timeline.v1.metadata";
+
+message Artist {
+    string uri = 1;
+    string name = 2;
+    ArtistRole role = 3;
+}
+
+enum ArtistRole {
+    ARTIST_ROLE_UNSPECIFIED = 0;
+    ARTIST_ROLE_MAIN_ARTIST = 1;
+    ARTIST_ROLE_FEATURED_ARTIST = 2;
+    ARTIST_ROLE_REMIXER = 3;
+    ARTIST_ROLE_ACTOR = 4;
+    ARTIST_ROLE_COMPOSER = 5;
+    ARTIST_ROLE_CONDUCTOR = 6;
+    ARTIST_ROLE_ORCHESTRA = 7;
+}

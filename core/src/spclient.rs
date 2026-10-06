@@ -12,7 +12,7 @@ use crate::{
     error::ErrorKind,
     protocol::{
         autoplay_context_request::AutoplayContextRequest,
-        clienttoken_http::{
+        client_token_http::{
             ChallengeAnswer, ChallengeType, ClientTokenRequest, ClientTokenRequestType,
             ClientTokenResponse, ClientTokenResponseType,
         },
@@ -203,8 +203,8 @@ impl SpClient {
 
         match os {
             "windows" => {
-                let os_version = os_version.parse::<f32>().unwrap_or(10.) as i32;
-                let kernel_version = kernel_version.parse::<i32>().unwrap_or(21370);
+                let os_version = os_version.parse::<f32>().unwrap_or(10.) as u64;
+                let kernel_version = kernel_version.parse::<u64>().unwrap_or(26200);
 
                 let (pe, image_file) = match std::env::consts::ARCH {
                     "arm" => (448, 452),
@@ -213,14 +213,14 @@ impl SpClient {
                     _ => (332, 332), // x86
                 };
 
-                let windows_data = platform_data.mut_desktop_windows();
-                windows_data.os_version = os_version;
-                windows_data.os_build = kernel_version;
+                let windows_data = platform_data.mut_win();
+                windows_data.system_version_major = os_version;
+                windows_data.system_version_build = kernel_version;
                 windows_data.platform_id = 2;
-                windows_data.unknown_value_6 = 9;
-                windows_data.image_file_machine = image_file;
-                windows_data.pe_machine = pe;
-                windows_data.unknown_value_10 = true;
+                windows_data.processor_architecture = 9;
+                windows_data.native_processor_architecture = 9;
+                windows_data.process_machine = image_file;
+                windows_data.native_machine = pe;
             }
             "ios" => {
                 let ios_data = platform_data.mut_ios();
@@ -231,20 +231,20 @@ impl SpClient {
             }
             "android" => {
                 let android_data = platform_data.mut_android();
-                android_data.android_version = os_version;
-                android_data.api_version = 31;
-                "Pixel".clone_into(&mut android_data.device_name);
-                "GF5KQ".clone_into(&mut android_data.model_str);
-                "Google".clone_into(&mut android_data.vendor);
+                android_data.os_version = os_version;
+                android_data.api_level = 31;
+                "Pixel".clone_into(&mut android_data.name);
+                "GF5KQ".clone_into(&mut android_data.model);
+                "Google".clone_into(&mut android_data.brand);
             }
             "macos" => {
-                let macos_data = platform_data.mut_desktop_macos();
+                let macos_data = platform_data.mut_mac();
                 macos_data.system_version = os_version;
                 macos_data.hw_model = "iMac21,1".to_string();
                 macos_data.compiled_cpu_type = std::env::consts::ARCH.to_string();
             }
             _ => {
-                let linux_data = platform_data.mut_desktop_linux();
+                let linux_data = platform_data.mut_linux();
                 linux_data.system_name = "Linux".to_string();
                 linux_data.system_release = kernel_version;
                 linux_data.system_version = os_version;

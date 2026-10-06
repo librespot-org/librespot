@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
@@ -15,4 +15,9 @@ message LoggingParams {
     OptionalInt64 command_received_time = 2;
     repeated string page_instance_ids = 3;
     repeated string interaction_ids = 4;
+    string device_identifier = 5;
+    
+    oneof _command_id {
+        string command_id = 6;
+    }
 }

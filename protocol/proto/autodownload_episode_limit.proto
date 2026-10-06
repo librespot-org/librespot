@@ -1,0 +1,20 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.autodownload_esperanto.proto;
+
+option objc_class_prefix = "ESP";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.autodownload.esperanto.proto";
+
+message EpisodeLimitRequest {
+    int32 update_throttling = 1;
+}
+
+message EpisodeLimitResponse {
+    bool theres_no_limit = 1;
+    int32 limit = 2;
+    string error = 3;
+}

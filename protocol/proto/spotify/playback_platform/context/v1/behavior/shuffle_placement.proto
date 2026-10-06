@@ -1,0 +1,57 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playback_platform.context.v1.behavior;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.playback_platform.context.v1.behavior";
+
+message ShufflePlacement {
+    oneof distribution {
+        Uniform uniform = 8;
+        Uniform uniform_strict = 9;
+        Normal normal = 10;
+        Normal normal_strict = 11;
+        Dirac dirac = 12;
+        Dirac dirac_strict = 13;
+    }
+    
+    oneof _partition_number {
+        uint32 partition_number = 1;
+    }
+    
+    oneof _partition_layout {
+        Layout partition_layout = 2;
+    }
+    
+    oneof _group_number {
+        uint64 group_number = 3;
+    }
+    
+    oneof _group_layout {
+        Layout group_layout = 4;
+    }
+    
+    message Uniform {
+        float a = 1;
+        float b = 2;
+    }
+    
+    message Normal {
+        float mu = 1;
+        float sd = 2;
+    }
+    
+    message Dirac {
+        float x = 1;
+    }
+    
+    enum Layout {
+        LAYOUT_UNSPECIFIED = 0;
+        LAYOUT_FORWARD = 1;
+        LAYOUT_SHUFFLE = 2;
+        LAYOUT_REVERSE = 3;
+    }
+}

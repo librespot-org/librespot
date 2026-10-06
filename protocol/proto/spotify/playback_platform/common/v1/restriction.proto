@@ -1,0 +1,27 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playback_platform.common.v1;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.playback_platform.common.v1";
+
+enum Restriction {
+    RESTRICTION_UNSPECIFIED = 0;
+    RESTRICTION_UNSUPPORTED = 1;
+    RESTRICTION_INEFFECTIVE = 2;
+    RESTRICTION_ONLINE_ONLY = 3;
+    RESTRICTION_SENSIBILITY = 4;
+    RESTRICTION_USER_BANNED = 5;
+    RESTRICTION_USER_FILTER = 6;
+    RESTRICTION_AUTO_FILTER = 7;
+    RESTRICTION_DEVICE_UNSPECIFIED = 16;
+    RESTRICTION_DEVICE_UNSUPPORTED = 17;
+    RESTRICTION_LICENSE_UNSPECIFIED = 24;
+    RESTRICTION_LICENSE_UNSUPPORTED = 25;
+    RESTRICTION_LICENSE_TIME_LIMIT_REACHED = 26;
+    RESTRICTION_LICENSE_PLAY_LIMIT_REACHED = 27;
+    RESTRICTION_LICENSE_SKIP_LIMIT_REACHED = 28;
+}

@@ -1,0 +1,15 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message DesktopWatchdogSessionExpirationNonAuth {
+    optional string url = 1;
+    optional int64 session_duration = 2;
+    optional int64 pings_received = 3;
+    optional int64 time_since_last_ping = 4;
+    optional int64 pings_missed_total = 5;
+}

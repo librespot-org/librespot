@@ -1,10 +1,12 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
 package spotify.autodownloadservice.v1.proto;
 
 import "google/protobuf/timestamp.proto";
+
+option optimize_for = CODE_SIZE;
 
 message Identifiers {
     string device_id = 1;

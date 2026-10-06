@@ -1,0 +1,36 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package google.protobuf;
+
+option csharp_namespace = "Google.Protobuf.WellKnownTypes";
+option objc_class_prefix = "GPB";
+option cc_enable_arenas = true;
+option go_package = "google.golang.org/protobuf/types/known/structpb";
+option java_multiple_files = true;
+option java_outer_classname = "StructProto";
+option java_package = "com.google.protobuf";
+
+message Struct {
+    map<string, Value> fields = 1;
+}
+
+message Value {
+    oneof kind {
+        NullValue null_value = 1;
+        double number_value = 2;
+        string string_value = 3;
+        bool bool_value = 4;
+        Struct struct_value = 5;
+        ListValue list_value = 6;
+    }
+}
+
+message ListValue {
+    repeated Value values = 1;
+}
+
+enum NullValue {
+    NULL_VALUE = 0;
+}

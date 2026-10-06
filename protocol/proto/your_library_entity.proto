@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
@@ -16,8 +16,10 @@ message YourLibraryEntity {
         YourLibraryRootlistEntity rootlist_entity = 3;
         collection.proto.CollectionShowEntry show = 4;
         collection.proto.CollectionBookEntry book = 5;
-        YourLibraryPreReleaseEntity prerelease = 6;
-        YourLibraryEventEntity event = 7;
+        YourLibraryPreReleaseEntity prerelease = 7;
+        YourLibraryEventEntity event = 8;
         collection.proto.CollectionAuthorEntry author = 9;
+        YourLibraryVenueEntity venue = 10;
+        YourLibraryConcertCampaignEntity concert_campaign = 11;
     }
 }

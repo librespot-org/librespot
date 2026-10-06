@@ -1,0 +1,185 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playback_platform.timeline.v1;
+
+import "spotify/playback_platform/common/v1/duration.proto";
+import "spotify/playback_platform/media/v1/manifests.proto";
+import "spotify/playback_platform/timeline/v1/timeline_behavior.proto";
+import "spotify/playback_platform/timeline/v1/timeline_metadata.proto";
+import "spotify/playback_platform/timeline/v1/timepoint.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.playback_platform.timeline.v1";
+
+message Timespan {
+    TimelineBehavior timeline_behavior = 1;
+    TimelineMetadata timeline_metadata = 2;
+    repeated uint64 tags = 4;
+    
+    oneof media {
+        Empty empty = 5;
+        Track track = 6;
+        Local local = 7;
+        Audio audio = 8;
+        Video video = 9;
+        GeneratedAudio generated_audio = 12;
+        GeneratedVideo generated_video = 13;
+        StreamingAudio streaming_audio = 14;
+        StreamingVideo streaming_video = 15;
+    }
+    
+    oneof _uid {
+        string uid = 3;
+    }
+    
+    message Empty {
+        Timepoint begin = 1;
+        Timepoint end = 2;
+    }
+    
+    message Track {
+        oneof position {
+            Timepoint begin = 1;
+            Timepoint end = 2;
+        }
+        
+        oneof media {
+            bytes spotify_track_gid = 3;
+            bytes episode_track_gid = 4;
+        }
+        
+        oneof _manifest {
+            media.v1.TrackManifest manifest = 5;
+        }
+        
+        oneof _slice {
+            Slice slice = 6;
+        }
+    }
+    
+    message Local {
+        string local_id = 3;
+        
+        oneof position {
+            Timepoint begin = 1;
+            Timepoint end = 2;
+        }
+        
+        oneof _slice {
+            Slice slice = 5;
+        }
+        
+        reserved 4;
+        
+        reserved "manifest";
+    }
+    
+    message Audio {
+        bytes audio_id = 3;
+        
+        oneof position {
+            Timepoint begin = 1;
+            Timepoint end = 2;
+        }
+        
+        oneof _manifest {
+            media.v1.AudioManifest manifest = 4;
+        }
+        
+        oneof _slice {
+            Slice slice = 5;
+        }
+    }
+    
+    message Video {
+        bytes video_id = 3;
+        
+        oneof position {
+            Timepoint begin = 1;
+            Timepoint end = 2;
+        }
+        
+        oneof _manifest {
+            media.v1.VideoManifest manifest = 4;
+        }
+        
+        oneof _slice {
+            Slice slice = 5;
+        }
+    }
+    
+    message GeneratedAudio {
+        bytes media_id = 4;
+        
+        oneof position {
+            Timepoint begin = 1;
+            Timepoint end = 2;
+        }
+        
+        oneof _format_id {
+            string format_id = 3;
+        }
+        
+        oneof _manifest {
+            media.v1.GeneratedAudioManifest manifest = 5;
+        }
+        
+        oneof _slice {
+            Slice slice = 6;
+        }
+    }
+    
+    message GeneratedVideo {
+        bytes media_id = 4;
+        
+        oneof position {
+            Timepoint begin = 1;
+            Timepoint end = 2;
+        }
+        
+        oneof _format_id {
+            string format_id = 3;
+        }
+        
+        oneof _manifest {
+            media.v1.GeneratedVideoManifest manifest = 5;
+        }
+        
+        oneof _slice {
+            Slice slice = 6;
+        }
+    }
+    
+    message StreamingAudio {
+        Timepoint begin = 1;
+        bytes stream_id = 2;
+        
+        oneof _manifest {
+            media.v1.StreamingAudioManifest manifest = 3;
+        }
+    }
+    
+    message StreamingVideo {
+        Timepoint begin = 1;
+        bytes stream_id = 2;
+        
+        oneof _manifest {
+            media.v1.StreamingVideoManifest manifest = 3;
+        }
+    }
+    
+    message Slice {
+        oneof in_point {
+            common.v1.Duration in = 1;
+            common.v1.Duration in_offset_by_duration = 2;
+        }
+        
+        oneof out_point {
+            common.v1.Duration out = 3;
+            common.v1.Duration out_offset_by_duration = 4;
+        }
+    }
+}

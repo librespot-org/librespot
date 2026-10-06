@@ -1,0 +1,24 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playback_platform.context.v1;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.playback_platform.context.v1";
+
+message SequenceQuery {
+    repeated string include_uids = 1;
+    repeated string exclude_uids = 2;
+    repeated uint64 include_tags = 3;
+    repeated uint64 exclude_tags = 4;
+    
+    Order order = 5;
+    enum Order {
+        ORDER_RELATIVE_NATURAL = 0;
+        ORDER_RELATIVE_REVERSE = 1;
+        ORDER_FIRST_TO_LAST = 3;
+        ORDER_LAST_TO_FIRST = 4;
+    }
+}

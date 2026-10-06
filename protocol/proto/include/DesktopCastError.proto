@@ -1,0 +1,14 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message DesktopCastError {
+    optional string device_id = 1;
+    optional string cast_error = 2;
+    optional string error_msg = 3;
+    optional int64 platform_error_code = 4;
+}

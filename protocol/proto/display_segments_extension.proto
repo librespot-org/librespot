@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
@@ -14,6 +14,7 @@ message DisplaySegmentsExtension {
     string episode_uri = 1;
     repeated DisplaySegment segments = 2;
     int32 duration_ms = 3;
+    
     oneof decoration {
         MusicAndTalkDecoration music_and_talk_decoration = 4;
         PodcastChaptersDecoration podcast_chapters_decoration = 5;
@@ -26,10 +27,26 @@ message DisplaySegment {
     int32 duration_ms = 3;
     int32 seek_start_ms = 4;
     int32 seek_stop_ms = 5;
-    optional string title = 6;
-    optional string subtitle = 7;
-    optional string image_url = 8;
-    optional bool is_preview = 9;
+    
+    oneof _title {
+        string title = 6;
+    }
+    
+    oneof _subtitle {
+        string subtitle = 7;
+    }
+    
+    oneof _image_url {
+        string image_url = 8;
+    }
+    
+    oneof _is_preview {
+        bool is_preview = 9;
+    }
+    
+    oneof _chapter_uri {
+        string chapter_uri = 10;
+    }
 }
 
 message MusicAndTalkDecoration {
@@ -44,4 +61,5 @@ enum SegmentType {
     SEGMENT_TYPE_UNSPECIFIED = 0;
     SEGMENT_TYPE_TALK = 1;
     SEGMENT_TYPE_MUSIC = 2;
+    SEGMENT_TYPE_CHAPTER = 3;
 }

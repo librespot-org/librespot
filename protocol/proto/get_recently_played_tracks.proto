@@ -1,0 +1,39 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.recently_played_esperanto.proto;
+
+import "recently_played_decoration_policy.proto";
+import "recently_played_item.proto";
+
+option objc_class_prefix = "ESP";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.recently_played_esperanto.proto";
+
+message GetRecentlyPlayedTracksRequest {
+    bool include_hidden = 1;
+    bool include_episodes = 2;
+    bool include_local_tracks = 3;
+    uint32 update_throttling = 4;
+    RecentlyPlayedTrackDecorationPolicy track_policy = 5;
+    RecentlyPlayedEpisodeDecorationPolicy episode_policy = 6;
+}
+
+message RecentlyPlayedEntity {
+    oneof entity {
+        RecentlyPlayedTrack track = 1;
+        RecentlyPlayedEpisode episode = 2;
+    }
+}
+
+message GetRecentlyPlayedTracksResponse {
+    repeated RecentlyPlayedEntity entity = 1;
+    uint32 missing_metadata_count = 2;
+    bool loaded = 3;
+    uint32 original_length = 4;
+    uint32 unfiltered_length = 5;
+    uint32 status = 6;
+    string error = 7;
+}

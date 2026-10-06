@@ -1,0 +1,51 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.player.proto.transfer;
+
+import "google/protobuf/timestamp.proto";
+
+option optimize_for = CODE_SIZE;
+
+message PlayHistoryEntry {
+    optional string uid = 1;
+    optional Provider provider = 2;
+    optional CommandType command_type = 3;
+    optional bool reset_context = 4;
+    optional bool shuffled = 5;
+    optional string uri = 6;
+    optional string state_id = 7;
+    optional google.protobuf.Timestamp timestamp = 9;
+    
+    reserved 8;
+}
+
+message PlayHistoryEntries {
+    repeated PlayHistoryEntry play_history_entries = 1;
+}
+
+enum CommandType {
+    COMMAND_TYPE_UNSPECIFIED = 0;
+    COMMAND_TYPE_SKIP_NEXT = 1;
+    COMMAND_TYPE_SKIP_PREVIOUS = 2;
+    COMMAND_TYPE_PLAY = 3;
+    COMMAND_TYPE_ADVANCE = 4;
+    COMMAND_TYPE_SEEK_TO = 5;
+    COMMAND_TYPE_TRANSFER = 6;
+    COMMAND_TYPE_SWITCH_TO_ASSOCIATED_ITEM = 7;
+    COMMAND_TYPE_UPDATE_CONTEXT = 8;
+    COMMAND_TYPE_SIGNAL = 9;
+    COMMAND_TYPE_PLAY_AS_NEXT_IN_QUEUE = 10;
+}
+
+enum Provider {
+    PROVIDER_CONTEXT = 0;
+    PROVIDER_QUEUE = 1;
+    PROVIDER_AUTOPLAY = 2;
+    PROVIDER_AD = 3;
+    PROVIDER_RECOMMENDATION_FILLER = 4;
+    PROVIDER_RECOMMENDATION_RANDOM = 5;
+    PROVIDER_RECOMMENDATION = 8;
+    PROVIDER_TTS = 9;
+}

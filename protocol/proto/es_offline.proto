@@ -1,0 +1,346 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.offline_esperanto.proto;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+option objc_class_prefix = "ESPOffline";
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.offline_esperanto.proto";
+
+service Offline {
+    rpc GetOfflinePlaybackStatus(google.protobuf.Empty) returns (GetOfflinePlaybackStatusResponse);
+    rpc SubscribeOfflinePlaybackStatus(google.protobuf.Empty) returns (stream GetOfflinePlaybackStatusResponse);
+    rpc SetOfflinePlaybackAllowed(SetOfflinePlaybackAllowedRequest) returns (SetOfflinePlaybackAllowedResponse);
+    rpc SubscribeError(google.protobuf.Empty) returns (stream Error);
+    rpc GetContexts(GetContextsRequest) returns (GetContextsResponse);
+    rpc SubscribeContexts(GetContextsRequest) returns (stream GetContextsResponse);
+    rpc GetItems(GetItemsRequest) returns (GetItemsResponse);
+    rpc SubscribeItems(GetItemsRequest) returns (stream GetItemsResponse);
+    rpc AddDownload(DownloadRequest) returns (DownloadResponse);
+    rpc RemoveDownload(DownloadRequest) returns (DownloadResponse);
+    rpc RemoveAllDownloads(google.protobuf.Empty) returns (google.protobuf.Empty);
+    rpc GetContextsProgress(GetContextsProgressRequest) returns (ContextsProgressResponse);
+    rpc SubscribeContextsProgress(GetContextsProgressRequest) returns (stream ContextsProgressResponse);
+    rpc GetTotalProgress(google.protobuf.Empty) returns (TotalProgressResponse);
+    rpc SubscribeTotalProgress(google.protobuf.Empty) returns (stream TotalProgressResponse);
+    rpc GetDevices(google.protobuf.Empty) returns (GetDevicesResponse);
+    rpc GetLocalDevice(google.protobuf.Empty) returns (Device);
+    rpc SubscribeDevicesWithContext(DevicesWithContextRequest) returns (stream DevicesWithContextResponse);
+    rpc SubscribeContextAdded(google.protobuf.Empty) returns (stream ContextAdded);
+    rpc LicenseStatus(google.protobuf.Empty) returns (LicenseStatusResponse);
+    rpc GetOfflineLicenseInfo(google.protobuf.Empty) returns (OfflineLicenseInfo);
+    rpc GetEstimatedStorageIncrease(GetEstimatedStorageIncreaseRequest) returns (EstimatedStorageIncrease);
+    rpc GetListsContainingItem(GetListsContainingItemRequest) returns (GetListsContainingItemResponse);
+    rpc PrepareResource(PrepareResourceRequest) returns (PrepareResourceResponse);
+    rpc HasResource(HasResourceRequest) returns (HasResourceResponse);
+    rpc RemoveResource(RemoveResourceRequest) returns (google.protobuf.Empty);
+    rpc BulkRedownloadPreflight(google.protobuf.Empty) returns (BulkRedownloadPreflightResponse);
+    rpc BulkRedownloadStart(google.protobuf.Empty) returns (BulkRedownloadStartResponse);
+    rpc BulkRedownloadCancel(google.protobuf.Empty) returns (BulkRedownloadCancelResponse);
+    rpc SubscribeBulkRedownloadProgress(google.protobuf.Empty) returns (stream Progress);
+}
+
+message GetOfflinePlaybackStatusResponse {
+    bool allowed = 1;
+    bool explicitly_enabled = 2;
+    bool implicitly_enabled = 3;
+}
+
+message SetOfflinePlaybackAllowedRequest {
+    bool enable = 1;
+}
+
+message SetOfflinePlaybackAllowedResponse {
+    bool ok = 1;
+}
+
+message Error {
+    ErrorCode code = 1;
+    enum ErrorCode {
+        SUCCESS = 0;
+        GENERIC = 1;
+        DISK_FULL = 8;
+        EXPIRED = 14;
+        TOO_MANY_TRACKS = 19;
+        NOT_ALLOWED = 23;
+        CONNECTION_DISABLED = 36;
+        DEVICE_LIMIT_REACHED = 7028;
+    }
+}
+
+message ContextInfoPolicy {
+    bool items = 1;
+}
+
+message Context {
+    string uri = 1;
+    
+    State state = 2;
+    enum State {
+        NOT_DOWNLOADED = 0;
+        ERROR = 1;
+        REQUESTED = 2;
+        DOWNLOADED = 3;
+        DOWNLOADING = 4;
+        WAITING = 5;
+    }
+    
+    float percent_complete = 3;
+}
+
+message Item {
+    string uri = 1;
+    
+    State state = 2;
+    enum State {
+        NOT_DOWNLOADED = 0;
+        ERROR = 1;
+        DOWNLOADED_EXPIRED = 2;
+        DOWNLOADED = 3;
+        WAITING_FOR_REDOWNLOAD = 4;
+        DOWNLOADING = 5;
+        WAITING = 6;
+        WAITING_LIMIT_EXCEEDED = 7;
+    }
+    
+    State video_state = 3 [deprecated = true];
+    uint32 sync_progress = 4;
+    
+    Kind kind = 5;
+    enum Kind {
+        DEFAULT = 0;
+        VIDEO = 1;
+    }
+}
+
+message ContextInfo {
+    Context context = 1;
+    repeated Item items = 2;
+}
+
+message DeviceKey {
+    string device_id = 1;
+    string cache_id = 2;
+}
+
+message DeviceContextInfo {
+    DeviceKey device = 1;
+    Context context = 2;
+}
+
+message GetContextsRequest {
+    repeated string uris = 3;
+    
+    oneof _policy {
+        ContextInfoPolicy policy = 1;
+    }
+    
+    oneof _device {
+        DeviceKey device = 2;
+    }
+    
+    oneof _filtering {
+        Filtering filtering = 4;
+    }
+    
+    message Filtering {
+        repeated string item_uris = 1;
+    }
+}
+
+message GetContextsResponse {
+    repeated ContextInfo contexts = 1;
+    int64 error = 2;
+}
+
+message GetItemsRequest {
+    repeated string uris = 1;
+}
+
+message GetItemsResponse {
+    repeated Item items = 1;
+}
+
+message DownloadRequest {
+    string uri = 2;
+    repeated string music_video_uris = 3;
+    
+    oneof _device {
+        DeviceKey device = 1;
+    }
+}
+
+message DownloadResponse {
+    int64 error = 1;
+}
+
+message Progress {
+    int64 queued_tracks = 1;
+    int64 queued_bytes = 2;
+    int64 downloaded_tracks = 3;
+    int64 downloaded_bytes = 4;
+    int64 total_tracks = 5;
+    int64 total_bytes = 6;
+    bool downloading = 7;
+    int64 download_speed = 8;
+    float percent_complete = 9;
+    int64 seconds_left = 10;
+}
+
+message GetContextsProgressRequest {
+    repeated string uris = 1;
+}
+
+message ContextProgress {
+    string uri = 1;
+    Progress progress = 2;
+}
+
+message ContextsProgressResponse {
+    repeated ContextProgress progresses = 1;
+}
+
+message TotalProgressResponse {
+    Progress progress = 1;
+}
+
+message Capabilities {
+    bool remote_downloads_enabled = 1;
+}
+
+message Device {
+    string device_id = 1;
+    string cache_id = 2;
+    string name = 3;
+    int32 type = 4;
+    int32 platform = 5;
+    google.protobuf.Timestamp last_seen_at = 6;
+    bool is_local = 7;
+    string client_id = 8;
+    Capabilities capabilities = 9;
+    bool offline_enabled = 10;
+}
+
+message GetDevicesResponse {
+    repeated Device devices = 1;
+    int64 error = 2;
+}
+
+message DevicesWithContextRequest {
+    string uri = 1;
+}
+
+message DevicesWithContextResponse {
+    repeated DeviceWithContext deviceWithContext = 1;
+    message DeviceWithContext {
+        Device device = 1;
+        bool is_supported = 2;
+        
+        oneof _context {
+            Context context = 3;
+        }
+    }
+    
+    int64 error = 2;
+}
+
+message OfflineLicenseInfo {
+    Expiry expiry = 1;
+    message Expiry {
+        google.protobuf.Timestamp track = 1;
+        google.protobuf.Timestamp episode = 2;
+    }
+}
+
+message GetEstimatedStorageIncreaseRequest {
+    Setting setting = 1;
+    enum Setting {
+        UNKNOWN = 0;
+        LOW = 1;
+        NORMAL = 2;
+        HIGH = 3;
+        VERY_HIGH = 4;
+        LOSSLESS = 5;
+    }
+}
+
+message EstimatedStorageIncrease {
+    int64 estimated_bytes_increase = 1;
+}
+
+message GetListsContainingItemRequest {
+    string item_uri = 1;
+}
+
+message GetListsContainingItemResponse {
+    repeated string list_uris = 1;
+}
+
+message LicenseStatusResponse {
+    int32 max_licenses = 1;
+    int32 free_licenses = 2;
+    int64 error = 3;
+}
+
+message PrepareResourceRequest {
+    string resource_id = 1;
+    ResourceType type = 2;
+}
+
+message PrepareResourceResponse {
+    bool success = 1;
+}
+
+message HasResourceRequest {
+    string resource_id = 1;
+    ResourceType type = 2;
+}
+
+message HasResourceResponse {
+    bool present = 1;
+}
+
+message RemoveResourceRequest {
+    string resource_id = 1;
+    ResourceType type = 2;
+}
+
+message BulkRedownloadPreflightResponse {
+    int64 total_download_bytes = 1;
+    int32 total_tracks = 2;
+    bool is_on_cellular = 3;
+    bool sync_over_cellular_allowed = 4;
+    bool has_sufficient_storage = 5;
+    int32 downloads_in_progress = 6;
+    int64 current_downloaded_bytes = 7;
+}
+
+message BulkRedownloadStartResponse {
+    bool started = 1;
+    string error_message = 2;
+}
+
+message BulkRedownloadCancelResponse {
+    bool cancelled = 1;
+}
+
+message ContextAdded {
+    string uri = 1;
+    
+    Reason reason = 2;
+    enum Reason {
+        UNSPECIFIED = 0;
+        USER_ACTION_LOCAL_DEVICE = 1;
+        USER_ACTION_REMOTE_DEVICE = 2;
+        AUTO_DOWNLOAD_SERVICE = 3;
+    }
+}
+
+enum ResourceType {
+    RESOURCE_TYPE_VIDEO = 0;
+    RESOURCE_TYPE_AUDIO = 1;
+}

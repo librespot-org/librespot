@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
@@ -8,6 +8,7 @@ import "status_response.proto";
 import "stream_handle.proto";
 
 option objc_class_prefix = "ESP";
+option optimize_for = CODE_SIZE;
 option java_package = "com.spotify.stream_reporting_esperanto.proto";
 
 message StreamStartResponse {

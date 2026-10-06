@@ -1,0 +1,413 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.connect.esperanto.proto;
+
+import "common_messages.proto";
+
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.connect.esperanto.proto";
+
+message LogoutRequest {
+    string connect_device_identifier = 1;
+}
+
+message TransferRequest {
+    LoggingParams logging_params = 1;
+    string connect_device_identifier = 2;
+}
+
+message InstallSpotifyRequest {
+    string connect_device_identifier = 1;
+    LoggingParams logging_params = 3;
+    
+    oneof _port {
+        uint32 port = 2;
+    }
+}
+
+message InstallSpotifyStatusUpdate {
+    InstallSpotifyState current_state = 1;
+}
+
+message SendCommandRequest {
+    LoggingParams logging_params = 1;
+    string connect_device_identifier = 2;
+    string command_json = 3;
+}
+
+message SendCommandResponse {
+    int32 context_player_error = 1;
+}
+
+message PullRequest {
+    LoggingParams logging_params = 1;
+}
+
+message StateRequest {
+    bool show_offline_devices_in_core = 1;
+    bool show_offline_amazon_devices_as_online = 2;
+    bool include_local_device = 3;
+    bool exclude_non_local_devices = 4;
+    bool include_user_match_unauthenticated_devices = 5;
+}
+
+message OutputPeripheral {
+    oneof _name {
+        string name = 1;
+    }
+    
+    oneof _brand {
+        string brand = 2;
+    }
+    
+    oneof _model {
+        string model = 3;
+    }
+    
+    oneof _category {
+        OutputPeripheralCategory category = 4;
+    }
+    
+    oneof _connection_type {
+        OutputPeripheralConnectionType connection_type = 5;
+    }
+}
+
+message StateResponse {
+    bool is_running = 1;
+    bool is_connected = 2;
+    string local_name = 3;
+    bool should_use_local_playback = 4;
+    
+    repeated Device devices = 5;
+    message Device {
+        bool is_self = 1;
+        string local_identifier = 2;
+        string deduplication_id = 3;
+        string connect_state_identifier = 4;
+        string name = 5;
+        string type = 6;
+        string state = 7;
+        bool is_disabled = 8;
+        bool is_active = 9;
+        bool is_being_activated = 10;
+        bool is_zeroconf = 11;
+        bool is_webapp = 12;
+        bool is_local = 14;
+        bool is_group = 15;
+        bool is_offline = 16;
+        bool is_social_connect = 17;
+        uint64 creation_time_ms = 18;
+        uint32 volume = 19;
+        
+        Hifi hifi = 20;
+        message Hifi {
+            bool fully_supported = 1;
+            bool user_eligible = 2;
+            bool device_supported = 3;
+        }
+        
+        string license = 21;
+        bool supports_on_demand = 22;
+        bool supports_volume = 23;
+        bool supports_logout = 24;
+        bool supports_rename = 25;
+        bool supports_alarm = 26;
+        bool is_voice_enabled = 27;
+        bool is_newly_discovered = 28;
+        repeated string supported_media_types = 29;
+        string brand_display_name = 30;
+        string model_display_name = 31;
+        
+        repeated Incarnation incarnations = 34;
+        message Incarnation {
+            LoginType login_type = 1;
+            string identifier = 2;
+            bool preferred = 3;
+            ProtocolChoiceReason preferred_reason = 4;
+        }
+        
+        string library_version = 37;
+        string local_ip = 39;
+        uint32 discovery_method = 40;
+        bool supports_remote_sleep_timer = 41;
+        bool supports_playlist_mixing = 42;
+        bool is_public = 44;
+        bool supports_remote_audio_quality_control = 45;
+        bool supports_zephyr = 47;
+        bool supports_gapless = 48;
+        bool supports_crossfade = 49;
+        
+        oneof _volume_steps {
+            uint32 volume_steps = 32;
+        }
+        
+        oneof _capabilities {
+            string capabilities = 33;
+        }
+        
+        oneof _alias_id {
+            uint32 alias_id = 35;
+        }
+        
+        oneof _supports_dj {
+            bool supports_dj = 36;
+        }
+        
+        oneof _output_peripheral {
+            OutputPeripheral output_peripheral = 38;
+        }
+        
+        oneof _group_data {
+            GroupData group_data = 43;
+        }
+        
+        oneof _is_authenticated_with_current_user {
+            bool is_authenticated_with_current_user = 46;
+        }
+        
+        reserved 13;
+    }
+    
+    bool is_active = 6;
+    bool is_active_on_same_device = 7;
+    bool is_synced_with_backend = 8;
+}
+
+message NotifyAudioRouteChangedRequest {
+    oneof _audio_output_device_name {
+        string audio_output_device_name = 1;
+    }
+    
+    oneof _audio_output_device_connection_type {
+        OutputPeripheralConnectionType audio_output_device_connection_type = 2;
+    }
+    
+    oneof _audio_output_device_brand {
+        string audio_output_device_brand = 3;
+    }
+    
+    oneof _audio_output_device_model {
+        string audio_output_device_model = 4;
+    }
+    
+    oneof _audio_output_device_category {
+        OutputPeripheralCategory audio_output_device_category = 5;
+    }
+}
+
+message RenameRequest {
+    string device_id = 1;
+    string new_name = 2;
+}
+
+message SetPreferredIncarnationRequest {
+    string device_id = 1;
+    LoggingParams logging_params = 3;
+    
+    oneof _preferred_login_type {
+        LoginType preferred_login_type = 2;
+    }
+}
+
+message ClusterUpdateAfterBackendConnectionResponse {
+    bool has_received_cluster_update_after_backend_connection = 1;
+}
+
+message GroupData {
+    repeated GroupDevice devices = 1;
+    GroupCapabilities capabilities = 2;
+    
+    reserved 3;
+}
+
+message GroupDevice {
+    GroupDeviceIdentifiers identifiers = 1;
+    string name = 2;
+    string type = 3;
+    string model_display_name = 4;
+    GroupDeviceCapabilities capabilities = 5;
+    GroupingStatus grouping_status = 6;
+    
+    oneof _volume {
+        GroupDeviceVolume volume = 7;
+    }
+}
+
+message GroupDeviceIdentifiers {
+    string group_device_identifier = 1;
+    
+    oneof _local_identifier {
+        string local_identifier = 2;
+    }
+    
+    oneof _deduplication_id {
+        string deduplication_id = 3;
+    }
+    
+    oneof _connect_state_identifier {
+        string connect_state_identifier = 4;
+    }
+}
+
+message GroupDeviceVolume {
+    uint32 volume = 1;
+    int32 volume_steps = 2;
+}
+
+message GroupCapabilities {
+    uint32 max_devices = 1;
+}
+
+message GroupDeviceCapabilities {
+    bool removable = 1;
+    bool removal_dissolves_group = 2;
+}
+
+message CreateStaticGroupRequest {
+    
+}
+
+message CreateStaticGroupResponse {
+    
+}
+
+message RenameGroupRequest {
+    
+}
+
+message RenameGroupResponse {
+    
+}
+
+message AddDeviceToGroupRequest {
+    string connect_device_identifier = 1;
+    string group_device_identifier = 2;
+    LoggingParams logging_params = 3;
+}
+
+message AddDeviceToGroupResponse {
+    bool success = 1;
+    
+    oneof _error {
+        Error error = 2;
+    }
+    
+    enum Error {
+        UNKNOWN_ERROR = 0;
+        TIMEOUT = 1;
+        INTERNAL = 2;
+        GROUP_DEVICE_NOT_FOUND = 3;
+        MAX_NUMBER_OF_DEVICES_REACHED = 4;
+        TARGET_NOT_FOUND = 5;
+        NOT_IMPLEMENTED = 6;
+    }
+}
+
+message RemoveDeviceFromGroupRequest {
+    string connect_device_identifier = 1;
+    string group_device_identifier = 2;
+    LoggingParams logging_params = 3;
+}
+
+message RemoveDeviceFromGroupResponse {
+    bool success = 1;
+    
+    oneof _error {
+        Error error = 2;
+    }
+    
+    enum Error {
+        UNKNOWN_ERROR = 0;
+        TIMEOUT = 1;
+        INTERNAL = 2;
+        GROUP_DEVICE_NOT_FOUND = 3;
+        TARGET_NOT_FOUND = 4;
+        NOT_IMPLEMENTED = 5;
+    }
+}
+
+message DeleteGroupRequest {
+    string connect_device_identifier = 1;
+    LoggingParams logging_params = 2;
+}
+
+message DeleteGroupResponse {
+    bool success = 1;
+    
+    oneof _error {
+        Error error = 2;
+    }
+    
+    enum Error {
+        UNKNOWN_ERROR = 0;
+        TIMEOUT = 1;
+        INTERNAL = 2;
+        TARGET_NOT_FOUND = 3;
+        NOT_IMPLEMENTED = 4;
+    }
+}
+
+enum InstallSpotifyState {
+    CONNECTING = 0;
+    PAIRING = 1;
+    SUBSCRIBING = 2;
+    LAUNCHING_APP_STORE = 3;
+    WAITING_FOR_APP_TO_BE_INSTALLED = 4;
+    LAUNCHING_THE_APP = 5;
+    SUCCESS = 6;
+    UNKNOWN_ERROR = 100;
+    DEVICE_NOT_FOUND = 101;
+    DEVICE_NOT_SUPPORTED = 102;
+    TIMEOUT = 103;
+    CANCELLED = 104;
+}
+
+enum DiscoveryMethod {
+    NONE = 0;
+    CLUSTER = 1;
+    ZEROCONF = 2;
+    DIAL = 4;
+    CAST_SDK = 8;
+}
+
+enum OutputPeripheralCategory {
+    OUTPUT_PERIPHERAL_CATEGORY_UNKNOWN = 0;
+    OUTPUT_PERIPHERAL_CATEGORY_CAR = 1;
+    OUTPUT_PERIPHERAL_CATEGORY_HEADPHONES = 2;
+    OUTPUT_PERIPHERAL_CATEGORY_SPEAKER = 3;
+    OUTPUT_PERIPHERAL_CATEGORY_WEARABLE = 4;
+    OUTPUT_PERIPHERAL_CATEGORY_GLASSES = 5;
+    OUTPUT_PERIPHERAL_CATEGORY_APP = 6;
+}
+
+enum OutputPeripheralConnectionType {
+    OUTPUT_PERIPHERAL_CONNECTION_TYPE_UNKNOWN = 0;
+    OUTPUT_PERIPHERAL_CONNECTION_TYPE_WIRED = 1;
+    OUTPUT_PERIPHERAL_CONNECTION_TYPE_CAR_PROJECTED = 2;
+    OUTPUT_PERIPHERAL_CONNECTION_TYPE_BLUETOOTH = 3;
+    OUTPUT_PERIPHERAL_CONNECTION_TYPE_AIRPLAY = 4;
+    OUTPUT_PERIPHERAL_CONNECTION_TYPE_BUILT_IN_SPEAKER = 5;
+}
+
+enum LoginType {
+    CONNECT = 0;
+    CAST = 1;
+}
+
+enum ProtocolChoiceReason {
+    PROTOCOL_CHOICE_REASON_DEFAULT = 0;
+    PROTOCOL_CHOICE_REASON_USER_SELECTED = 1;
+    PROTOCOL_CHOICE_REASON_STREAM_EXPANSION = 2;
+    PROTOCOL_CHOICE_REASON_ANDROID_TV = 3;
+    PROTOCOL_CHOICE_REASON_TAP_DEVICE = 4;
+}
+
+enum GroupingStatus {
+    UNKNOWN_GROUPING_STATUS = 0;
+    GROUPED = 1;
+    GROUPABLE = 2;
+    GROUPING = 3;
+}

@@ -1,0 +1,30 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playbacksettingsinternal;
+
+import "playback-settings.proto";
+import "google/protobuf/empty.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.playbacksettings.model";
+
+message ScopeKey {
+    oneof scope {
+        google.protobuf.Empty user_scope = 1;
+        string content_id = 2;
+        string device_id = 3;
+    }
+}
+
+message CacheEntry {
+    ScopeKey setting_scope_key = 1;
+    playbacksettings.FieldId setting_id = 2;
+    playbacksettings.FieldValue setting_value = 3;
+}
+
+message CacheFile {
+    repeated CacheEntry entries = 1;
+}

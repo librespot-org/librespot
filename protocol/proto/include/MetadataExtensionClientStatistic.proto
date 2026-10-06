@@ -1,0 +1,29 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message MetadataExtensionClientStatistic {
+    optional bytes task_id = 1;
+    optional string feature_id = 2;
+    optional bool is_online_param = 3;
+    optional int32 num_extensions_with_etags = 4;
+    optional int32 num_extensions_requested = 5;
+    optional int32 num_extensions_needed = 6;
+    optional int32 num_uris_requested = 7;
+    optional int32 num_uris_needed = 8;
+    optional int32 num_prepared_requests = 9;
+    optional int32 num_sent_requests = 10;
+    optional int32 refresh_opt_param = 11;
+    optional int32 num_extensions_coalesced = 12;
+    optional int32 num_attached_request_tasks = 13;
+    optional int32 num_created_request_tasks = 14;
+    optional int32 duration_ms = 15;
+    repeated int32 extension_kinds_needed = 16;
+    optional int32 cache_peek_duration_ms = 17;
+    optional int32 request_task_error_code = 18;
+    optional int64 cache_peek_duration_ns = 19;
+}

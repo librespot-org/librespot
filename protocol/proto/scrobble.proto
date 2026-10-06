@@ -1,0 +1,32 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.scrobble.esperanto.proto;
+
+option objc_class_prefix = "ESP";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.scrobble.esperanto.proto";
+
+service Scrobble {
+    rpc GetIncognitoMode(GetIncognitoModeRequest) returns (GetIncognitoModeResponse);
+    rpc PutIncognitoMode(PutIncognitoModeRequest) returns (GetIncognitoModeResponse);
+    rpc SubIncognitoMode(SubIncognitoModeRequest) returns (stream GetIncognitoModeResponse);
+}
+
+message GetIncognitoModeRequest {
+    
+}
+
+message GetIncognitoModeResponse {
+    bool incognito_mode = 1;
+}
+
+message PutIncognitoModeRequest {
+    bool incognito_mode = 1;
+}
+
+message SubIncognitoModeRequest {
+    
+}

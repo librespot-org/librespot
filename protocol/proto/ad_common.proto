@@ -1,0 +1,192 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.ads.esperanto.proto;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.ads.esperanto.proto";
+
+message UrlArray {
+    repeated string urls = 1;
+}
+
+message AdMedia {
+    string mime_type = 1;
+    int32 bitrate = 2;
+    uint64 duration = 3;
+    int32 width = 4;
+    int32 height = 5;
+    
+    oneof media_file {
+        string url = 6;
+        string audio_file_id = 7;
+        string image_file_id = 8;
+        string text = 9;
+        string video_manifest_id = 10;
+    }
+}
+
+message Ad {
+    string ad_id = 1;
+    map<string, string> metadata = 2;
+    bool is_dummy = 3;
+    repeated AdMedia cover_art = 4;
+    repeated AdMedia audio = 5;
+    repeated AdMedia video = 6;
+    repeated AdMedia display = 7;
+    string clickthrough_url = 8;
+    map<string, UrlArray> tracking_events = 9;
+    string slot = 10;
+    string request_id = 11;
+    AdFormat format = 12;
+    bool is_dsa_eligible = 13;
+    repeated Companion companions = 14;
+    repeated Verification verifications = 15;
+}
+
+message AdSlotEvent {
+    AdSlotEventType event_type = 1;
+    enum AdSlotEventType {
+        AVAILABLE = 0;
+        PLAY = 1;
+        DISCARD = 2;
+    }
+    
+    string slot_id = 2;
+    AdFormat format = 3;
+    Ad ad = 4;
+}
+
+message AdSlot {
+    string slot_id = 1;
+    bool has_available_ads = 2;
+    bool has_active_ad = 3;
+    bool has_listeners = 4;
+    bool has_audio_listeners = 5;
+    bool has_video_listeners = 6;
+    bool has_display_listeners = 7;
+    repeated Ad available_ads = 8;
+}
+
+message AdQueue {
+    repeated Ad ads = 1;
+}
+
+message SurveyQuestionOption {
+    string id = 1;
+    string primary_text = 2;
+    bool is_exclusive = 3;
+}
+
+message SurveyQuestion {
+    string id = 1;
+    SurveyQuestionType survey_question_type = 2;
+    string primary_text = 3;
+    string secondary_text = 4;
+    repeated SurveyQuestionOption survey_question_options = 5;
+}
+
+message SurveyTransparencyContent {
+    string transparency_label = 1;
+    string transparency_url = 2;
+}
+
+message Survey {
+    repeated SurveyQuestion survey_questions = 1;
+    SurveyTransparencyContent survey_transparency_content = 2;
+}
+
+message CanvasImage {
+    string media_type = 1;
+    uint32 width = 2;
+    uint32 height = 3;
+    
+    oneof media_file {
+        string url = 4;
+    }
+}
+
+message CanvasVideo {
+    string media_type = 1;
+    uint32 duration_seconds = 2;
+    uint32 width = 3;
+    uint32 height = 4;
+    
+    oneof media_file {
+        string url = 5;
+        string video_manifest_id = 6;
+    }
+}
+
+message ItemPrice {
+    string price = 1;
+}
+
+message ItemSalePrice {
+    string price = 1;
+    string sale_price = 2;
+}
+
+message CarouselItem {
+    string item_id = 1;
+    string tagline = 2;
+    string clickthrough_url = 3;
+    
+    oneof media {
+        AdMedia image = 4;
+        AdMedia video = 5;
+    }
+    
+    oneof pricing {
+        ItemPrice price = 6;
+        ItemSalePrice sale_price = 7;
+    }
+}
+
+message Carousel {
+    string carousel_id = 1;
+    repeated CarouselItem items = 2;
+}
+
+message Companion {
+    oneof type {
+        CanvasImage canvas_image = 1;
+        CanvasVideo canvas_video = 2;
+        Survey survey = 3;
+        Carousel carousel = 4;
+    }
+}
+
+message SKAdNetworkData {
+    string signature_store_kit = 1;
+    string signature_view_through = 2;
+    string version = 3;
+    string network_identifier = 4;
+    string source_identifier = 5;
+    int64 timestamp = 6;
+    string nonce = 7;
+    string source_app_identifier = 8;
+    string advertised_app_identifier = 9;
+}
+
+message Verification {
+    oneof type {
+        SKAdNetworkData sk_ad_network = 1;
+    }
+}
+
+enum AdFormat {
+    UNKNOWN = 0;
+    AUDIO = 1;
+    VIDEO = 2;
+    DISPLAY = 3;
+    DUMMY = 4;
+}
+
+enum SurveyQuestionType {
+    SURVEY_QUESTION_TYPE_UNKNOWN = 0;
+    SINGLE_SELECT = 1;
+    MULTI_SELECT = 2;
+}

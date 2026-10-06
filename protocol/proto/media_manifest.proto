@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
@@ -23,34 +23,42 @@ message AudioFile {
 }
 
 message File {
+    int32 bitrate = 3;
+    string mime_type = 4;
+    
+    oneof file {
+        ExternalFile external_file = 1;
+        FileIdFile file_id_file = 2;
+    }
+    
+    oneof _normalization_params {
+        NormalizationParams normalization_params = 5;
+    }
+    
     message ExternalFile {
         string method = 1;
         bytes body = 4;
+        
         oneof endpoint {
             string url = 2;
             string service = 3;
         }
-        optional bool disable_range_requests = 5;
+        
+        oneof _disable_range_requests {
+            bool disable_range_requests = 5;
+        }
     }
-
+    
     message FileIdFile {
         string file_id_hex = 1;
         AudioFile.Format download_format = 2;
         EncryptionType encryption = 3;
     }
-
+    
     message NormalizationParams {
         float loudness_db = 1;
         float true_peak_db = 2;
     }
-
-    int32 bitrate = 3;
-    string mime_type = 4;
-    oneof file {
-        ExternalFile external_file = 1;
-        FileIdFile file_id_file = 2;
-    }
-    optional NormalizationParams normalization_params = 5;
 }
 
 message Files {

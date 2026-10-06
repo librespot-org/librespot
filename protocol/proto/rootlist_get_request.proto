@@ -1,0 +1,26 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playlist_esperanto.proto;
+
+import "policy/rootlist_request_decoration_policy.proto";
+import "rootlist_query.proto";
+import "rootlist_request.proto";
+import "response_status.proto";
+
+option objc_class_prefix = "ESP";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.playlist.esperanto.proto";
+
+message RootlistGetRequest {
+    RootlistQuery query = 1;
+    playlist.cosmos.proto.RootlistRequestDecorationPolicy policy = 2;
+}
+
+message RootlistGetResponse {
+    ResponseStatus status = 1;
+    playlist.cosmos.rootlist_request.proto.Response data = 2;
+    RootlistQuery query = 3;
+}

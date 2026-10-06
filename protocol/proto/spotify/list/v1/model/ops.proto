@@ -1,0 +1,84 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.list.v1.model;
+
+import "spotify/list/v1/model/attribute_kinds.proto";
+import "spotify/list/v1/model/attributes.proto";
+import "spotify/list/v1/model/list_entity.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "OpsProto";
+option java_package = "com.spotify.list.v1.model";
+
+message Target {
+    oneof Kind {
+        bool last = 1;
+        bool first = 2;
+        Item before_item = 3;
+        Item after_item = 4;
+    }
+}
+
+message Add {
+    repeated Item items = 1;
+    
+    oneof _target {
+        Target target = 2;
+    }
+}
+
+message Rem {
+    repeated Item items = 1;
+}
+
+message Mov {
+    repeated Item items = 1;
+    
+    oneof _target {
+        Target target = 2;
+    }
+}
+
+message Set {
+    repeated Item items = 1;
+}
+
+message UpdateAttributes {
+    repeated AttributeKind no_value = 3;
+    
+    oneof _target_item {
+        Item target_item = 1;
+    }
+    
+    oneof _values {
+        Attributes values = 2;
+    }
+    
+    oneof _replace {
+        bool replace = 4;
+    }
+}
+
+message UpdateItemId {
+    oneof _target_item {
+        Item target_item = 1;
+    }
+    
+    oneof _new_id {
+        bytes new_id = 2;
+    }
+}
+
+message Op {
+    oneof Kind {
+        Add add = 1;
+        Rem rem = 2;
+        Mov mov = 3;
+        Set set = 4;
+        UpdateAttributes update_attributes = 5;
+        UpdateItemId update_item_id = 6;
+    }
+}

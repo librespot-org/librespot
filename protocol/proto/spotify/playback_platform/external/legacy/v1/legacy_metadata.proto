@@ -1,0 +1,61 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playback_platform.external.legacy.v1;
+
+import "google/protobuf/duration.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.playback_platform.external.legacy.v1";
+
+message Image {
+    string url = 1;
+    string small_url = 2;
+    string large_url = 3;
+    string xlarge_url = 4;
+}
+
+message Artist {
+    string uri = 1;
+    string name = 2;
+    ArtistRole role = 3;
+}
+
+message Album {
+    string uri = 1;
+    string title = 2;
+    Artist artist = 3;
+}
+
+message LegacyMetadata {
+    option deprecated = true;
+    Image image = 2;
+    repeated Artist artists = 3;
+    Album album = 4;
+    map<string, string> unmapped = 7;
+    
+    oneof _title {
+        string title = 1;
+    }
+    
+    oneof _start_position {
+        google.protobuf.Duration start_position = 5;
+    }
+    
+    oneof _stop_position {
+        google.protobuf.Duration stop_position = 6;
+    }
+}
+
+enum ArtistRole {
+    ARTIST_ROLE_UNSPECIFIED = 0;
+    ARTIST_ROLE_MAIN_ARTIST = 1;
+    ARTIST_ROLE_FEATURED_ARTIST = 2;
+    ARTIST_ROLE_REMIXER = 3;
+    ARTIST_ROLE_ACTOR = 4;
+    ARTIST_ROLE_COMPOSER = 5;
+    ARTIST_ROLE_CONDUCTOR = 6;
+    ARTIST_ROLE_ORCHESTRA = 7;
+}

@@ -1,0 +1,152 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.automix.esperanto.proto;
+
+import "transition.proto";
+import "google/protobuf/empty.proto";
+
+option objc_class_prefix = "ESP";
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.automix.esperanto.proto";
+
+service Automix {
+    rpc GetComputedTransitions(GetComputedTransitionsRequest) returns (GetComputedTransitionsResponse);
+    rpc GetStylesForPresetId(GetStylesForPresetIdRequest) returns (GetStylesForPresetIdResponse);
+    rpc GetVolumeStylesForVolumeStyleId(GetVolumeStylesForVolumeStyleIdRequest) returns (GetVolumeStylesForVolumeStyleIdResponse);
+    rpc GetEqStylesForEqStyleId(GetEqStylesForEqStyleIdRequest) returns (GetEqStylesForEqStyleIdResponse);
+    rpc GetFilterFxStylesForFilterFxStyleId(GetFilterFxStylesForFilterFxStyleIdRequest) returns (GetFilterFxStylesForFilterFxStyleIdResponse);
+    rpc GetFxStylesForFxStyleId(GetFxStylesForFxStyleIdRequest) returns (GetFxStylesForFxStyleIdResponse);
+    rpc GetMaxTransitionLength(google.protobuf.Empty) returns (GetMaxTransitionLengthResponse);
+    rpc GetBeatmatchOptOutTransitionDuration(google.protobuf.Empty) returns (GetBeatmatchOptOutTransitionDurationResponse);
+    rpc AdjustTransitionRecipeForItemSpeeds(AdjustTransitionRecipeForItemSpeedsRequest) returns (AdjustTransitionRecipeForItemSpeedsResponse);
+    rpc GetJogwheelBlocks(GetJogwheelBlocksRequest) returns (GetJogwheelBlocksResponse);
+    rpc GetLoopingBlocks(GetLoopingBlocksRequest) returns (GetLoopingBlocksResponse);
+}
+
+message TrackPair {
+    string track_a_uri = 1;
+    string track_b_uri = 2;
+    double item_speed_a = 3;
+    double item_speed_b = 4;
+}
+
+message GetComputedTransitionsRequest {
+    repeated TrackPair track_pairs = 1;
+}
+
+message ComputedPreset {
+    automix.proto.Preset preset = 1;
+    float computed_score = 2;
+}
+
+message ComputedTransition {
+    automix.proto.Overlap overlap = 1;
+    float computed_score = 2;
+    repeated ComputedPreset ranked_presets = 3;
+}
+
+message ComputedTransitions {
+    repeated ComputedTransition ranked_transitions = 1;
+}
+
+message GetComputedTransitionsResponse {
+    repeated ComputedTransitions computed_transitions = 1;
+}
+
+message GetStylesForPresetIdRequest {
+    repeated int32 preset_ids = 1;
+}
+
+message PresetIdStyle {
+    int32 preset_id = 1;
+    automix.proto.VolumeStyle volume_style = 2;
+    automix.proto.EqStyle eq_style = 3;
+    automix.proto.FilterFxStyle filter_fx_style = 4;
+    automix.proto.FxStyle fx_style = 5;
+    automix.proto.JogwheelStyle jogwheel_style = 6;
+    automix.proto.LoopingStyle looping_style = 7;
+}
+
+message GetStylesForPresetIdResponse {
+    repeated PresetIdStyle preset_styles = 1;
+}
+
+message GetVolumeStylesForVolumeStyleIdRequest {
+    repeated int32 volume_style_ids = 1;
+    int32 num_bars = 2;
+}
+
+message GetVolumeStylesForVolumeStyleIdResponse {
+    repeated automix.proto.VolumeStyleCurves volume_styles = 1;
+}
+
+message GetEqStylesForEqStyleIdRequest {
+    repeated int32 eq_style_ids = 1;
+    int32 num_bars = 2;
+}
+
+message GetEqStylesForEqStyleIdResponse {
+    repeated automix.proto.EqStyleCurves eq_styles = 1;
+}
+
+message GetFilterFxStylesForFilterFxStyleIdRequest {
+    repeated int32 filter_fx_style_ids = 1;
+    int32 num_bars = 2;
+}
+
+message GetFilterFxStylesForFilterFxStyleIdResponse {
+    repeated automix.proto.FilterFxStyleCurves filter_fx_styles = 1;
+}
+
+message GetFxStylesForFxStyleIdRequest {
+    repeated int32 fx_style_ids = 1;
+    float bpm = 2;
+    int32 num_bars = 3;
+}
+
+message GetFxStylesForFxStyleIdResponse {
+    repeated automix.proto.FxStyleCurves fx_styles = 1;
+}
+
+message GetMaxTransitionLengthResponse {
+    int32 milliseconds = 1;
+}
+
+message GetBeatmatchOptOutTransitionDurationResponse {
+    int32 milliseconds = 1;
+}
+
+message AdjustTransitionRecipeForItemSpeedsRequest {
+    string transition_recipe = 1;
+    
+    oneof _new_item_speed_a {
+        double new_item_speed_a = 2;
+    }
+    
+    oneof _new_item_speed_b {
+        double new_item_speed_b = 3;
+    }
+}
+
+message AdjustTransitionRecipeForItemSpeedsResponse {
+    string transition_recipe = 1;
+}
+
+message GetJogwheelBlocksRequest {
+    repeated int32 jogwheel_style_ids = 1;
+    int32 num_bars = 2;
+}
+
+message GetJogwheelBlocksResponse {
+    repeated automix.proto.JogwheelStyleBlocks jogwheel_style_blocks = 1;
+}
+
+message GetLoopingBlocksRequest {
+    repeated int32 looping_style_ids = 1;
+}
+
+message GetLoopingBlocksResponse {
+    repeated automix.proto.LoopingStyleBlocks looping_style_blocks = 1;
+}

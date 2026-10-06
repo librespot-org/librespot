@@ -1,0 +1,142 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playback_platform.context.v1.behavior;
+
+import "google/protobuf/duration.proto";
+import "spotify/playback_platform/common/v1/duration.proto";
+import "spotify/playback_platform/context/v1/behavior/navigation.proto";
+import "spotify/playback_platform/context/v1/context_state.proto";
+import "spotify/playback_platform/context/v1/ledger_query.proto";
+import "spotify/playback_platform/timeline/v1/timeline_query.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.playback_platform.context.v1.behavior";
+
+message Action {
+    oneof action {
+        Remote remote = 1;
+        Report report = 2;
+        Reload reload = 3;
+        Unload unload = 4;
+        Signal signal = 5;
+        Player player = 6;
+    }
+    
+    message Remote {
+        google.protobuf.Duration timeout = 5;
+        repeated Action fallback_actions = 6;
+        
+        oneof _context_id {
+            string context_id = 1;
+        }
+        
+        oneof _action_id {
+            string action_id = 2;
+        }
+        
+        oneof _parameters {
+            bytes parameters = 3;
+        }
+        
+        oneof _ledger_query {
+            LedgerQuery ledger_query = 4;
+        }
+    }
+    
+    message Report {
+        google.protobuf.Duration max_shaping_delay = 5;
+        
+        oneof _context_id {
+            string context_id = 1;
+        }
+        
+        oneof _action_id {
+            string action_id = 2;
+        }
+        
+        oneof _parameters {
+            bytes parameters = 3;
+        }
+        
+        oneof _ledger {
+            LedgerQuery ledger = 4;
+        }
+        
+        oneof _singleton_report_id {
+            uint64 singleton_report_id = 6;
+        }
+    }
+    
+    message Reload {
+        ContextState state = 1;
+    }
+    
+    message Unload {
+        ContextState state = 1;
+    }
+    
+    message Signal {
+        string signal_id = 1;
+        bytes parameters = 2;
+    }
+    
+    message Player {
+        oneof operation {
+            MoveToward move_to_prev = 1;
+            MoveToward move_to_next = 2;
+            SkipToward skip_to_prev = 3;
+            SkipToward skip_to_next = 4;
+            FailToward fail_to_prev = 5;
+            FailToward fail_to_next = 6;
+            SeekByDuration seek_by_duration = 9;
+            SeekToPosition seek_to_position = 10;
+            SeekToTimespan seek_to_enter_timespan = 11;
+            SeekToTimespan seek_to_leave_timespan = 12;
+            SeekToTimespan seek_back_to_enter_timespan = 13;
+            SeekToTimespan seek_back_to_leave_timespan = 14;
+            SeekToLive seek_to_live = 15;
+            SeekToward seek_to_prev = 16;
+            SeekToward seek_to_next = 17;
+            Stop stop = 18;
+        }
+        
+        message MoveToward {
+            repeated Navigation.Transitions transitions = 1;
+        }
+        
+        message SkipToward {
+            repeated Navigation.Transitions transitions = 1;
+        }
+        
+        message FailToward {
+            repeated Navigation.Transitions transitions = 1;
+        }
+        
+        message SeekByDuration {
+            common.v1.StochasticDuration duration = 1;
+        }
+        
+        message SeekToPosition {
+            common.v1.StochasticDuration position = 1;
+        }
+        
+        message SeekToTimespan {
+            timeline.v1.TimelineQuery timespans = 1;
+        }
+        
+        message SeekToLive {
+            
+        }
+        
+        message SeekToward {
+            
+        }
+        
+        message Stop {
+            
+        }
+    }
+}

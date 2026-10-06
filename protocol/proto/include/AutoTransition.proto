@@ -1,0 +1,22 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message AutoTransition {
+    optional bytes playback_id = 1;
+    optional bytes prev_playback_id = 2;
+    optional bool beatmatched = 3;
+    optional float initial_speed = 4;
+    optional int64 fade_in_start = 5;
+    optional int64 fade_out_start = 6;
+    optional int64 fade_in_duration = 7;
+    optional int64 fade_out_duration = 8;
+    optional bool stored = 9;
+    optional int64 auto_preset_id = 10;
+    optional string arm_id = 11;
+    optional string transition_uri = 12;
+}

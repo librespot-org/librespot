@@ -1,0 +1,52 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playback_platform.context.v1.behavior;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "spotify/playback_platform/common/v1/duration.proto";
+import "spotify/playback_platform/context/v1/behavior/handler.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.playback_platform.context.v1.behavior";
+
+message Timers {
+    repeated OnTriggerPlayTimer on_trigger_play_timer = 1;
+    message OnTriggerPlayTimer {
+        Trigger trigger = 1;
+        Actions actions = 2;
+        string timer_id = 3;
+        
+        oneof when {
+            common.v1.Duration duration = 4;
+            common.v1.Duration periodic = 5;
+            common.v1.Duration duration_nominal = 6;
+            common.v1.Duration periodic_nominal = 7;
+        }
+    }
+    
+    repeated OnTriggerWallTimer on_trigger_wall_timer = 2;
+    message OnTriggerWallTimer {
+        Trigger trigger = 1;
+        Actions actions = 2;
+        string timer_id = 3;
+        
+        oneof when {
+            google.protobuf.Timestamp timestamp = 4;
+        }
+    }
+    
+    repeated OnTriggerIdleTimer on_trigger_idle_timer = 3;
+    message OnTriggerIdleTimer {
+        Trigger trigger = 1;
+        Actions actions = 2;
+        string timer_id = 3;
+        
+        oneof when {
+            google.protobuf.Duration duration = 4;
+        }
+    }
+}

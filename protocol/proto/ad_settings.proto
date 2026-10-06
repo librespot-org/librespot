@@ -1,0 +1,101 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.ads.esperanto.proto;
+
+import "google/protobuf/empty.proto";
+
+option objc_class_prefix = "ESP";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.ads.esperanto.proto";
+
+service Settings {
+    rpc getAllSlotSettings(GetAllSlotSettingsRequest) returns (GetSlotSettingsResponse);
+    rpc getSlotSettings(GetSlotSettingsRequest) returns (GetSlotSettingsResponse);
+    rpc updateAdServerEndpoint(UpdateAdServerEndpointRequest) returns (UpdateSlotResponse);
+    rpc updateDisplayTimeInterval(UpdateTimeIntervalRequest) returns (UpdateSlotResponse);
+    rpc updateExpiryTimeInterval(UpdateTimeIntervalRequest) returns (UpdateSlotResponse);
+    rpc updateStreamTimeInterval(UpdateTimeIntervalRequest) returns (UpdateSlotResponse);
+    rpc updateSlotEnabled(UpdateSlotEnabledRequest) returns (UpdateSlotResponse);
+    rpc getRequestHeaders(GetRequestHeadersRequest) returns (GetRequestHeadersResponse);
+    rpc setRequestHeaders(SetRequestHeadersRequest) returns (google.protobuf.Empty);
+    rpc deleteRequestHeaders(DeleteRequestHeadersRequest) returns (google.protobuf.Empty);
+    rpc updateAdStateEndpoint(UpdateAdStateEndpointRequest) returns (google.protobuf.Empty);
+}
+
+message SlotSettings {
+    string id = 1;
+    bool enabled = 2;
+    
+    oneof _display_time_interval {
+        uint64 display_time_interval = 3;
+    }
+    
+    oneof _expiry_time_interval {
+        uint64 expiry_time_interval = 4;
+    }
+    
+    oneof _stream_time_interval {
+        uint64 stream_time_interval = 5;
+    }
+}
+
+message GetAllSlotSettingsRequest {
+    
+}
+
+message GetSlotSettingsRequest {
+    string slot_id = 1;
+}
+
+message UpdateAdServerEndpointRequest {
+    repeated string slot_ids = 1;
+    string url = 2;
+}
+
+message UpdateTimeIntervalRequest {
+    string slot_id = 1;
+    uint64 time_interval = 2;
+}
+
+message UpdateSlotEnabledRequest {
+    string slot_id = 1;
+    bool enabled = 2;
+}
+
+message GetRequestHeadersRequest {
+    string field = 1;
+}
+
+message SetRequestHeadersRequest {
+    map<string, string> request_headers = 1;
+    bool refresh_inventory = 2;
+}
+
+message DeleteRequestHeadersRequest {
+    string field = 1;
+    bool refresh_inventory = 2;
+}
+
+message UpdateAdStateEndpointRequest {
+    string url = 1;
+}
+
+message GetSlotSettingsResponse {
+    repeated SlotSettings slot_settings = 1;
+}
+
+message UpdateSlotResponse {
+    Status status = 1;
+    enum Status {
+        OK = 0;
+        INVALID_SLOT = 1;
+        BAD_REQUEST = 2;
+    }
+}
+
+message GetRequestHeadersResponse {
+    map<string, string> request_headers = 1;
+}

@@ -1,0 +1,80 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.clientrestrictions.v1;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+message ExternalAccessoryDescription {
+    oneof _integration {
+        string integration = 1;
+    }
+    
+    oneof _client_id {
+        string client_id = 2;
+    }
+    
+    oneof _name {
+        string name = 3;
+    }
+    
+    oneof _transport_type {
+        string transport_type = 4;
+    }
+    
+    oneof _category {
+        string category = 5;
+    }
+    
+    oneof _company {
+        string company = 6;
+    }
+    
+    oneof _model {
+        string model = 7;
+    }
+    
+    oneof _version {
+        string version = 8;
+    }
+    
+    oneof _protocol {
+        string protocol = 9;
+    }
+    
+    oneof _sender_id {
+        string sender_id = 10;
+    }
+}
+
+message RestrictedIntegration {
+    ExternalAccessoryDescription matcher = 1;
+    string restriction_id = 2;
+}
+
+message RestrictedIntegrationsPayload {
+    repeated RestrictedIntegration restricted_integrations = 1;
+}
+
+message RestrictedIntegrationsRequest {
+    oneof _etag {
+        string etag = 1;
+    }
+}
+
+message RestrictedIntegrationsResponse {
+    string etag = 1;
+    int64 cache_ttl_in_seconds = 2;
+    
+    oneof payload {
+        RestrictedIntegrationsPayload payload_uncached = 3;
+        google.protobuf.Empty payload_cached = 4;
+    }
+}
+
+message CachedRestrictedIntegrationsResponse {
+    RestrictedIntegrationsResponse response = 1;
+    google.protobuf.Timestamp expiry_time = 2;
+}

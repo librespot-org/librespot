@@ -1,0 +1,14 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.clientrestrictions.v1;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "ClientRestrictionsExtensionProto";
+option java_package = "com.spotify.clientrestrictions.v1";
+
+message ClientRestrictionsExtensionData {
+    repeated string restriction_id = 1;
+}

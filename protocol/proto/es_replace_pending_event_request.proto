@@ -1,0 +1,17 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.pending_events.esperanto.proto;
+
+option objc_class_prefix = "ESP";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.pending_events.esperanto.proto";
+
+message ReplacePendingEventRequest {
+    string token_event_name = 1;
+    uint32 token_sequence_no = 2;
+    string proto_name = 3;
+    bytes proto_data = 4;
+}

@@ -1,0 +1,29 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.timbrefademetadata.v1;
+
+option optimize_for = CODE_SIZE;
+
+message TransitionMetadataExtensionResponse {
+    string transition_uri = 1;
+    string transition_audio_url_normalized = 2;
+    int32 transition_fade_in_end_ms = 3;
+    int32 transition_fade_out_end_ms = 4;
+    int32 head_fade_out_end_ms = 5;
+    int32 tail_fade_in_end_ms = 6;
+    int32 fade_duration_ms = 7;
+    int32 transition_audio_duration_ms = 8;
+    string transition_name = 9;
+    string transition_cover_url = 10;
+    string transition_audio_url_unnormalized = 14;
+    
+    oneof _transition_audio_true_peak_db {
+        float transition_audio_true_peak_db = 11;
+    }
+    
+    oneof _transition_audio_loudness_db {
+        float transition_audio_loudness_db = 12;
+    }
+}

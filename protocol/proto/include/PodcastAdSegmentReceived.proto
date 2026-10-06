@@ -1,0 +1,19 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message PodcastAdSegmentReceived {
+    optional string episode_uri = 1;
+    optional string playback_id = 2;
+    optional string slots = 3;
+    optional bool is_audio = 4;
+    optional string asset_id = 5;
+    optional string source = 6;
+    optional string request_id = 7;
+    optional string metadata_request_id = 8;
+    optional int64 latency_ms = 9;
+}

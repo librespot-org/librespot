@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
@@ -8,8 +8,10 @@ import "google/protobuf/timestamp.proto";
 import "audio_format.proto";
 import "stream_handle.proto";
 import "playback_state.proto";
+import "video_surface.proto";
 
 option objc_class_prefix = "ESP";
+option optimize_for = CODE_SIZE;
 option java_package = "com.spotify.stream_reporting_esperanto.proto";
 
 message StreamProgressRequest {
@@ -18,16 +20,39 @@ message StreamProgressRequest {
     bool is_paused = 3;
     bool is_playing_video = 4;
     bool is_overlapping = 5;
-    bool is_background = 6;
     bool is_fullscreen = 7;
     bool is_external = 8;
     double playback_speed = 9;
     google.protobuf.Timestamp client_timestamp = 14;
     PlaybackState playback_state = 15;
-    optional string media_id = 10;
-    optional bool content_is_downloaded = 11;
-    optional AudioFormat audio_format = 12;
-    optional string content_uri = 13;
-    optional bool is_audio_on = 16;
-    optional string video_surface = 17;
+    
+    oneof _is_background {
+        bool is_background = 6;
+    }
+    
+    oneof _media_id {
+        string media_id = 10;
+    }
+    
+    oneof _content_is_downloaded {
+        bool content_is_downloaded = 11;
+    }
+    
+    oneof _audio_format {
+        AudioFormat audio_format = 12;
+    }
+    
+    oneof _content_uri {
+        string content_uri = 13;
+    }
+    
+    oneof _is_audio_on {
+        bool is_audio_on = 16;
+    }
+    
+    oneof _video_surface_v2 {
+        VideoSurface video_surface_v2 = 18;
+    }
+    
+    reserved 17, 19;
 }

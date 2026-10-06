@@ -1,0 +1,32 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.connectivity.auth.client_token.esperanto.proto;
+
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.connectivity.auth.clienttoken.esperanto.proto";
+
+message AcquireResult {
+    oneof result {
+        ClientToken token = 1;
+        AcquireFailure failure = 2;
+    }
+}
+
+message AcquireFailure {
+    int32 code = 1;
+    string message = 2;
+}
+
+message ClientToken {
+    string token = 1;
+    int64 expires_at_timestamp = 2;
+    int64 refresh_at_timestamp = 3;
+    string client_data_hash = 4;
+    repeated string domains = 5;
+}
+
+message EncryptedClientToken {
+    string encryptedToken = 1;
+}

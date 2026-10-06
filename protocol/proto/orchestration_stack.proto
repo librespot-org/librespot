@@ -1,0 +1,17 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.stream_reporting_esperanto.proto;
+
+option objc_class_prefix = "ESP";
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.stream_reporting_esperanto.proto";
+
+enum OrchestrationStack {
+    ORCHESTRATION_STACK_UNKNOWN = 0;
+    ORCHESTRATION_STACK_LIST_PLAYER = 1;
+    ORCHESTRATION_STACK_CONTEXT_PLAYER = 2;
+    ORCHESTRATION_STACK_MULTIPLAYER = 3;
+    ORCHESTRATION_STACK_STANDALONE = 4;
+}

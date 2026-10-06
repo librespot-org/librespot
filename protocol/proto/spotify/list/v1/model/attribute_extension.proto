@@ -1,0 +1,31 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.list.v1.model;
+
+import "google/protobuf/descriptor.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "AttributeExtensionProto";
+option java_package = "com.spotify.list.v1.model";
+
+enum MappingKind {
+    KIND_NAME_MAPPING_UNSPECIFIED = 0;
+    KIND_LOWER_KEBAB_CASE = 1;
+    KIND_CAMEL_CASE = 2;
+    KIND_PASCAL_CASE = 3;
+    KIND_LOWER_SNAKE_CASE = 4;
+    KIND_UPPER_SNAKE_CASE = 5;
+    KIND_COMPLEX_TYPE = 6;
+}
+
+extend google.protobuf.FieldOptions {
+    string attribute_mapping = 10001;
+    MappingKind mapping_kind = 10002;
+    string complex_prefix = 10003;
+    string custom_mapper = 10004;
+    bool expose_list_metadata_v2_ext = 10005;
+    bool expose_list_metadata_v1_ext = 10006;
+}

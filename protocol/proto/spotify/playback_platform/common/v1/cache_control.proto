@@ -1,0 +1,24 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playback_platform.common.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.playback_platform.common.v1";
+
+message CacheControl {
+    bool disallow_expired_use_on_failure = 3;
+    bool disallow_expired_use_if_offline = 4;
+    
+    oneof _entity_tag {
+        bytes entity_tag = 1;
+    }
+    
+    oneof _valid_until {
+        google.protobuf.Timestamp valid_until = 2;
+    }
+}

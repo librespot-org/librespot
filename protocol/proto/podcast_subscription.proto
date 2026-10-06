@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
@@ -13,10 +13,16 @@ option java_package = "com.spotify.podcastsubscription.proto";
 message PodcastSubscription {
     bool is_paywalled = 1;
     bool is_user_subscribed = 2;
-
+    
     UserExplanation user_explanation = 3;
     enum UserExplanation {
         SUBSCRIPTION_DIALOG = 0;
         NONE = 1;
+    }
+    
+    Badge badge = 5;
+    enum Badge {
+        BADGE_UNSPECIFIED = 0;
+        BADGE_EXTRAS = 1;
     }
 }

@@ -1,0 +1,31 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message EventSenderStats2NonAuth {
+    repeated bytes sequence_ids = 1;
+    repeated string event_names = 2;
+    repeated int32 loss_stats_num_entries_per_sequence_id = 3;
+    repeated int32 loss_stats_event_name_index = 4;
+    repeated int64 loss_stats_storage_sizes = 5;
+    repeated int64 loss_stats_sequence_number_mins = 6;
+    repeated int64 loss_stats_sequence_number_nexts = 7;
+    repeated int32 ratelimiter_stats_event_name_index = 8;
+    repeated int64 ratelimiter_stats_drop_count = 9;
+    repeated int32 drop_list_num_entries_per_sequence_id = 10;
+    repeated int32 drop_list_event_name_index = 11;
+    repeated int64 drop_list_counts_total = 12;
+    repeated int64 drop_list_counts_unreported = 13;
+    repeated int32 states_list_event_name_index = 15;
+    repeated int64 states_list_entered_counts_total = 16;
+    repeated int64 states_list_rejected_client_counts_total = 17;
+    repeated int64 states_list_dropped_counts_total = 18;
+    repeated int64 states_list_persisted_counts_total = 19;
+    repeated int64 states_list_rejected_backend_counts_total = 20;
+    repeated int64 states_list_delivered_counts_total = 21;
+    repeated int64 states_list_deleted_counts_total = 22;
+}

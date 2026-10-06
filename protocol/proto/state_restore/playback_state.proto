@@ -1,15 +1,25 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
 syntax = "proto2";
 
 package spotify.player.proto.state_restore;
 
 import "state_restore/playback_quality.proto";
 
-message PlaybackState {
-  optional int64 timestamp = 1;
-  optional int32 position_as_of_timestamp = 2;
-  optional int32 duration = 3;
-  optional bool is_buffering = 4;
-  optional PlaybackQuality playback_quality = 5;
-  optional double playback_speed = 6;
-}
+option optimize_for = CODE_SIZE;
 
+message PlaybackState {
+    optional int64 timestamp = 1;
+    optional int32 position_as_of_timestamp = 2;
+    optional int32 duration = 3;
+    optional bool is_buffering = 4;
+    optional PlaybackQuality playback_quality = 5;
+    optional double playback_speed = 6;
+    
+    optional Format format = 7;
+    enum Format {
+        UNKNOWN = 0;
+        DEFAULT = 1;
+        PARROT = 2;
+    }
+}

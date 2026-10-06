@@ -12,15 +12,15 @@ use crate::{
 use librespot_core::date::Date;
 
 use librespot_protocol as protocol;
-use protocol::playlist4_external::FormatListAttribute as PlaylistFormatAttributeMessage;
-pub use protocol::playlist4_external::ItemAttributeKind as PlaylistItemAttributeKind;
-use protocol::playlist4_external::ItemAttributes as PlaylistItemAttributesMessage;
-use protocol::playlist4_external::ItemAttributesPartialState as PlaylistPartialItemAttributesMessage;
-pub use protocol::playlist4_external::ListAttributeKind as PlaylistAttributeKind;
-use protocol::playlist4_external::ListAttributes as PlaylistAttributesMessage;
-use protocol::playlist4_external::ListAttributesPartialState as PlaylistPartialAttributesMessage;
-use protocol::playlist4_external::UpdateItemAttributes as PlaylistUpdateItemAttributesMessage;
-use protocol::playlist4_external::UpdateListAttributes as PlaylistUpdateAttributesMessage;
+use protocol::playlist_api::FormatListAttribute as PlaylistFormatAttributeMessage;
+pub use protocol::playlist_api::ItemAttributeKind as PlaylistItemAttributeKind;
+use protocol::playlist_api::ItemAttributes as PlaylistItemAttributesMessage;
+use protocol::playlist_api::ItemAttributesPartialState as PlaylistPartialItemAttributesMessage;
+pub use protocol::playlist_api::ListAttributeKind as PlaylistAttributeKind;
+use protocol::playlist_api::ListAttributes as PlaylistAttributesMessage;
+use protocol::playlist_api::ListAttributesPartialState as PlaylistPartialAttributesMessage;
+use protocol::playlist_api::UpdateItemAttributes as PlaylistUpdateItemAttributesMessage;
+use protocol::playlist_api::UpdateListAttributes as PlaylistUpdateAttributesMessage;
 
 #[derive(Debug, Clone)]
 pub struct PlaylistAttributes {

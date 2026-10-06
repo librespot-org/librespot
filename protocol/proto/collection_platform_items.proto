@@ -1,19 +1,21 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
 syntax = "proto3";
 
 package spotify.collection_platform.proto;
 
-option java_package = "com.spotify.collection_platform.esperanto.proto";
-option java_multiple_files = true;
+import "collection_itemdata.proto";
+
 option objc_class_prefix = "ESP";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.collection_platform.esperanto.proto";
 
 message CollectionPlatformItem {
-  string uri = 1;
-  int64 add_time = 2;
+    string uri = 1;
+    int64 add_time = 2;
+    
+    oneof _item_data {
+        collection.itemdata.ItemData item_data = 3;
+    }
 }
-
-message CollectionPlatformContextItem {
-  string uri = 1;
-  int64 add_time = 2;
-  string context_uri = 3;
-}
-

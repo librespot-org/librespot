@@ -295,18 +295,18 @@ impl TryFrom<&protocol::metadata::ArtistWithRole> for SpotifyUri {
     }
 }
 
-impl TryFrom<&protocol::playlist4_external::Item> for SpotifyUri {
+impl TryFrom<&protocol::playlist_api::Item> for SpotifyUri {
     type Error = crate::Error;
-    fn try_from(item: &protocol::playlist4_external::Item) -> Result<Self, Self::Error> {
+    fn try_from(item: &protocol::playlist_api::Item) -> Result<Self, Self::Error> {
         Self::from_uri(item.uri())
     }
 }
 
 // Note that this is the unique revision of an item's metadata on a playlist,
 // not the ID of that item or playlist.
-impl TryFrom<&protocol::playlist4_external::MetaItem> for SpotifyUri {
+impl TryFrom<&protocol::playlist_api::MetaItem> for SpotifyUri {
     type Error = crate::Error;
-    fn try_from(item: &protocol::playlist4_external::MetaItem) -> Result<Self, Self::Error> {
+    fn try_from(item: &protocol::playlist_api::MetaItem) -> Result<Self, Self::Error> {
         Ok(Self::Unknown {
             kind: "MetaItem".into(),
             id: SpotifyId::try_from(item.revision())?.to_base62(),
@@ -315,10 +315,10 @@ impl TryFrom<&protocol::playlist4_external::MetaItem> for SpotifyUri {
 }
 
 // Note that this is the unique revision of a playlist, not the ID of that playlist.
-impl TryFrom<&protocol::playlist4_external::SelectedListContent> for SpotifyUri {
+impl TryFrom<&protocol::playlist_api::SelectedListContent> for SpotifyUri {
     type Error = crate::Error;
     fn try_from(
-        playlist: &protocol::playlist4_external::SelectedListContent,
+        playlist: &protocol::playlist_api::SelectedListContent,
     ) -> Result<Self, Self::Error> {
         Ok(Self::Unknown {
             kind: "SelectedListContent".into(),

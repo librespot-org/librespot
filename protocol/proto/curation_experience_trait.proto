@@ -1,0 +1,43 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.contentagnostic.v2;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.contentagnostic.v2";
+
+message CurationExperienceTrait {
+    string uri_to_curate = 1;
+    
+    Method default_method = 2;
+    message Method {
+        oneof method {
+            Rootlist rootlist = 1;
+            Playlist playlist = 2;
+            Collection collection = 3;
+            AnyUserPlaylist any_playlist = 4;
+        }
+        
+        message Rootlist {
+            
+        }
+        
+        message Playlist {
+            string uri = 1;
+        }
+        
+        message Collection {
+            string set = 1;
+        }
+        
+        message AnyUserPlaylist {
+            repeated string exclusions = 1;
+        }
+    }
+    
+    repeated Method allowed_methods = 3;
+    
+    reserved 4;
+}

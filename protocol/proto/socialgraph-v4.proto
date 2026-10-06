@@ -1,0 +1,28 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.socialgraph.v4;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "SocialgraphV4SchemaProto";
+option java_package = "com.spotify.socialgraph.v4.proto";
+
+message UsernameUser {
+    oneof _username {
+        string username = 1;
+    }
+    
+    oneof _timestamp {
+        int64 timestamp = 2;
+    }
+}
+
+message GetRelationsUsernameResponse {
+    repeated UsernameUser users = 1;
+    
+    oneof _next_page_token {
+        string next_page_token = 2;
+    }
+}

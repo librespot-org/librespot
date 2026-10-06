@@ -1,0 +1,13 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.pending_events.proto;
+
+option optimize_for = CODE_SIZE;
+
+message PESequenceNumberEntity {
+    uint32 file_format_version = 1;
+    string event_name = 2;
+    uint64 sequence_number_next = 4;
+}

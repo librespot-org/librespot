@@ -1,0 +1,67 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.connect.discovery.cast.esperanto.proto;
+
+option objc_class_prefix = "SPTConnectCastEsperanto";
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.connect.discovery.cast.esperanto.proto";
+
+message Response {
+    Result result = 1;
+    enum Result {
+        OK = 0;
+        NOT_FOUND = 1;
+        FAILED_TO_PARSE_JSON = 2;
+    }
+}
+
+message PutDeviceRequest {
+    string device_id = 1;
+    bytes json = 2;
+}
+
+message DeviceId {
+    string device_id = 1;
+}
+
+message ConnectRequest {
+    string device_id = 1;
+    repeated string interaction_ids = 2;
+}
+
+message ConnectionErrorRequest {
+    string device_id = 1;
+    
+    Error error = 2;
+    enum Error {
+        APPLICATION_LAUNCH_ERROR = 0;
+        APPLICATION_NOT_FOUND = 1;
+        APPLICATION_NOT_RUNNING = 2;
+        CANCELLED = 3;
+        CASTING_ROUTE_CHANGED = 4;
+        CASTING_STOPPED = 5;
+        CAST_INTERNAL_ERROR = 6;
+        CAST_SOCKET_ERROR = 7;
+        DEVICE_AUTHENTICATION_FAILURE = 8;
+        DEVICE_AUTHENTICATION_TIMEOUT_FAILURE = 9;
+        DEVICE_CAPABILITY_NOT_SUPPORTED = 10;
+        DEVICE_CERTIFICATE_NOT_TRUSTED = 11;
+        DISCONNECTED = 12;
+        INVALID_STATE = 13;
+        NETWORK_ERROR = 14;
+        NETWORK_NOT_REACHABLE = 15;
+        NOT_ALLOWED = 16;
+        OTHER = 17;
+        PROTOCOL_ERROR = 18;
+        SECURE_TRANSPORT_ERROR = 19;
+        SESSION_RESUME_FAILED = 20;
+        SESSION_START_FAILED = 21;
+        SSL_CERTIFICATE_NOT_TRUSTED = 22;
+        TIMEOUT = 23;
+        UNKNOWN = 24;
+    }
+    
+    int32 platform_error_code = 3;
+}

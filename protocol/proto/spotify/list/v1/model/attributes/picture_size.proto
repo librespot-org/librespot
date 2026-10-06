@@ -1,0 +1,24 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.list.v1.model.attributes;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "PictureSizesProto";
+option java_package = "com.spotify.list.v1.model.attributes";
+
+message PictureSizes {
+    repeated PictureSize picture_size = 1;
+}
+
+message PictureSize {
+    oneof _target_name {
+        string target_name = 1;
+    }
+    
+    oneof _url {
+        string url = 2;
+    }
+}

@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto2";
 
@@ -12,10 +12,10 @@ import "state_restore/circuit_breaker_rules.proto";
 import "state_restore/explicit_content_rules.proto";
 import "state_restore/kitteh_box_rules.proto";
 import "state_restore/mft_rules_core.proto";
-import "state_restore/mod_rules_interruptions.proto";
 import "state_restore/music_injection_rules.proto";
 import "state_restore/remove_banned_tracks_rules.proto";
 import "state_restore/resume_points_rules.proto";
+import "state_restore/shuffle_order_event_rules.proto";
 import "state_restore/track_error_rules.proto";
 
 option optimize_for = CODE_SIZE;
@@ -47,7 +47,7 @@ message MftConfiguration {
 message MftRules {
     required bool locked = 1;
     optional MftConfiguration config = 2;
-    map<string, ContextPlayerRules> old_forward_rules = 3;
+    map<string, ContextPlayerRules> old_forward_rules = 3 [deprecated = true];
     optional ContextPlayerRules forward_rules = 4;
 }
 
@@ -61,12 +61,13 @@ message ContextPlayerRules {
     optional TrackErrorRules track_error_rules = 8;
     optional AdsRulesInjectTracks ads_rules_inject_tracks = 9;
     optional MftRulesCore mft_rules_core = 10;
-    optional ModRulesInterruptions mod_rules_interruptions = 11;
     optional KittehBoxRules kitteh_box_rules = 12;
     optional AutomixRules automix_rules = 13;
     optional AutomixTalkRules automix_talk_rules = 14;
     optional MftRules mft_rules = 15;
     map<string, ContextPlayerRules> sub_rules = 16;
     optional bool is_adaptor_only = 17;
+    optional ShuffleOrderEventRules shuffle_order_event_rules = 18;
+    
+    reserved 11;
 }
-

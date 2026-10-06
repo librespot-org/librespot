@@ -1,0 +1,28 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.contentagnostic;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.contentagnostic";
+
+message ContentTypeTrait {
+    string uri = 1;
+    ContentType type = 2;
+}
+
+enum ContentType {
+    CONTENT_TYPE_UNSPECIFIED = 0;
+    CONTENT_TYPE_TRACK = 1;
+    CONTENT_TYPE_ALBUM = 2;
+    CONTENT_TYPE_MUSIC_VIDEO = 3;
+    CONTENT_TYPE_PODCAST_EPISODE = 4;
+    CONTENT_TYPE_PODCAST_SHOW = 5;
+    CONTENT_TYPE_AUDIOBOOK_CHAPTER = 6;
+    CONTENT_TYPE_AUDIOBOOK = 7;
+    CONTENT_TYPE_COURSE = 9 [deprecated = true];
+    CONTENT_TYPE_LESSON = 10 [deprecated = true];
+    CONTENT_TYPE_USER_HIGHLIGHT = 11;
+}

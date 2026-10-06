@@ -1,0 +1,26 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playback_platform.context.v1;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.playback_platform.context.v1";
+
+message SequencePatch {
+    repeated Change changes = 1;
+    message Change {
+        repeated string select = 1;
+        repeated string insert = 3;
+        repeated string remove = 4;
+        
+        oneof _before {
+            string before = 2;
+        }
+        
+        oneof _iteration {
+            int32 iteration = 5;
+        }
+    }
+}

@@ -1,0 +1,82 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.cappingapi.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.cappingapi.v1";
+
+message Quota {
+    google.protobuf.Timestamp valid_from = 1;
+    google.protobuf.Timestamp valid_to = 2;
+    int32 priority = 3;
+    int64 allowance = 4;
+    int64 consumption = 5;
+}
+
+message QuotaInfo {
+    Feature feature = 1;
+    bool is_capping_enabled = 2;
+    google.protobuf.Timestamp refresh_at = 3;
+    repeated Quota quotas = 4;
+    ResponseStatus status = 9;
+}
+
+message ConsumptionEvent {
+    int64 consumption_value = 2;
+    string consumption_details = 3;
+    string deduplication_id = 4;
+    google.protobuf.Timestamp consumption_ts = 5;
+}
+
+message FeatureConsumption {
+    Feature feature = 1;
+    repeated ConsumptionEvent consumption = 2;
+}
+
+message GetQuotasRequest {
+    repeated Feature features = 1;
+    google.protobuf.Duration timezone_offset = 2;
+    bool allow_partial_results = 4;
+}
+
+message GetQuotasResponse {
+    repeated QuotaInfo quota_info = 1;
+}
+
+message PutConsumptionRequest {
+    repeated Feature get_features = 1;
+    google.protobuf.Duration timezone_offset = 2;
+    repeated FeatureConsumption consumption = 3;
+    bool allow_partial_results = 4;
+}
+
+message PutConsumptionResponse {
+    repeated QuotaInfo quota_info = 1;
+}
+
+message RefreshFeaturesPayload {
+    repeated Feature features_to_refresh = 1;
+}
+
+enum ResponseStatus {
+    RESPONSE_STATUS_FAILED = 0;
+    RESPONSE_STATUS_OK = 1;
+}
+
+enum Feature {
+    UNDEFINED = 0;
+    AUDIOBOOK_SUBSCRIPTION = 1;
+    PICK_AND_SHUFFLE = 2;
+    LYRICS = 3;
+    REFERRALS = 4;
+    KALLAX = 5;
+    PROMPT_PLAYLIST = 6;
+    BLUEJAY = 7;
+    SUPER_CONNECT = 8;
+}

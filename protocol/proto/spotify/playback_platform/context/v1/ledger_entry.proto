@@ -1,0 +1,91 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playback_platform.context.v1;
+
+import "google/protobuf/duration.proto";
+import "spotify/playback_platform/common/v1/duration.proto";
+import "spotify/playback_platform/context/v1/sequence_options.proto";
+import "spotify/playback_platform/timeline/v1/timeline_options.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.playback_platform.context.v1";
+
+message LedgerEntry {
+    MoveOnto move_onto = 1;
+    message MoveOnto {
+        MoveOntoReason reason = 1;
+        enum MoveOntoReason {
+            MOVE_ONTO_REASON_UNSPECIFIED = 0;
+            MOVE_FROM_PLAY = 1;
+            MOVE_FROM_PREV = 2;
+            MOVE_FROM_NEXT = 3;
+            SKIP_FROM_PREV = 4;
+            SKIP_FROM_NEXT = 5;
+            FAIL_FROM_PREV = 6;
+            FAIL_FROM_NEXT = 7;
+        }
+        
+        google.protobuf.Duration move_offset = 2;
+        bool predicted = 3;
+    }
+    
+    MovePast move_past = 2;
+    message MovePast {
+        MovePastReason reason = 1;
+        enum MovePastReason {
+            MOVE_PAST_REASON_UNSPECIFIED = 0;
+            MOVE_TO_NEXT = 1;
+            MOVE_TO_PREV = 2;
+            SKIP_TO_NEXT = 3;
+            SKIP_TO_PREV = 4;
+            FAIL_TO_NEXT = 5;
+            FAIL_TO_PREV = 6;
+        }
+        
+        google.protobuf.Duration move_offset = 2;
+        bool predicted = 3;
+    }
+    
+    repeated LedgerEntry entries = 3;
+    
+    repeated PlayingInfo playing = 8;
+    message PlayingInfo {
+        google.protobuf.Duration create_offset = 1;
+        bool paused = 17;
+        SequenceOptions sequence_options = 25;
+        timeline.v1.TimelineOptions timeline_options = 26;
+        
+        oneof _position {
+            common.v1.ExtrapolatedDuration position = 2;
+        }
+        
+        oneof _duration {
+            common.v1.ExtrapolatedDuration duration = 3;
+        }
+        
+        oneof _playtime {
+            common.v1.ExtrapolatedDuration playtime = 4;
+        }
+        
+        oneof _playtime_nominal {
+            common.v1.ExtrapolatedDuration playtime_nominal = 5;
+        }
+        
+        reserved 6 to 16, 18 to 24;
+    }
+    
+    repeated uint64 tags = 11;
+    
+    oneof _entry_id {
+        string entry_id = 9;
+    }
+    
+    oneof _uid {
+        string uid = 10;
+    }
+    
+    reserved "device_id", "player_id", "session_id";
+}

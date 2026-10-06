@@ -1,0 +1,72 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.audiophile;
+
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.audiophile.proto";
+
+enum Bucket {
+    BUCKET_UNKNOWN = 0;
+    BUCKET_AUDIO = 1;
+    BUCKET_LOSSLESS = 2;
+    BUCKET_MP3_PREVIEW = 3;
+}
+
+enum Format {
+    OGG_VORBIS_96 = 0;
+    OGG_VORBIS_160 = 1;
+    OGG_VORBIS_320 = 2;
+    MP3_256 = 3;
+    MP3_320 = 4;
+    MP3_160 = 5;
+    MP3_96 = 6;
+    MP3_160_ENC = 7;
+    AAC_24 = 8;
+    AAC_48 = 9;
+    MP4_128 = 10;
+    MP4_256 = 11;
+    MP4_128_DUAL = 12;
+    MP4_256_DUAL = 13;
+    MP4_128_CBCS = 14;
+    MP4_256_CBCS = 15;
+    FLAC_FLAC = 16;
+    MP4_FLAC = 17;
+    XHE_AAC_24 = 18;
+    XHE_AAC_16 = 19;
+    XHE_AAC_12 = 20;
+    HE_AAC_64 = 21;
+    FLAC_FLAC_24BIT = 22;
+    MP4_FLAC_24BIT = 23;
+    MP4_128_CLEAR = 24;
+    MP4_256_CLEAR = 25;
+    WAV_PCM_UNENCRYPTED = 26;
+    OGG_VORBIS_160000_UNENCRYPTED = 27;
+    MP4_HE_AAC_V1_64 = 28;
+    MP4_HE_AAC_V1_96 = 29;
+    MP3_32_MONO = 30;
+    MP3_40_MONO = 31;
+    MP3_48_MONO = 32;
+    MP3_56_MONO = 33;
+    MP3_64_MONO = 34;
+    MP3_80_MONO = 35;
+    MP3_96_MONO = 36;
+    MP3_112_MONO = 37;
+    MP3_128_MONO = 38;
+    MP3_160_MONO = 39;
+    MP3_192_MONO = 40;
+    MP3_224_MONO = 41;
+    MP3_256_MONO = 42;
+    MP3_320_MONO = 43;
+    MP3_32 = 44;
+    MP3_40 = 45;
+    MP3_48 = 46;
+    MP3_56 = 47;
+    MP3_64 = 48;
+    MP3_80 = 49;
+    MP3_112 = 50;
+    MP3_128 = 51;
+    MP3_192 = 52;
+    MP3_224 = 53;
+}

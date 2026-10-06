@@ -1,0 +1,37 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.ads.esperanto.proto;
+
+option objc_class_prefix = "ESP";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.ads.esperanto.proto";
+
+service Targeting {
+    rpc GetTargeting(GetTargetingRequest) returns (TargetingResponse);
+    rpc GetAllTargeting(GetAllTargetingRequest) returns (TargetingResponse);
+    rpc PutTargeting(PutTargetingRequest) returns (TargetingResponse);
+    rpc DeleteTargeting(DeleteTargetingRequest) returns (TargetingResponse);
+}
+
+message TargetingResponse {
+    map<string, string> targeting_map = 1;
+}
+
+message GetTargetingRequest {
+    repeated string targeting_keys = 1;
+}
+
+message GetAllTargetingRequest {
+    
+}
+
+message PutTargetingRequest {
+    map<string, string> targeting_map = 1;
+}
+
+message DeleteTargetingRequest {
+    repeated string targeting_keys = 1;
+}

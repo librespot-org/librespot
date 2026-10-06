@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
@@ -28,5 +28,9 @@ message PlayOptions {
         IMMEDIATELY = 0;
         ADVANCED_PAST_TRACK = 1;
         ADVANCED_PAST_CONTEXT = 2;
+    }
+    
+    oneof _playback_speed {
+        float playback_speed = 4;
     }
 }

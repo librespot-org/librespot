@@ -1,0 +1,29 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.desktop.navigation_esperanto.proto;
+
+option optimize_for = CODE_SIZE;
+
+service DesktopNavigation {
+    rpc SubscribeNavigation(SubscribeNavigationRequest) returns (stream NavigationEvent);
+    rpc SubscribeDeepLink(SubscribeDeepLinkRequest) returns (stream DeepLinkEvent);
+}
+
+message SubscribeNavigationRequest {
+    
+}
+
+message SubscribeDeepLinkRequest {
+    
+}
+
+message NavigationEvent {
+    string uri = 1;
+    string original_uri = 2;
+}
+
+message DeepLinkEvent {
+    string url = 1;
+}

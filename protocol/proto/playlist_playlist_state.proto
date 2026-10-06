@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto2";
 
@@ -20,6 +20,7 @@ message FormatListAttribute {
 message Allows {
     optional bool can_insert = 1;
     optional bool can_remove = 2;
+    optional bool can_delete = 3;
 }
 
 message PlaylistMetadata {
@@ -46,6 +47,8 @@ message PlaylistMetadata {
     repeated cosmos_util.proto.Extension extension = 21;
     optional uint32 length_ignoring_text_filter = 22;
     optional string ai_curation_reference_id = 23;
+    optional bool deleted_by_owner = 24;
+    optional bool user_created = 25;
 }
 
 message PlaylistOfflineState {

@@ -1,0 +1,28 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message ClientCoreConnectCommand {
+    optional string command_type = 1;
+    optional string result = 2;
+    optional int64 duration = 3;
+    optional string interaction_ids = 4;
+    optional string http_response = 5;
+    optional int32 http_status_code = 6;
+    optional string context_player_error_message = 7;
+    optional string http_client_error = 8;
+    optional string intent_id = 9;
+    optional int32 command_size_bytes = 10;
+    optional int64 ack_duration = 11;
+    optional string target_device_id = 12;
+    optional string target_device_brand = 13;
+    optional string target_device_model = 14;
+    optional string target_device_client_id = 15;
+    optional string play_origin = 16;
+    optional string command_id = 17;
+    optional string feature_identifier = 18;
+}

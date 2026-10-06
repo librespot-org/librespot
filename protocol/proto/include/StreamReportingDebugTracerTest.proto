@@ -1,0 +1,24 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message StreamReportingDebugTracerTest {
+    optional int64 event_schema_version = 1;
+    optional int64 message_version = 2;
+    optional bytes playback_id = 3;
+    optional int64 core_version = 4;
+    repeated int32 sequence = 5;
+    optional string reason_send = 6;
+    optional int64 send_iteration = 7;
+    optional int64 total_send = 8;
+    repeated int32 stream_handle = 9;
+    repeated int64 stream_data_holder_size = 10;
+    repeated int64 timestamp = 11;
+    optional int64 initial_timestamp = 12;
+    optional int64 core_version_tiny = 13;
+    optional string configuration = 14;
+}

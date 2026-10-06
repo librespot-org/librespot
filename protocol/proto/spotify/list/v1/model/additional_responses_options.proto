@@ -1,0 +1,14 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.list.v1.model;
+
+option java_multiple_files = true;
+option optimize_for = SPEED;
+option java_outer_classname = "AdditionalResponsesOptionsProto";
+option java_package = "com.spotify.list.v1.model";
+
+message AdditionalResponsesOptions {
+    bool allow_additional_responses = 1;
+}

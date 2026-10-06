@@ -1,0 +1,49 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.list.v1.model;
+
+import "google/protobuf/duration.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "CachingProto";
+option java_package = "com.spotify.list.v1.model";
+
+message CacheControl {
+    oneof _etag {
+        string etag = 1;
+    }
+}
+
+message CacheInfo {
+    oneof _policy {
+        CachePolicy policy = 1;
+    }
+    
+    oneof _ttl {
+        google.protobuf.Duration ttl = 2;
+    }
+    
+    oneof _etag {
+        string etag = 3;
+    }
+    
+    oneof _not_modified {
+        bool not_modified = 4;
+    }
+}
+
+message CacheHint {
+    oneof _next_expected_content_update {
+        google.protobuf.Duration next_expected_content_update = 1;
+    }
+}
+
+enum CachePolicy {
+    CACHE_POLICY_UNSPECIFIED = 0;
+    CACHE_POLICY_NO = 1;
+    CACHE_POLICY_PRIVATE = 2;
+    CACHE_POLICY_PUBLIC = 3;
+}

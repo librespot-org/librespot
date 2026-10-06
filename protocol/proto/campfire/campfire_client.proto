@@ -1,0 +1,222 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package campfire.v1;
+
+import "campfire/campfire_common.proto";
+import "google/protobuf/timestamp.proto";
+
+message RetrieveLatestNodeRequest {
+    oneof _sort_order {
+        SortOrder sort_order = 1;
+    }
+}
+
+message RetrieveLatestNodeResponse {
+    repeated LatestNodeResponse latest_node_response = 1;
+}
+
+message LatestNodeResponse {
+    Hierarchy hierarchy = 1;
+    
+    oneof _client_node {
+        ClientNode client_node = 2;
+    }
+}
+
+message RetrieveNodeRequest {
+    string hierarchy_id = 1;
+    string node_path_id = 2;
+    int32 prev_limit = 3;
+    int32 next_limit = 4;
+    
+    oneof _sort_order {
+        SortOrder sort_order = 5;
+    }
+}
+
+message RetrieveNodeResponse {
+    Hierarchy hierarchy = 1;
+    repeated ClientNode client_node = 2;
+}
+
+message Hierarchy {
+    HierarchyIdentifier hierarchy_identifier = 1;
+    HierarchyStatistic hierarchy_statistic = 3;
+    HierarchyMetadata hierarchy_metadata = 4;
+    
+    oneof _group {
+        Group group = 5;
+    }
+}
+
+message HierarchyMetadata {
+    string initiator_username = 1;
+    HierarchyStatus hierarchy_status = 2;
+    HierarchyUserParticipationStatus current_user_participation_status = 3;
+    HierarchySource source = 4;
+    HierarchyType hierarchy_type = 5;
+    google.protobuf.Timestamp created_at = 6;
+    bool current_user_channel_muted = 7;
+}
+
+message HierarchyStatistic {
+    int32 total_user_unseen_events = 1;
+    bool all_events_seen = 2;
+    int32 total_user_unseen_activity_events = 3;
+    int32 total_user_unseen_contribution_events = 4;
+    string revision = 5;
+}
+
+message Group {
+    repeated GroupMember group_member = 2;
+    
+    oneof _name {
+        string name = 1;
+    }
+}
+
+message GroupMember {
+    string member_username = 1;
+    GroupMemberStatus group_member_status = 2;
+    HierarchyUserRole user_role = 3;
+    string invited_by_username = 4;
+}
+
+message GroupDetail {
+    repeated string member_username = 2;
+    string name = 3;
+}
+
+message ClientNode {
+    NodeIdentifier node_identifier = 1;
+    HierarchyIdentifier hierarchy_identifier = 2;
+    repeated ClientNode child_node = 3;
+    NodeStatistic node_statistic = 4;
+    ModerationStatus moderation_status = 5;
+    ClientEventCapture event_capture = 6;
+    
+    oneof _group_detail {
+        GroupDetail group_detail = 7;
+    }
+    
+    oneof _message_payload {
+        MessagePayload message_payload = 8;
+    }
+}
+
+message NodeIdentifier {
+    string node_path_id = 1;
+    NodeClass node_class = 2;
+    string uri = 3;
+}
+
+message NodeStatistic {
+    bool user_seen = 1;
+}
+
+message ClientEventCapture {
+    string init_username = 1;
+    EventCapture event_capture = 2;
+    
+    oneof _agent_context {
+        AgentContext agent_context = 3;
+    }
+}
+
+message MessagePayload {
+    oneof cmp {
+        ContributionPayload contribution_payload = 1;
+        ActivityPayload activity_payload = 2;
+    }
+}
+
+message ContributionMetadata {
+    oneof _message_envelope {
+        string message_envelope = 1;
+    }
+}
+
+message ContributionPayload {
+    oneof ccp {
+        FreeText free_text = 1;
+        TrackedShare tracked_share = 2;
+        OffplatformTrackedShare op_tracked_share = 3;
+    }
+    
+    oneof _metadata {
+        ContributionMetadata metadata = 7;
+    }
+}
+
+message ActivityPayload {
+    
+}
+
+message ClientNodeRequest {
+    repeated NodeRequest node_request = 1;
+}
+
+message ClientNodeResponse {
+    Hierarchy hierarchy = 1;
+    repeated ClientNode client_node = 2;
+}
+
+message NodeRequest {
+    oneof cnr {
+        HierarchyRequest hierarchy_request = 1;
+        MessageRequest message_request = 2;
+    }
+    
+    oneof _agent_context {
+        AgentContext agent_context = 7;
+    }
+}
+
+message HierarchyRequest {
+    
+}
+
+message MessageRequest {
+    oneof cmr {
+        AddContribution add_contribution = 1;
+        AddContributionForGroup add_contribution_for_group = 6;
+    }
+}
+
+message AddContribution {
+    string parent_node_path_id = 1;
+    ContributionPayload payload = 2;
+}
+
+message AddContributionForGroup {
+    GroupDetail group_detail = 1;
+    ContributionPayload payload = 2;
+}
+
+enum HierarchyUserParticipationStatus {
+    HIERARCHY_USER_PARTICIPATION_STATUS_UNSPECIFIED = 0;
+    HIERARCHY_USER_PARTICIPATION_STATUS_ACCEPTED = 1;
+    HIERARCHY_USER_PARTICIPATION_STATUS_REJECTED = 2;
+}
+
+enum HierarchySource {
+    HIERARCHY_SOURCE_UNSPECIFIED = 0;
+}
+
+enum GroupMemberStatus {
+    UNSPECIFIED = 0;
+    OPTED_OUT = 1;
+    PENDING = 2;
+}
+
+enum HierarchyUserRole {
+    HIERARCHY_USER_ROLE_UNSPECIFIED = 0;
+    HIERARCHY_USER_ROLE_MEMBER = 1;
+    HIERARCHY_USER_ROLE_ADMIN = 2;
+}
+
+enum ModerationStatus {
+    MODERATION_STATUS_UNSPECIFIED = 0;
+}

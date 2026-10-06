@@ -1,0 +1,15 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.player.proto;
+
+import "track_instance.proto";
+
+option optimize_for = CODE_SIZE;
+
+message SegmentSwitchNode {
+    optional TrackInstance injected_full_episode = 1;
+    optional bool should_play_injected_track = 2;
+    optional int64 full_episode_position_ms = 3;
+}

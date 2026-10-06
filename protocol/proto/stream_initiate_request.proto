@@ -1,0 +1,131 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.stream_reporting_esperanto.proto;
+
+import "google/protobuf/timestamp.proto";
+import "media_type.proto";
+import "orchestration_stack.proto";
+import "play_reason.proto";
+import "playback_stack.proto";
+import "streaming_rule.proto";
+
+option objc_class_prefix = "ESP";
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.stream_reporting_esperanto.proto";
+
+message StreamInitiateRequest {
+    bytes playback_id = 1;
+    string video_session_id = 4;
+    PlaybackStack playback_stack = 8;
+    google.protobuf.Timestamp client_timestamp = 29;
+    bool is_ready_to_play = 30;
+    repeated string config_params = 49;
+    
+    oneof _parent_playback_id {
+        bytes parent_playback_id = 2;
+    }
+    
+    oneof _play_context {
+        string play_context = 5;
+    }
+    
+    oneof _content_uri {
+        string content_uri = 6;
+    }
+    
+    oneof _displayed_content_uri {
+        string displayed_content_uri = 7;
+    }
+    
+    oneof _provider {
+        string provider = 9;
+    }
+    
+    oneof _referrer {
+        string referrer = 10;
+    }
+    
+    oneof _streaming_rule {
+        StreamingRule streaming_rule = 11;
+    }
+    
+    oneof _connect_controller_device_id {
+        string connect_controller_device_id = 12;
+    }
+    
+    oneof _page_instance_id {
+        string page_instance_id = 13;
+    }
+    
+    oneof _interaction_id {
+        string interaction_id = 14;
+    }
+    
+    oneof _source_start {
+        string source_start = 15;
+    }
+    
+    oneof _reason_start {
+        PlayReason reason_start = 16;
+    }
+    
+    oneof _is_shuffle {
+        bool is_shuffle = 17;
+    }
+    
+    oneof _is_repeating_track {
+        bool is_repeating_track = 18;
+    }
+    
+    oneof _is_repeating_context {
+        bool is_repeating_context = 19;
+    }
+    
+    oneof _media_id {
+        string media_id = 20;
+    }
+    
+    oneof _media_type {
+        MediaType media_type = 21;
+    }
+    
+    oneof _is_live {
+        bool is_live = 22;
+    }
+    
+    oneof _content_is_downloaded {
+        bool content_is_downloaded = 23;
+    }
+    
+    oneof _client_offline {
+        bool client_offline = 24;
+    }
+    
+    oneof _decision_id {
+        string decision_id = 25;
+    }
+    
+    oneof _custom_reporting_attribution {
+        string custom_reporting_attribution = 26;
+    }
+    
+    oneof _play_context_decision_id {
+        string play_context_decision_id = 27;
+    }
+    
+    oneof _feature_uuid {
+        string feature_uuid = 28;
+    }
+    
+    oneof _orchestration_stack {
+        OrchestrationStack orchestration_stack = 50;
+    }
+    
+    oneof _list_uri {
+        string list_uri = 51;
+    }
+    
+    reserved 3;
+}

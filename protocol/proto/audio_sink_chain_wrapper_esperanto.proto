@@ -1,0 +1,81 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.audio_sink_chain_wrapper_esperanto.proto;
+
+option objc_class_prefix = "ESP";
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.audio_sink_chain_wrapper_esperanto.proto";
+
+message AudioFormat {
+    int32 sample_rate = 1;
+    SampleFormat sample_format = 2;
+    ChannelConfig channel_config = 3;
+}
+
+message PcmAudioBuffer {
+    bytes samples = 1;
+}
+
+message CreateRequest {
+    AudioFormat format = 1;
+    bool is_talk = 4;
+    
+    oneof _true_peak {
+        float true_peak = 2;
+    }
+    
+    oneof _loudness {
+        float loudness = 3;
+    }
+}
+
+message CreateResponse {
+    int64 id = 1;
+}
+
+message DestroyRequest {
+    int64 id = 1;
+}
+
+message WriteRequest {
+    int64 id = 1;
+    PcmAudioBuffer pcm = 2;
+    bool final = 3;
+}
+
+message WriteResponse {
+    bool success = 1;
+}
+
+message ReadRequest {
+    int64 id = 1;
+}
+
+message ReadResponse {
+    PcmAudioBuffer pcm = 1;
+}
+
+message FlushRequest {
+    int64 id = 1;
+    int64 frame = 2;
+}
+
+message EofRequest {
+    int64 id = 1;
+}
+
+message EofResponse {
+    bool eof = 1;
+}
+
+enum SampleFormat {
+    SIXTEEN_BITS_PER_SAMPLE = 0;
+    IEEE_FLOAT = 1;
+}
+
+enum ChannelConfig {
+    MONO = 0;
+    STEREO = 1;
+}

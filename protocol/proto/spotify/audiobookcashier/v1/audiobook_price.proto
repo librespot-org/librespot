@@ -1,18 +1,20 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
 syntax = "proto3";
 
 package spotify.audiobookcashier.v1;
 
-option java_package = "com.spotify.audiobookcashier.v1";
 option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.audiobookcashier.v1";
 
 message Price {
-  double amount = 1;
-  string currency = 2;
-  string formatted_price = 3;
+    double amount = 1;
+    string currency = 2;
+    string formatted_price = 3;
 }
 
 message AudiobookPrice {
-  .spotify.audiobookcashier.v1.Price final_price = 1;
-  .spotify.audiobookcashier.v1.Price final_list_price = 2;
+    Price final_price = 1;
+    Price final_list_price = 2;
 }
-

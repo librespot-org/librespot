@@ -1,0 +1,18 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.player.proto;
+
+option optimize_for = CODE_SIZE;
+
+message AutopodcastFamiliarShowRequest {
+    repeated string exclude_result_uris = 1;
+    optional MediaType media_type = 2;
+}
+
+enum MediaType {
+    MEDIA_TYPE_UNSPECIFIED = 0;
+    MIXED = 1;
+    VIDEO_ONLY = 2;
+}

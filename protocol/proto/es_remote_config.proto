@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
@@ -7,12 +7,13 @@ package spotify.remote_config.esperanto.proto;
 import "esperanto_options.proto";
 
 option objc_class_prefix = "ESP";
+option optimize_for = CODE_SIZE;
 option java_package = "com.spotify.remoteconfig.esperanto.proto";
 
 service RemoteConfig {
-    rpc lookupBool(LookupRequest) returns (.spotify.remote_config.esperanto.proto.BoolResponse) {}
-    rpc lookupInt(LookupRequest) returns (.spotify.remote_config.esperanto.proto.IntResponse) {}
-    rpc lookupEnum(LookupRequest) returns (.spotify.remote_config.esperanto.proto.EnumResponse) {}
+    rpc lookupBool(LookupRequest) returns (BoolResponse);
+    rpc lookupInt(LookupRequest) returns (IntResponse);
+    rpc lookupEnum(LookupRequest) returns (EnumResponse);
 }
 
 message LookupRequest {
@@ -21,13 +22,19 @@ message LookupRequest {
 }
 
 message BoolResponse {
-    optional bool value = 1;
+    oneof _value {
+        bool value = 1;
+    }
 }
 
 message IntResponse {
-    optional int32 value = 1;
+    oneof _value {
+        int32 value = 1;
+    }
 }
 
 message EnumResponse {
-    optional string value = 1;
+    oneof _value {
+        string value = 1;
+    }
 }

@@ -1,0 +1,22 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.concerts.metadata.v1;
+
+option optimize_for = CODE_SIZE;
+
+message DateWithOffset {
+    string date = 1;
+    int32 utc_offset_in_minutes = 2;
+}
+
+message ConcertTimes {
+    DateWithOffset start_time = 1;
+}
+
+message Concert {
+    string uri = 1;
+    string title = 2;
+    ConcertTimes times = 3;
+}

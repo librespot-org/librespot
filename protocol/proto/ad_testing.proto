@@ -1,0 +1,38 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.ads.esperanto.proto;
+
+import "google/protobuf/empty.proto";
+
+option objc_class_prefix = "ESP";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.ads.esperanto.proto";
+
+service Testing {
+    rpc AddPlaytime(AddPlaytimeRequest) returns (google.protobuf.Empty);
+    rpc InsertAds(InsertAdsRequest) returns (InsertAdsResponse);
+    rpc SetAlwaysEligibleForAdBreak(SetAlwaysEligibleForAdBreakRequest) returns (google.protobuf.Empty);
+}
+
+message AddPlaytimeRequest {
+    uint32 seconds = 1;
+}
+
+message SetAlwaysEligibleForAdBreakRequest {
+    bool enabled = 1;
+}
+
+message InsertAdsRequest {
+    string ads_json = 1;
+}
+
+message InsertAdsResponse {
+    Status status = 1;
+    enum Status {
+        OK = 0;
+        FAILED = 1;
+    }
+}

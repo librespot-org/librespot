@@ -1,0 +1,32 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message BoomboxPlaybackSession {
+    optional bytes playback_id = 1;
+    optional int64 ms_latency = 2;
+    optional int64 ui_latency = 3;
+    optional int64 ms_key_latency = 4;
+    optional int64 ms_rcv_latency = 5;
+    optional bool cached_key = 6;
+    optional int64 n_stutter = 7;
+    optional int64 n_seekback = 8;
+    optional int64 ms_seekback = 9;
+    optional int64 n_seekfwd = 10;
+    optional int64 ms_seekfwd = 11;
+    optional int64 ms_total_est = 12;
+    optional string audio_stream_type_at_start = 13;
+    optional string experiments = 14;
+    optional string transition = 15;
+    optional bool ext_track_ad_pos_mapping = 16;
+    optional bool ever_completed_initial_buffering = 17;
+    optional bool ended_while_buffering = 18;
+    optional bool exclusive_mode = 19;
+    optional bool device_selected = 20;
+    optional int64 entry_reset_counter = 21;
+    optional int64 track_stuck_timer_elapsed_counter = 22;
+}

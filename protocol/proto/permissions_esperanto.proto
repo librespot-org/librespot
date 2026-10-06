@@ -1,0 +1,92 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.restrictions.permissions.permissions_proto;
+
+import "google/protobuf/empty.proto";
+
+option optimize_for = CODE_SIZE;
+
+service Permissions {
+    rpc CanSeeQueue(google.protobuf.Empty) returns (QueueQueryResponse);
+    rpc CanAddToQueue(google.protobuf.Empty) returns (QueueQueryResponse);
+    rpc CanSetQueue(google.protobuf.Empty) returns (QueueQueryResponse);
+    rpc CanSwitchToMusicVideo(google.protobuf.Empty) returns (MusicVideoAccessPermissionQueryResponse);
+    rpc CanSkipPodcastVideoAd(google.protobuf.Empty) returns (PodcastVideoAdSkipPermissionQueryResponse);
+    rpc CanPlayContent(CanPlayContentRequest) returns (CanPlayContentResponse);
+    rpc ObserveInvalidation(google.protobuf.Empty) returns (stream ObserveInvalidationResponse);
+}
+
+message QueueQueryResponse {
+    QueuePermissionResults result = 1;
+    bool is_allowed = 2;
+}
+
+message MusicVideoAccessPermissionQueryResponse {
+    MusicVideoAccessPermissionResult result = 1;
+}
+
+message PodcastVideoAdSkipPermissionQueryResponse {
+    PodcastVideoAdSkipPermissionResult result = 1;
+}
+
+message CanPlayContentRequest {
+    repeated string content_uri = 1;
+    string caller_source = 2;
+    bool force_fetch = 3;
+}
+
+message CanPlayContentResponse {
+    repeated CanPlayContentResult result = 1;
+}
+
+message CanPlayContentResult {
+    string content_uri = 1;
+    bool can_play = 2;
+    
+    AgeAssuranceReason reason = 3;
+    enum AgeAssuranceReason {
+        AGE_ASSURANCE_REASON_UNKNOWN = 0;
+        AGE_ASSURANCE_REASON_UNAVAILABLE = 1;
+        AGE_ASSURANCE_REASON_REQUIRES_AGE_ASSURANCE = 2;
+        AGE_ASSURANCE_REASON_ALLOW = 3;
+    }
+    
+    AssuranceRequiredDetails assurance_required_details = 4;
+    message AssuranceRequiredDetails {
+        int32 age_threshold = 1;
+    }
+    
+    repeated RestrictionReason restriction_reason = 5;
+    enum RestrictionReason {
+        RESTRICTION_REASON_UNSPECIFIED = 0;
+        RESTRICTION_REASON_AGE_ASSURANCE = 1;
+        RESTRICTION_REASON_EXPLICIT_CONTENT = 2;
+        RESTRICTION_REASON_AGE_ASSURANCE_19_PLUS = 3;
+        RESTRICTION_REASON_UNAVAILABLE_CONTENT = 4;
+        RESTRICTION_REASON_OFFLINE_UNAVAILABLE_CONTENT = 5;
+    }
+}
+
+message ObserveInvalidationResponse {
+    bool was_invalidated = 1;
+}
+
+enum QueuePermissionResults {
+    QUEUE_PERMISSION_RESULTS_ALLOWED = 0;
+    QUEUE_PERMISSION_RESULTS_ALLOWED_UNCAPPED_PNS = 1;
+    QUEUE_PERMISSION_RESULTS_DISALLOWED_MFT = 2;
+    QUEUE_PERMISSION_RESULTS_DISALLOWED_CAPPED_PNS = 3;
+}
+
+enum MusicVideoAccessPermissionResult {
+    MUSIC_VIDEO_ACCESS_PERMISSION_RESULT_ALLOWED = 0;
+    MUSIC_VIDEO_ACCESS_PERMISSION_RESULT_DISALLOWED = 1;
+}
+
+enum PodcastVideoAdSkipPermissionResult {
+    PODCAST_VIDEO_AD_SKIP_PERMISSION_RESULT_ALLOWED = 0;
+    PODCAST_VIDEO_AD_SKIP_PERMISSION_RESULT_DISALLOWED_NOT_PREMIUM = 1;
+    PODCAST_VIDEO_AD_SKIP_PERMISSION_RESULT_DISALLOWED_NOT_PODCAST_VIDEO = 2;
+}

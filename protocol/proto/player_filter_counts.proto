@@ -1,0 +1,12 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playlist.proto;
+
+option optimize_for = CODE_SIZE;
+
+message FilterInfo {
+    uint32 unfiltered_length = 1;
+    map<string, uint32> filter_counts = 2;
+}

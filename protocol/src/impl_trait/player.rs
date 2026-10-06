@@ -64,6 +64,27 @@ impl From<PlayerRestrictions> for Restrictions {
             disallow_setting_playback_speed: value.disallow_setting_playback_speed_reasons,
             disallow_setting_modes: hashmap_into(value.disallow_setting_modes),
             disallow_signals: hashmap_into(value.disallow_signals),
+            disallow_play_as_next_in_queue_reasons: value.disallow_play_as_next_in_queue_reasons,
+            disallow_sleep_timer_clear_reasons: value.disallow_sleep_timer_clear_reasons,
+            disallow_sleep_timer_duration_reasons: value.disallow_sleep_timer_duration_reasons,
+            disallow_sleep_timer_end_of_track_reasons: value
+                .disallow_sleep_timer_end_of_track_reasons,
+            disallow_add_to_queue_track_reasons: value.disallow_add_to_queue_track_reasons,
+            disallow_tap_to_play_track_in_next_tracks_reasons: value
+                .disallow_tap_to_play_track_in_next_tracks_reasons,
+            disallow_reordering_track_in_next_tracks_reasons: value
+                .disallow_reordering_track_in_next_tracks_reasons,
+            disallow_reordering_episode_in_next_tracks_reasons: value
+                .disallow_reordering_episode_in_next_tracks_reasons,
+            disallow_reordering_enqueued_track_in_next_tracks_reasons: value
+                .disallow_reordering_enqueued_track_in_next_tracks_reasons,
+            disallow_reordering_enqueued_episode_in_next_tracks_reasons: value
+                .disallow_reordering_enqueued_episode_in_next_tracks_reasons,
+            disallow_viewing_queue_reasons: value.disallow_viewing_queue_reasons,
+            disallow_viewing_ordered_tracks_in_next_tracks_reasons: value
+                .disallow_viewing_ordered_tracks_in_next_tracks_reasons,
+            disallow_swipe_next_reasons: vec![],
+            disallow_swipe_prev_reasons: vec![],
             special_fields: value.special_fields,
         }
     }
@@ -100,12 +121,31 @@ impl From<Restrictions> for PlayerRestrictions {
             disallow_removing_from_context_tracks_reasons: value
                 .disallow_removing_from_context_tracks_reasons,
             disallow_updating_context_reasons: value.disallow_updating_context_reasons,
-            disallow_add_to_queue_reasons: value.disallow_add_to_queue_reasons,
-            disallow_setting_playback_speed_reasons: value.disallow_setting_playback_speed,
-            disallow_setting_modes: hashmap_into(value.disallow_setting_modes),
-            disallow_signals: hashmap_into(value.disallow_signals),
             disallow_playing_reasons: vec![],
             disallow_stopping_reasons: vec![],
+            disallow_add_to_queue_reasons: value.disallow_add_to_queue_reasons,
+            disallow_setting_playback_speed_reasons: vec![],
+            disallow_setting_modes: hashmap_into(value.disallow_setting_modes),
+            disallow_signals: hashmap_into(value.disallow_signals),
+            disallow_play_as_next_in_queue_reasons: value.disallow_play_as_next_in_queue_reasons,
+            disallow_sleep_timer_clear_reasons: value.disallow_sleep_timer_clear_reasons,
+            disallow_sleep_timer_duration_reasons: value.disallow_sleep_timer_duration_reasons,
+            disallow_sleep_timer_end_of_track_reasons: value
+                .disallow_sleep_timer_end_of_track_reasons,
+            disallow_add_to_queue_track_reasons: value.disallow_add_to_queue_track_reasons,
+            disallow_tap_to_play_track_in_next_tracks_reasons: value
+                .disallow_tap_to_play_track_in_next_tracks_reasons,
+            disallow_reordering_track_in_next_tracks_reasons: value
+                .disallow_reordering_track_in_next_tracks_reasons,
+            disallow_reordering_episode_in_next_tracks_reasons: value
+                .disallow_reordering_episode_in_next_tracks_reasons,
+            disallow_reordering_enqueued_track_in_next_tracks_reasons: value
+                .disallow_reordering_enqueued_track_in_next_tracks_reasons,
+            disallow_reordering_enqueued_episode_in_next_tracks_reasons: value
+                .disallow_reordering_enqueued_episode_in_next_tracks_reasons,
+            disallow_viewing_queue_reasons: value.disallow_viewing_queue_reasons,
+            disallow_viewing_ordered_tracks_in_next_tracks_reasons: value
+                .disallow_viewing_ordered_tracks_in_next_tracks_reasons,
             special_fields: value.special_fields,
         }
     }

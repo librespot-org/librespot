@@ -90,7 +90,7 @@ impl RequestHandler {
             "statusString": "OK",
             "spotifyError": 0,
             // departing from the Spotify documentation, Google Cast uses "5.0.0"
-            "version": "2.9.0",
+            "version": "2.10.0",
             "deviceID": (self.config.device_id),
             "deviceType": (device_type),
             "remoteName": (self.config.name),

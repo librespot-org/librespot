@@ -1,0 +1,86 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.recently_played_esperanto.proto;
+
+import "policy/artist_decoration_policy.proto";
+import "policy/album_decoration_policy.proto";
+import "policy/track_decoration_policy.proto";
+import "policy/show_decoration_policy.proto";
+import "policy/episode_decoration_policy.proto";
+import "policy/playlist_decoration_policy.proto";
+
+option objc_class_prefix = "ESP";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.recently_played_esperanto.proto";
+
+message RecentlyPlayedArtistDecorationPolicy {
+    cosmos_util.proto.ArtistCollectionDecorationPolicy collection_policy = 1;
+    cosmos_util.proto.ArtistSyncDecorationPolicy sync_policy = 2;
+    cosmos_util.proto.ArtistDecorationPolicy artist_policy = 3;
+    bool type = 4;
+    bool timestamp = 5;
+}
+
+message RecentlyPlayedAlbumDecorationPolicy {
+    cosmos_util.proto.AlbumCollectionDecorationPolicy collection_policy = 1;
+    cosmos_util.proto.AlbumSyncDecorationPolicy sync_policy = 2;
+    cosmos_util.proto.AlbumDecorationPolicy album_policy = 3;
+    bool in_collection = 4;
+    bool type = 7;
+    bool timestamp = 8;
+    cosmos_util.proto.ArtistDecorationPolicy artists_policy = 9;
+}
+
+message RecentlyPlayedTrackDecorationPolicy {
+    cosmos_util.proto.TrackCollectionDecorationPolicy collection_policy = 1;
+    cosmos_util.proto.TrackSyncDecorationPolicy sync_policy = 2;
+    cosmos_util.proto.TrackDecorationPolicy track_policy = 3;
+    cosmos_util.proto.TrackPlayedStateDecorationPolicy played_state_policy = 4;
+    bool type = 7;
+    bool timestamp = 8;
+    cosmos_util.proto.ArtistDecorationPolicy artists_policy = 9;
+    cosmos_util.proto.AlbumDecorationPolicy album_policy = 10;
+    cosmos_util.proto.ArtistDecorationPolicy album_artist_policy = 11;
+}
+
+message RecentlyPlayedShowDecorationPolicy {
+    cosmos_util.proto.ShowDecorationPolicy show_policy = 1;
+    cosmos_util.proto.ShowCollectionDecorationPolicy collection_policy = 2;
+    cosmos_util.proto.ShowPlayedStateDecorationPolicy played_state_policy = 3;
+    bool type = 4;
+    bool timestamp = 5;
+}
+
+message RecentlyPlayedEpisodeDecorationPolicy {
+    cosmos_util.proto.EpisodeDecorationPolicy episode_policy = 1;
+    cosmos_util.proto.EpisodeCollectionDecorationPolicy collection_policy = 2;
+    cosmos_util.proto.EpisodeSyncDecorationPolicy sync_policy = 3;
+    cosmos_util.proto.EpisodePlayedStateDecorationPolicy played_state_policy = 4;
+    cosmos_util.proto.ShowDecorationPolicy show_policy = 5;
+    bool type = 6;
+    bool timestamp = 7;
+}
+
+message RecentlyPlayedProfileDecorationPolicy {
+    bool link = 1;
+    bool name = 2;
+    bool image_uri = 3;
+    bool offline = 4;
+    bool type = 5;
+    bool timestamp = 6;
+}
+
+message RecentlyPlayedPlaylistDecorationPolicy {
+    playlist.cosmos.proto.PlaylistDecorationPolicy playlist_policy = 1;
+    bool type = 2;
+    bool timestamp = 3;
+}
+
+message RecentlyPlayedCollectionTracksDecorationPolicy {
+    bool link = 1;
+    bool type = 2;
+    bool timestamp = 3;
+}

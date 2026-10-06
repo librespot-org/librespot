@@ -1,0 +1,32 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.your_library.proto;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.your_library.esperanto.proto";
+
+message TransferProgressRequest {
+    
+}
+
+message TransferProgress {
+    string transfer_id = 1;
+    TransferStatus status = 2;
+    float progress = 3;
+    int32 items_moved = 4;
+    int32 items_total = 5;
+}
+
+message TransferProgressResponse {
+    TransferProgress transfer_progress = 1;
+    uint32 status_code = 98;
+    string error = 99;
+}
+
+enum TransferStatus {
+    IN_PROGRESS = 0;
+    COMPLETED = 1;
+}

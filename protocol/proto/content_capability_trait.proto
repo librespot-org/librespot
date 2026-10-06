@@ -1,0 +1,48 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.contentagnostic.v2;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.contentagnostic.v2";
+
+message Capability {
+    oneof value {
+        Allowed allowed = 1;
+        Disallowed disallowed = 2;
+        Restricted restricted = 3;
+        Irrelevant irrelevant = 4;
+    }
+}
+
+message Allowed {
+    
+}
+
+message Disallowed {
+    
+}
+
+message Restricted {
+    oneof condition {
+        ProductStateCondition product_state = 1;
+    }
+}
+
+message Irrelevant {
+    
+}
+
+message ContentCapabilityTrait {
+    Capability rateability = 1;
+    Capability downloadability = 2;
+    Capability recordability = 3;
+    Capability watchability = 4;
+}
+
+message ProductStateCondition {
+    string key = 1;
+    string expected_value = 2;
+}

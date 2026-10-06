@@ -27,6 +27,7 @@ use crate::{
         provider::{IsProvider, Provider},
     },
 };
+use librespot_protocol::connect::CapabilitySupportDetails;
 use log::LevelFilter;
 use protobuf::{EnumOrUnknown, MessageField};
 use std::{
@@ -144,51 +145,63 @@ impl ConnectState {
             can_play: true,
             volume: cfg.initial_volume.into(),
             name: cfg.name,
-            device_id: session.device_id().to_string(),
-            device_type: EnumOrUnknown::new(cfg.device_type.into()),
             device_software_version: version::SEMVER.to_string(),
+            device_type: EnumOrUnknown::new(cfg.device_type.into()),
             spirc_version: version::SPOTIFY_SPIRC_VERSION.to_string(),
+            device_id: session.device_id().to_string(),
+            is_private_session: false,
+            is_social_connect: false,
             client_id: session.client_id(),
+            license: "mft".to_string(),
             is_group: cfg.is_group,
             capabilities: MessageField::some(Capabilities {
-                volume_steps: cfg.volume_steps.into(),
-                disable_volume: cfg.disable_volume,
-
-                gaia_eq_connect_id: true,
                 can_be_player: true,
-                needs_full_player_state: true,
-                is_observable: true,
-                is_controllable: true,
-                hidden: false,
-
-                supports_gzip_pushes: true,
+                restrict_to_local: false,
+                gaia_eq_connect_id: true,
                 // todo: enable after logout handling is implemented, see spirc logout_request
                 supports_logout: false,
+                is_observable: true,
+                volume_steps: cfg.volume_steps.into(),
                 supported_types: vec![
                     "audio/episode".into(),
                     "audio/track".into(),
                     "audio/local".into(),
                 ],
-                supports_playlist_v2: true,
-                supports_transfer_command: true,
-                supports_command_request: true,
-                supports_set_options_command: true,
-
-                is_voice_enabled: false,
-                restrict_to_local: false,
-                connect_disabled: false,
+                command_acks: true,
                 supports_rename: false,
+                hidden: false,
+                disable_volume: cfg.disable_volume,
+                connect_disabled: false,
+                supports_playlist_v2: true,
+                is_controllable: true,
                 supports_external_episodes: false,
                 supports_set_backend_metadata: false,
-                supports_hifi: MessageField::none(),
+                supports_transfer_command: true,
+                supports_command_request: true,
+                is_voice_enabled: false,
+                needs_full_player_state: true,
+                supports_gzip_pushes: true,
+                supports_set_options_command: true,
+                supports_hifi: MessageField::some(CapabilitySupportDetails {
+                    fully_supported: false,
+                    user_eligible: false,
+                    device_supported: false,
+                    ..Default::default()
+                }),
+                connect_capabilities: "".to_string(),
+                supports_rooms: false,
                 // that "AI" dj thingy only available to specific regions/users
                 supports_dj: false,
-                supports_rooms: false,
                 // AudioQuality::HIFI is available, further investigation necessary
                 supported_audio_quality: EnumOrUnknown::new(AudioQuality::VERY_HIGH),
-
-                command_acks: true,
-
+                supports_smart_shuffle_mode: false,
+                supports_remote_sleep_timer: false,
+                supports_ping_request: false,
+                supports_playlist_mixing: false,
+                supports_remote_audio_quality_control: false,
+                supports_zephyr: false,
+                supports_gapless: false,
+                supports_crossfade: false,
                 ..Default::default()
             }),
             ..Default::default()

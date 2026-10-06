@@ -1,0 +1,58 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playback_platform.transition.v1;
+
+import "spotify/playback_platform/common/v1/duration.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.playback_platform.transition.v1";
+
+message TargetId {
+    oneof target_id {
+        bytes audio_id = 1;
+        bytes video_id = 2;
+    }
+}
+
+message TargetTag {
+    oneof target_tag {
+        bytes file_id = 1;
+        bytes encoding_id = 2;
+    }
+}
+
+message TransitionMaps {
+    repeated TransitionMap transition_maps = 1;
+}
+
+message TransitionMap {
+    repeated TargetId from_id = 1;
+    repeated TargetId to_id = 2;
+    repeated TimeMap time_maps = 4;
+    
+    oneof _direction {
+        TransitionDirection direction = 3;
+    }
+    
+    oneof _from_tag {
+        TargetTag from_tag = 5;
+    }
+    
+    oneof _to_tag {
+        TargetTag to_tag = 6;
+    }
+}
+
+message TimeMap {
+    common.v1.Durations from_t = 1;
+    common.v1.Durations to_t = 2;
+}
+
+enum TransitionDirection {
+    TRANSITION_DIRECTION_UNSPECIFIED = 0;
+    TRANSITION_DIRECTION_BIDIRECTIONAL = 1;
+    TRANSITION_DIRECTION_FORWARD = 2;
+}

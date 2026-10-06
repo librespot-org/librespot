@@ -1,0 +1,31 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playback_platform.context.v1;
+
+import "spotify/playback_platform/context/v1/sequence_start.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.playback_platform.context.v1";
+
+message ContextState {
+    oneof _cookie {
+        bytes cookie = 1;
+    }
+    
+    oneof _shuffle_seed {
+        string shuffle_seed = 2;
+    }
+    
+    oneof _context_id {
+        string context_id = 3;
+    }
+    
+    oneof _start {
+        SequenceStart start = 5;
+    }
+    
+    reserved 4;
+}

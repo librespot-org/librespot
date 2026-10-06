@@ -1,0 +1,54 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.ads.esperanto.proto;
+
+option objc_class_prefix = "ESP";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.ads.esperanto.proto";
+
+service AdOpportunity {
+    rpc postEvent(PostEventRequest) returns (PostEventResponse);
+    rpc postEventV2(PostEventV2Request) returns (PostEventV2Response);
+}
+
+message PostEventRequest {
+    string slot_id = 1;
+    bool decision = 2 [deprecated = true];
+    string reason = 3 [deprecated = true];
+    string content_uri = 4;
+}
+
+message PostEventResponse {
+    Status status = 1;
+    enum Status {
+        SUCCESS = 0;
+        FAIL = 1;
+    }
+}
+
+message PostEventV2Request {
+    string slot_id = 1;
+    string content_uri = 2;
+    string demand_status = 3;
+    string eligibility_status = 4;
+    string trigger_origin = 5;
+    repeated string trigger_states = 6;
+    
+    oneof _request_id {
+        string request_id = 7;
+    }
+}
+
+message PostEventV2Response {
+    Status status = 1;
+    enum Status {
+        SUCCESS = 0;
+        FAIL = 1;
+        INVALID_SLOT = 2;
+        INVALID_DEMAND_STATUS = 3;
+        INVALID_ELIGIBILITY_STATUS = 4;
+    }
+}

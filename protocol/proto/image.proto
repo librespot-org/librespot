@@ -1,0 +1,52 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.contentagnostic.v2;
+
+import "flat_file.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.contentagnostic.v2";
+
+message Image {
+    repeated ImageInstance instances = 1;
+    ColorSetContrastOptions extracted_color_set = 2;
+}
+
+message ImageInstance {
+    FlatFile flat_file = 1;
+    ImageSize size = 2;
+}
+
+message ColorSetContrastOptions {
+    ColorSet min_contrast = 1;
+    ColorSet high_contrast = 2;
+    ColorSet higher_contrast = 3;
+    RgbaColor encore_base_set_text_color = 4;
+}
+
+message ColorSet {
+    RgbaColor background_base = 1;
+    RgbaColor background_tinted_base = 2;
+    RgbaColor text_base = 3;
+    RgbaColor text_subdued = 4;
+    RgbaColor text_bright_accent = 5;
+}
+
+message RgbaColor {
+    int32 r = 1;
+    int32 g = 2;
+    int32 b = 3;
+    int32 a = 4;
+}
+
+enum ImageSize {
+    IMAGE_SIZE_UNSPECIFIED = 0;
+    IMAGE_SIZE_SMALL = 1;
+    IMAGE_SIZE_DEFAULT = 2;
+    IMAGE_SIZE_LARGE = 3;
+    IMAGE_SIZE_XLARGE = 4;
+    IMAGE_SIZE_XXLARGE = 5;
+}

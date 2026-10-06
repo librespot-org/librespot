@@ -1,0 +1,28 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.desktop.logs_esperanto.proto;
+
+option optimize_for = CODE_SIZE;
+
+service DesktopLogs {
+    rpc CopyLogsToTempFolder(CopyLogsToTempFolderRequest) returns (CopyLogsToTempFolderResponse);
+    rpc OpenFolder(OpenFolderRequest) returns (OpenFolderResponse);
+}
+
+message CopyLogsToTempFolderRequest {
+    
+}
+
+message CopyLogsToTempFolderResponse {
+    string temp_folder = 1;
+}
+
+message OpenFolderRequest {
+    string folder = 1;
+}
+
+message OpenFolderResponse {
+    
+}

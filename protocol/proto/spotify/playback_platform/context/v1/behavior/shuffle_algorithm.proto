@@ -1,0 +1,49 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playback_platform.context.v1.behavior;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.playback_platform.context.v1.behavior";
+
+message ShuffleAlgorithm {
+    oneof algorithm {
+        Simple simple = 1;
+        Stable stable = 2;
+        Format format = 3;
+        Burned burned = 4;
+    }
+    
+    message Permutation {
+        repeated uint32 indices = 1;
+    }
+    
+    message Stable {
+        repeated uint32 prescribed_pages = 1;
+        
+        oneof _min_num_children {
+            uint32 min_num_children = 2;
+        }
+    }
+    
+    message Format {
+        map<string, Permutation> permutations = 1;
+        
+        oneof _fallback {
+            ShuffleAlgorithm fallback = 2;
+        }
+    }
+    
+    message Burned {
+        string shuffle_seed = 1;
+    }
+    
+    enum Simple {
+        SIMPLE_UNSPECIFIED = 0;
+        SIMPLE_FORWARD = 1;
+        SIMPLE_SHUFFLE = 2;
+        SIMPLE_REVERSE = 3;
+    }
+}
