@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [core] Fixed AP login on Windows on ARM by using the supported desktop platform identifier
 - [audio] Fixed integer overflow in throughput calculation
+- [discovery] Respect `--zeroconf-ip` for the Avahi backend by restricting advertisements to the requested interfaces ([#486](https://github.com/librespot-org/librespot/issues/486), [#887](https://github.com/librespot-org/librespot/issues/887))
 - [main] Fixed `--volume-ctrl fixed` not disabling volume control
 - [core] Fix default permissions on credentials file and warn user if file is world readable
 - [core] Try all resolved addresses for the dealer connection instead of failing after the first one.
