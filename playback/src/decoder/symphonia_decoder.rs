@@ -12,7 +12,7 @@ use symphonia::core::{
 
 use super::{AudioDecoder, AudioPacket, AudioPacketPosition, DecoderError, DecoderResult};
 
-use crate::{NUM_CHANNELS, PAGES_PER_MS, SAMPLE_RATE, player::NormalisationData, symphonia_util};
+use crate::{NUM_CHANNELS, PAGES_PER_MS, player::NormalisationData, symphonia_util};
 
 pub struct SymphoniaDecoder {
     probe_result: ProbeResult,
@@ -59,20 +59,6 @@ impl SymphoniaDecoder {
         let decoder_opts: DecoderOptions = Default::default();
 
         let decoder = symphonia::default::get_codecs().make(&track.codec_params, &decoder_opts)?;
-
-        let rate = decoder.codec_params().sample_rate.ok_or_else(|| {
-            DecoderError::SymphoniaDecoder("Could not retrieve sample rate".into())
-        })?;
-
-        // TODO: The official client supports local files with sample rates other than 44,100 kHz.
-        // To play these accurately, we need to either resample the input audio, or introduce a way
-        // to change the player's current sample rate (likely by closing and re-opening the sink
-        // with new parameters).
-        if rate != SAMPLE_RATE {
-            return Err(DecoderError::SymphoniaDecoder(format!(
-                "Unsupported sample rate: {rate}"
-            )));
-        }
 
         let channels = decoder.codec_params().channels.ok_or_else(|| {
             DecoderError::SymphoniaDecoder("Could not retrieve channel configuration".into())
@@ -174,6 +160,15 @@ impl SymphoniaDecoder {
         }
 
         Some(metadata)
+    }
+
+    pub fn sample_rate(&self) -> DecoderResult<u32> {
+        self.decoder
+            .codec_params()
+            .sample_rate
+            .ok_or(DecoderError::SymphoniaDecoder(
+                "Could not retrieve sample rate".into(),
+            ))
     }
 
     #[inline]
