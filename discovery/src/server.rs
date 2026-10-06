@@ -1,6 +1,7 @@
 use std::{
     borrow::Cow,
     collections::BTreeMap,
+    io,
     net::{Ipv4Addr, Ipv6Addr, SocketAddr, TcpListener},
     sync::{Arc, Mutex},
 };
@@ -269,6 +270,23 @@ pub(crate) enum DiscoveryServerCmd {
     Shutdown,
 }
 
+fn bind_discovery_listener<T>(
+    port: u16,
+    prefer_dual_stack: bool,
+    mut bind: impl FnMut(SocketAddr) -> io::Result<T>,
+) -> io::Result<T> {
+    if prefer_dual_stack {
+        let address = SocketAddr::new(Ipv6Addr::UNSPECIFIED.into(), port);
+
+        match bind(address) {
+            Ok(listener) => return Ok(listener),
+            Err(e) => warn!("Failed to bind dual-stack discovery server: {e}; retrying with IPv4"),
+        }
+    }
+
+    bind(SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), port))
+}
+
 pub struct DiscoveryServer {
     close_tx: oneshot::Sender<DiscoveryServerCmd>,
     task_handle: tokio::task::JoinHandle<()>,
@@ -281,16 +299,12 @@ impl DiscoveryServer {
         event_tx: mpsc::UnboundedSender<DiscoveryEvent>,
     ) -> Result<Self, Error> {
         let discovery = RequestHandler::new(config, event_tx);
-        let address = if cfg!(windows) {
-            SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), *port)
-        } else {
-            // this creates a dual stack socket on non-windows systems
-            SocketAddr::new(Ipv6Addr::UNSPECIFIED.into(), *port)
-        };
 
         let (close_tx, close_rx) = oneshot::channel();
 
-        let listener = match TcpListener::bind(address) {
+        // An IPv6 wildcard socket is dual stack on supported non-Windows systems.
+        // Fall back to IPv4 when the kernel has IPv6 disabled.
+        let listener = match bind_discovery_listener(*port, !cfg!(windows), TcpListener::bind) {
             Ok(listener) => listener,
             Err(e) => {
                 warn!("Discovery server failed to start: {e}");
@@ -368,5 +382,69 @@ impl DiscoveryServer {
             let _ = task_handle.await;
             log::debug!("Discovery server stopped");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::bind_discovery_listener;
+    use std::{
+        io,
+        net::{SocketAddr, TcpListener},
+    };
+
+    #[test]
+    fn discovery_listener_binds_an_available_socket() {
+        let listener = bind_discovery_listener(0, true, TcpListener::bind).unwrap();
+
+        assert_ne!(listener.local_addr().unwrap().port(), 0);
+    }
+
+    #[test]
+    fn discovery_listener_prefers_dual_stack() {
+        let mut attempted = Vec::new();
+        let bound = bind_discovery_listener(1234, true, |address| {
+            attempted.push(address);
+            Ok(address)
+        })
+        .unwrap();
+
+        assert!(bound.is_ipv6());
+        assert_eq!(attempted, [bound]);
+    }
+
+    #[test]
+    fn discovery_listener_falls_back_to_ipv4() {
+        let mut attempted = Vec::new();
+        let bound = bind_discovery_listener(1234, true, |address| {
+            attempted.push(address);
+            if address.is_ipv6() {
+                Err(io::Error::new(
+                    io::ErrorKind::AddrNotAvailable,
+                    "IPv6 disabled",
+                ))
+            } else {
+                Ok(address)
+            }
+        })
+        .unwrap();
+
+        assert!(bound.is_ipv4());
+        assert_eq!(attempted.len(), 2);
+        assert!(attempted[0].is_ipv6());
+        assert!(attempted[1].is_ipv4());
+    }
+
+    #[test]
+    fn discovery_listener_uses_ipv4_when_dual_stack_is_not_preferred() {
+        let mut attempted = Vec::<SocketAddr>::new();
+        let bound = bind_discovery_listener(1234, false, |address| {
+            attempted.push(address);
+            Ok(address)
+        })
+        .unwrap();
+
+        assert!(bound.is_ipv4());
+        assert_eq!(attempted, [bound]);
     }
 }
