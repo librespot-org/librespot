@@ -14,6 +14,7 @@ name: build
       - "**/Dockerfile*"
       - "test.sh"
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
     paths-ignore:
       - "**.md"
       - "docs/**"
@@ -29,6 +30,8 @@ name: build
 env:
   RUST_BACKTRACE: 1
   RUSTFLAGS: -D warnings
+  GSTREAMER_WIN_PATH: D:\gstreamer
+  NOT_WINDOWS_FEATURES: alsa-backend,pulseaudio-backend,jackaudio-backend,rodiojack-backend,with-avahi,with-dns-sd
 
 jobs:
   test:
@@ -40,6 +43,16 @@ jobs:
         toolchain:
           - "1.85" # MSRV (Minimum supported rust version)
           - stable
+        isPR:
+          - ${{ github.event_name == 'pull_request' }}
+        isCIWindows:
+          - ${{ github.event.pull_request && contains(github.event.pull_request.labels.*.name, format('CI{0} Windows', ':')) }}
+        exclude:
+          # excludes windows in a PR by default, unless labeled with 'CI: Windows'
+          - os: 'windows-latest'
+            isPR: true
+            isCIWindows: false
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -60,6 +73,22 @@ jobs:
           gstreamer1.0-dev libgstreamer-plugins-base1.0-dev
           libavahi-compat-libdnssd-dev
 
+      - name: Install developer package dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: choco install pkgconfiglite
+
+      - name: Cache gstreamer (Windows)
+        uses: actions/cache@v4
+        id: cache-gstreamer
+        if: runner.os == 'Windows'
+        with:
+          path: ${{ env.GSTREAMER_WIN_PATH }}
+          key: gstreamer-Windows-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install gstreamer (Windows)
+        if: ${{ runner.os == 'Windows' && !steps.cache-gstreamer.outputs.cache-hit }}
+        run: choco install gstreamer-devel
+
       - name: Fetch dependencies
         run: cargo fetch --locked
 
@@ -72,27 +101,26 @@ jobs:
       - name: Install cargo-hack
         uses: taiki-e/install-action@cargo-hack
 
-      - name: Check packages without TLS requirements
-        run: cargo hack check -p librespot-protocol --each-feature
-
-      - name: Check workspace with native-tls
+      - name: Check binary with any tls option
         run: >
-          cargo hack check -p librespot --each-feature --exclude-all-features
-          --include-features native-tls
-          --exclude-features rustls-tls-native-roots,rustls-tls-webpki-roots
+          cargo hack check -p librespot --each-feature
+          --exclude-no-default-features --exclude-all-features
+          --include-features native-tls,rustls-tls-native-roots,rustls-tls-webpki-roots
 
-      - name: Check workspace with rustls-tls-native-roots
+      - name: Check binary features (cross-platform)
+        env:
+          PKG_CONFIG_PATH: ${{ env.GSTREAMER_WIN_PATH }}\1.0\msvc_x86_64\lib\pkgconfig
         run: >
-          cargo hack check -p librespot --each-feature --exclude-all-features
-          --include-features rustls-tls-native-roots
-          --exclude-features native-tls,rustls-tls-webpki-roots
+          cargo hack check -p librespot --each-feature
+          --exclude-no-default-features --exclude-all-features --features native-tls 
+          --exclude-features rustls-tls-native-roots,rustls-tls-webpki-roots,${{ env.NOT_WINDOWS_FEATURES }}
 
-      - name: Check discovery features (Linux only)
+      - name: Check binary features (linux)
         if: runner.os == 'Linux'
         run: >
-          cargo hack check -p librespot-discovery --each-feature --exclude-all-features
-          --include-features native-tls
-          --exclude-features rustls-tls-native-roots,rustls-tls-webpki-roots
+          cargo hack check -p librespot --each-feature
+          --exclude-no-default-features --exclude-all-features --features native-tls
+          --include-features ${{ env.NOT_WINDOWS_FEATURES }}
 
       - name: Build binary with default features
         run: cargo build --frozen
