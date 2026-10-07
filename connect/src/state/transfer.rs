@@ -25,7 +25,7 @@ impl ConnectState {
         }
         .ok_or(StateError::CouldNotResolveTrackFromTransfer)?;
 
-        self.context_to_provided_track(
+        let mut track = self.context_to_provided_track(
             track,
             transfer.current_session.context.uri.as_deref(),
             None,
@@ -35,7 +35,14 @@ impl ConnectState {
                 .is_playing_queue
                 .unwrap_or_default()
                 .then_some(Provider::Queue),
-        )
+        )?;
+
+        // a transfer marks an autoplay track only in its metadata
+        if track.is_context() && track.is_from_autoplay() {
+            track.set_provider(Provider::Autoplay);
+        }
+
+        Ok(track)
     }
 
     /// handles the initially transferable data
@@ -195,5 +202,48 @@ impl ConnectState {
         self.update_restrictions();
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{core::Session, protocol::context_track::ContextTrack};
+
+    fn uri(i: u32) -> String {
+        format!("spotify:track:{i:022}")
+    }
+
+    fn transferred(metadata: &[(&str, &str)]) -> TransferState {
+        let mut transfer = TransferState::new();
+        transfer.playback.mut_or_insert_default().current_track =
+            MessageField::some(ContextTrack {
+                uri: Some(uri(1)),
+                metadata: metadata
+                    .iter()
+                    .map(|(k, v)| (k.to_string(), v.to_string()))
+                    .collect(),
+                ..Default::default()
+            });
+        transfer
+    }
+
+    fn state() -> ConnectState {
+        ConnectState::new(Default::default(), &Session::new(Default::default(), None))
+    }
+
+    #[tokio::test]
+    async fn autoplay_track_is_transferred_as_autoplay() {
+        let transfer = transferred(&[("autoplay.is_autoplay", "true")]);
+        let track = state().current_track_from_transfer(&transfer).unwrap();
+        assert!(track.is_autoplay());
+    }
+
+    #[tokio::test]
+    async fn context_track_is_transferred_as_context() {
+        let track = state()
+            .current_track_from_transfer(&transferred(&[]))
+            .unwrap();
+        assert!(track.is_context());
     }
 }
