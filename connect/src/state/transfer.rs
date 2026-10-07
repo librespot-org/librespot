@@ -187,7 +187,14 @@ impl ConnectState {
             }
         }
 
-        if self.shuffling_context() {
+        if current_index.is_none() && self.active_context == ContextType::Autoplay {
+            // the autoplay batch leaves out the transferred track
+            self.player_mut().index.clear();
+            self.update_context_index(ContextType::Autoplay, 0)?;
+            self.clear_prev_track();
+            self.clear_next_tracks();
+            self.fill_up_next_tracks()?;
+        } else if self.shuffling_context() {
             self.set_current_track(current_index.unwrap_or_default())?;
             self.set_shuffle(true);
 
@@ -208,7 +215,10 @@ impl ConnectState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{core::Session, protocol::context_track::ContextTrack};
+    use crate::{
+        core::Session,
+        protocol::{context::Context, context_page::ContextPage, context_track::ContextTrack},
+    };
 
     fn uri(i: u32) -> String {
         format!("spotify:track:{i:022}")
@@ -245,5 +255,48 @@ mod tests {
             .current_track_from_transfer(&transferred(&[]))
             .unwrap();
         assert!(track.is_context());
+    }
+
+    #[tokio::test]
+    async fn transferred_track_stays_current_when_the_autoplay_batch_leaves_it_out() {
+        let mut state = state();
+        assert_transferred_track_stays_current(&mut state);
+    }
+
+    #[tokio::test]
+    async fn transferred_track_stays_current_while_shuffling() {
+        let mut state = state();
+        state.set_shuffle(true);
+        assert_transferred_track_stays_current(&mut state);
+    }
+
+    fn assert_transferred_track_stays_current(state: &mut ConnectState) {
+        let transfer = transferred(&[("autoplay.is_autoplay", "true")]);
+        let track = state.current_track_from_transfer(&transfer).unwrap();
+        state.set_track(track);
+        let batch = Context {
+            uri: Some("spotify:station:album:test".into()),
+            pages: vec![ContextPage {
+                tracks: (2..5)
+                    .map(|i| ContextTrack {
+                        uri: Some(uri(i)),
+                        ..Default::default()
+                    })
+                    .collect(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        state.update_context(batch, ContextType::Autoplay).unwrap();
+
+        state.finish_transfer(transfer).unwrap();
+
+        assert_eq!(state.current_track(|t| t.uri.clone()), uri(1));
+        let next = state
+            .next_tracks()
+            .iter()
+            .map(|t| t.uri.clone())
+            .collect::<Vec<_>>();
+        assert_eq!(next, [uri(2), uri(3), uri(4)]);
     }
 }
