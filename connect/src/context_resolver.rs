@@ -206,6 +206,11 @@ impl ContextResolver {
         self.find_next().is_some()
     }
 
+    /// Whether the next track has to wait for a queued resolve to add tracks.
+    pub fn awaits_next_track(&self, state: &ConnectState) -> bool {
+        self.has_next() && !state.has_playable_next_track()
+    }
+
     pub async fn get_next_context(
         &self,
         recent_track_uri: impl Fn() -> Vec<String>,
@@ -342,5 +347,181 @@ impl ContextResolver {
         state.update_queue_revision();
 
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        protocol::{
+            context_page::ContextPage, context_track::ContextTrack, playback::Playback,
+            session::Session as TransferSession,
+        },
+        state::context::ResetContext,
+    };
+    use protobuf::MessageField;
+
+    const PLAYLIST: &str = "spotify:playlist:test";
+
+    fn uri(i: u32) -> String {
+        format!("spotify:track:{i:022}")
+    }
+
+    fn page(tracks: std::ops::Range<u32>) -> ContextPage {
+        ContextPage {
+            tracks: tracks
+                .map(|i| ContextTrack {
+                    uri: Some(uri(i)),
+                    ..Default::default()
+                })
+                .collect(),
+            ..Default::default()
+        }
+    }
+
+    fn setup() -> (ContextResolver, ConnectState) {
+        let session = Session::new(Default::default(), None);
+        let state = ConnectState::new(Default::default(), &session);
+        (ContextResolver::new(session), state)
+    }
+
+    fn handle_answer(
+        resolver: &mut ContextResolver,
+        state: &mut ConnectState,
+        transfer: &mut Option<TransferState>,
+        pages: Vec<ContextPage>,
+    ) {
+        let context = Context {
+            uri: Some(PLAYLIST.to_string()),
+            pages,
+            ..Default::default()
+        };
+        resolver.apply_next_context(state, context).unwrap();
+        resolver.try_finish(state, transfer);
+        resolver.remove_used_and_invalid();
+    }
+
+    fn queue(resolver: &mut ContextResolver, update: ContextType) {
+        resolver.add(ResolveContext::from_uri(
+            PLAYLIST,
+            "",
+            update,
+            ContextAction::Replace,
+        ));
+    }
+
+    fn play_out(tracks: std::ops::Range<u32>) -> (ContextResolver, ConnectState) {
+        let (mut resolver, mut state) = setup();
+        queue(&mut resolver, ContextType::Default);
+        handle_answer(&mut resolver, &mut state, &mut None, vec![page(tracks)]);
+        while state.has_next_tracks(None) {
+            state.next_track().unwrap();
+        }
+        (resolver, state)
+    }
+
+    fn current(state: &ConnectState) -> String {
+        state.current_track(|t| t.uri.clone())
+    }
+
+    #[tokio::test]
+    async fn an_empty_queue_without_a_resolve_does_not_wait() {
+        let (resolver, state) = play_out(0..3);
+
+        assert!(!resolver.awaits_next_track(&state));
+    }
+
+    #[tokio::test]
+    async fn an_empty_queue_waits_for_the_first_autoplay_batch() {
+        let (mut resolver, mut state) = play_out(0..3);
+        queue(&mut resolver, ContextType::Autoplay);
+
+        assert!(resolver.awaits_next_track(&state));
+
+        handle_answer(&mut resolver, &mut state, &mut None, vec![page(10..13)]);
+
+        assert!(!resolver.awaits_next_track(&state));
+        state.next_track().unwrap();
+        assert_eq!(current(&state), uri(10));
+    }
+
+    #[tokio::test]
+    async fn an_empty_queue_waits_for_a_grown_playlist() {
+        let (mut resolver, mut state) = play_out(0..3);
+        queue(&mut resolver, ContextType::Default);
+
+        assert!(resolver.awaits_next_track(&state));
+
+        handle_answer(&mut resolver, &mut state, &mut None, vec![page(0..5)]);
+
+        assert!(!resolver.awaits_next_track(&state));
+        state.next_track().unwrap();
+        assert_eq!(current(&state), uri(3));
+    }
+
+    #[tokio::test]
+    async fn the_wait_ends_when_the_resolve_adds_nothing() {
+        let (mut resolver, mut state) = play_out(0..3);
+        queue(&mut resolver, ContextType::Default);
+
+        handle_answer(&mut resolver, &mut state, &mut None, vec![page(0..3)]);
+
+        assert!(!resolver.awaits_next_track(&state));
+        assert!(!state.has_playable_next_track());
+    }
+
+    #[tokio::test]
+    async fn the_wait_ends_when_the_resolve_fails() {
+        let (mut resolver, state) = play_out(0..3);
+        queue(&mut resolver, ContextType::Autoplay);
+
+        resolver.mark_next_unavailable();
+        resolver.remove_used_and_invalid();
+
+        assert!(!resolver.awaits_next_track(&state));
+    }
+
+    #[tokio::test]
+    async fn a_track_ending_before_its_transferred_context_waits_for_it() {
+        let (mut resolver, mut state) = setup();
+        let mut transfer = TransferState {
+            playback: MessageField::some(Playback {
+                current_track: MessageField::some(ContextTrack {
+                    uri: Some(uri(1)),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            current_session: MessageField::some(TransferSession {
+                context: MessageField::some(Context {
+                    uri: Some(PLAYLIST.to_string()),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        state.reset_context(ResetContext::Completely);
+        let track = state.current_track_from_transfer(&transfer).unwrap();
+        state.set_track(track);
+        queue(&mut resolver, ContextType::Default);
+        state.handle_initial_transfer(&mut transfer, Some(PLAYLIST.to_string()));
+
+        assert!(resolver.awaits_next_track(&state));
+
+        handle_answer(
+            &mut resolver,
+            &mut state,
+            &mut Some(transfer),
+            vec![page(0..4)],
+        );
+
+        assert!(!resolver.awaits_next_track(&state));
+        state.next_track().unwrap();
+        assert_eq!(current(&state), uri(2));
+        let prev = state.player().prev_tracks.last().map(|t| t.uri.clone());
+        assert_eq!(prev, Some(uri(1)));
     }
 }
