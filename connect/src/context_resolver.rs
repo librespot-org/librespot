@@ -256,9 +256,21 @@ impl ContextResolver {
         let (next, _, _) = self.find_next().ok_or(ContextResolverError::NoNext)?;
 
         let remaining = match next.action {
-            ContextAction::Append if context.pages.len() == 1 => state
-                .fill_context_from_page(context.pages.remove(0))
-                .map(|_| None),
+            ContextAction::Append if context.pages.len() == 1 => {
+                // a default append resolves one page of the current context, like an artist's
+                // album; its tracks keep the uri of the context they extend
+                let context_uri = match next.update {
+                    ContextType::Default => None,
+                    ContextType::Autoplay => context.uri.take(),
+                };
+                state
+                    .fill_context_from_page(
+                        next.update,
+                        context.pages.remove(0),
+                        context_uri.as_deref(),
+                    )
+                    .map(|_| None)
+            }
             ContextAction::Replace => {
                 let remaining = state.update_context(context, next.update);
                 if let Resolve::Context(ref ctx) = next.resolve {
@@ -342,5 +354,94 @@ impl ContextResolver {
         state.update_queue_revision();
 
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        protocol::{context_page::ContextPage, context_track::ContextTrack},
+        state::provider::IsProvider,
+    };
+
+    fn uri(i: u32) -> String {
+        format!("spotify:track:{i:022}")
+    }
+
+    fn page(tracks: std::ops::Range<u32>) -> ContextPage {
+        ContextPage {
+            tracks: tracks
+                .map(|i| ContextTrack {
+                    uri: Some(uri(i)),
+                    ..Default::default()
+                })
+                .collect(),
+            ..Default::default()
+        }
+    }
+
+    /// queues a resolve and handles its answer like `Spirc::handle_next_context`
+    fn resolve(
+        resolver: &mut ContextResolver,
+        state: &mut ConnectState,
+        (update, action): (ContextType, ContextAction),
+        pages: Vec<ContextPage>,
+    ) {
+        let uri = "spotify:playlist:test";
+        resolver.add(ResolveContext::from_uri(uri, "", update, action));
+        let context = Context {
+            uri: Some(uri.to_string()),
+            pages,
+            ..Default::default()
+        };
+        resolver.apply_next_context(state, context).unwrap();
+        resolver.try_finish(state, &mut None);
+        resolver.remove_used_and_invalid();
+    }
+
+    fn setup() -> (ContextResolver, ConnectState) {
+        let session = Session::new(Default::default(), None);
+        let state = ConnectState::new(Default::default(), &session);
+        (ContextResolver::new(session), state)
+    }
+
+    const DEFAULT: (ContextType, ContextAction) = (ContextType::Default, ContextAction::Replace);
+    const AUTOPLAY: (ContextType, ContextAction) = (ContextType::Autoplay, ContextAction::Replace);
+    const REFILL: (ContextType, ContextAction) = (ContextType::Autoplay, ContextAction::Append);
+
+    #[tokio::test]
+    async fn autoplay_refill_reaches_next_tracks() {
+        let (mut resolver, mut state) = setup();
+        resolve(&mut resolver, &mut state, DEFAULT, vec![page(0..2)]);
+        resolve(&mut resolver, &mut state, AUTOPLAY, vec![page(10..13)]);
+        while state.has_next_tracks(Some(2)) {
+            state.next_track().unwrap();
+        }
+
+        resolve(&mut resolver, &mut state, REFILL, vec![page(20..23)]);
+
+        let next = &state.player().next_tracks;
+        let uris: Vec<_> = next.iter().map(|t| t.uri.clone()).collect();
+        assert_eq!(uris, [12, 20, 21, 22].map(uri));
+        assert!(next.iter().all(IsProvider::is_autoplay));
+    }
+
+    #[tokio::test]
+    async fn extra_autoplay_pages_stay_in_autoplay_context() {
+        let (mut resolver, mut state) = setup();
+        resolve(&mut resolver, &mut state, DEFAULT, vec![page(0..2)]);
+        resolve(
+            &mut resolver,
+            &mut state,
+            AUTOPLAY,
+            vec![page(10..12), page(12..14)],
+        );
+
+        let len = |ty| state.get_context(ty).unwrap().tracks.len();
+        assert_eq!(
+            (len(ContextType::Default), len(ContextType::Autoplay)),
+            (2, 4)
+        );
     }
 }
