@@ -166,6 +166,14 @@ impl DealerManager {
         Ok(())
     }
 
+    pub(crate) fn shutdown(&self) {
+        self.lock(|inner| {
+            if let Some(dealer) = inner.dealer.get() {
+                dealer.shutdown()
+            }
+        })
+    }
+
     pub async fn close(&self) {
         if let Some(dealer) = self.lock(|inner| inner.dealer.take()) {
             dealer.close().await
