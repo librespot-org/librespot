@@ -39,7 +39,7 @@ use std::{
     future::Future,
     sync::Arc,
     sync::atomic::{AtomicUsize, Ordering},
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use thiserror::Error;
 use tokio::{sync::mpsc, time::sleep};
@@ -107,6 +107,8 @@ struct SpircTask {
     /// when no other future resolves, otherwise resets the delay
     update_volume: bool,
 
+    last_spotify_volume_update: Option<Instant>,
+
     /// when set to true, it will update the volume after [UPDATE_STATE_DELAY],
     /// when no other future resolves, otherwise resets the delay
     update_state: bool,
@@ -145,6 +147,9 @@ const CONTEXT_FETCH_THRESHOLD: usize = 2;
 const VOLUME_UPDATE_DELAY: Duration = Duration::from_millis(500);
 // to reduce updates to remote, we group some request by waiting for a set amount of time
 const UPDATE_STATE_DELAY: Duration = Duration::from_millis(200);
+// Avoid snapping the Spotify slider back to a stale external-controller value
+// while a user-initiated volume change is still propagating outside librespot.
+const EXTERNAL_VOLUME_REFRESH_SUPPRESSION: Duration = Duration::from_secs(2);
 
 /// The spotify connect handle
 pub struct Spirc {
@@ -260,6 +265,7 @@ impl Spirc {
 
             transfer_state: None,
             update_volume: false,
+            last_spotify_volume_update: None,
             update_state: false,
 
             spirc_id,
@@ -267,12 +273,15 @@ impl Spirc {
 
         let spirc = Spirc { commands: cmd_tx };
 
-        let initial_volume = task.connect_state.device_info().volume;
+        let initial_volume = task
+            .refresh_volume_from_mixer()
+            .map(u32::from)
+            .unwrap_or_else(|| task.connect_state.device_info().volume);
         task.connect_state.set_volume(0);
 
         match initial_volume.try_into() {
             Ok(volume) => {
-                task.set_volume(volume);
+                task.apply_volume(volume);
                 // we don't want to update the volume initially,
                 // we just want to set the mixer to the correct volume
                 task.update_volume = false;
@@ -1329,6 +1338,8 @@ impl SpircTask {
     }
 
     fn handle_activate(&mut self) {
+        self.sync_refreshed_volume_from_mixer();
+
         self.connect_state.set_active(true);
         self.player
             .emit_session_connected_event(self.session.connection_id(), self.session.username());
@@ -1551,8 +1562,7 @@ impl SpircTask {
 
         // Synchronize the volume from the mixer. This is useful on
         // systems that can switch sources from and back to librespot.
-        let current_volume = self.mixer.volume();
-        self.set_volume(current_volume);
+        self.sync_volume_from_mixer();
     }
 
     fn handle_play_pause(&mut self) {
@@ -1925,9 +1935,41 @@ impl SpircTask {
             .map(|_| ())
     }
 
+    fn should_skip_external_volume_refresh(&self) -> bool {
+        self.last_spotify_volume_update
+            .is_some_and(|updated_at| updated_at.elapsed() < EXTERNAL_VOLUME_REFRESH_SUPPRESSION)
+    }
+
+    fn refresh_volume_from_mixer(&mut self) -> Option<u16> {
+        if self.should_skip_external_volume_refresh() {
+            debug!("skipping external volume refresh after recent Spotify volume update");
+            return None;
+        }
+
+        self.mixer.refresh_volume()
+    }
+
+    fn sync_refreshed_volume_from_mixer(&mut self) {
+        if let Some(volume) = self.refresh_volume_from_mixer() {
+            self.apply_volume(volume);
+        }
+    }
+
+    fn sync_volume_from_mixer(&mut self) {
+        let volume = self
+            .refresh_volume_from_mixer()
+            .unwrap_or_else(|| self.mixer.volume());
+
+        self.apply_volume(volume);
+    }
+
     fn set_volume(&mut self, volume: u16) {
         debug!("SpircTask::set_volume({volume})");
+        self.last_spotify_volume_update = Some(Instant::now());
+        self.apply_volume(volume);
+    }
 
+    fn apply_volume(&mut self, volume: u16) {
         let old_volume = self.connect_state.device_info().volume;
         let new_volume = volume as u32;
         if old_volume != new_volume || self.mixer.volume() != volume {
