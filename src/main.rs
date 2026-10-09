@@ -41,6 +41,11 @@ use url::Url;
 mod player_event_handler;
 use player_event_handler::{EventHandler, run_program_on_sink_events};
 
+#[cfg(feature = "with-mpris")]
+mod mpris;
+#[cfg(feature = "with-mpris")]
+use mpris::MprisEventHandler;
+
 fn device_id(name: &str) -> String {
     HEXLOWER.encode(&Sha1::digest(name.as_bytes()))
 }
@@ -2051,6 +2056,18 @@ async fn main() {
         }
     }
 
+    // MPRIS is optional: headless systems usually have no D-Bus session bus.
+    #[cfg(feature = "with-mpris")]
+    let mpris = MprisEventHandler::spawn(
+        player.clone(),
+        &setup.connect_config.name,
+        setup.connect_config.initial_volume,
+        None,
+    )
+    .await
+    .inspect_err(|e| warn!("MPRIS disabled, could not register on the D-Bus session bus: {e}"))
+    .ok();
+
     loop {
         tokio::select! {
             credentials = async {
@@ -2104,6 +2121,12 @@ async fn main() {
                         exit(1);
                     }
                 };
+
+                #[cfg(feature = "with-mpris")]
+                if let Some(mpris) = &mpris {
+                    mpris.set_spirc(spirc_.clone());
+                }
+
                 spirc = Some(spirc_);
                 spirc_task = Some(Box::pin(spirc_task_));
 
@@ -2148,6 +2171,11 @@ async fn main() {
     info!("Gracefully shutting down");
 
     let mut shutdown_tasks = tokio::task::JoinSet::new();
+
+    #[cfg(feature = "with-mpris")]
+    if let Some(mpris) = mpris {
+        shutdown_tasks.spawn(mpris.quit_and_join());
+    }
 
     // Shutdown spirc if necessary
     if let Some(spirc) = spirc {

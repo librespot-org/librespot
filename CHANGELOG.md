@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [connect] Add method `clear_queue` to `Spirc` to remove all manually queued tracks
 - [playback] Add `SetQueue` player event, emitting when the queue changes (context loaded, track added to queue, or queue set via Spotify Connect). Gated behind `ConnectConfig::emit_set_queue_events`
 - [examples] Obtain an access token via OAuth to establish a new session and retrieve the stored credentials
+- [main] Add MPRIS support (D-Bus session bus), to display what is playing and control the player from the desktop. Enabled by the new `with-mpris` feature, which is a default feature
+- [main] Add `ALBUM_DATE` environment variable to the `track_changed` event of `--onevent`
+- [connect] Add method `seek_offset` to `Spirc` to seek relatively to the current position
+- [connect] `Spirc` is now `Clone`
+- [metadata] Add `album_date` to `UniqueFields::Track` (breaking)
 
 ### Changed
 
