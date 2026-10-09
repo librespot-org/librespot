@@ -18,7 +18,7 @@
 //! `docs/device-authorization.md`.
 
 use std::{
-    io::{self, BufRead, BufReader, Write},
+    io::{self, BufRead, BufReader, IsTerminal, Write},
     net::{SocketAddr, TcpListener},
     sync::mpsc,
     time::{Duration, Instant},
@@ -297,6 +297,15 @@ fn build_token(
     }
 }
 
+fn print_browse_to(url: &str) {
+    let safe: String = url.chars().filter(|c| !c.is_control()).collect();
+    if io::stdout().is_terminal() {
+        println!("Browse to: \x1b]8;;{safe}\x1b\\{safe}\x1b]8;;\x1b\\");
+    } else {
+        println!("Browse to: {safe}");
+    }
+}
+
 impl OAuthClient {
     /// Generates and opens/shows the authorization URL to obtain an access token.
     ///
@@ -317,7 +326,7 @@ impl OAuthClient {
         if self.should_open_url {
             open::that_in_background(auth_url.as_str());
         }
-        println!("Browse to: {auth_url}");
+        print_browse_to(auth_url.as_str());
 
         pkce_verifier
     }
@@ -514,7 +523,7 @@ pub fn get_access_token(
         .set_pkce_challenge(pkce_challenge)
         .url();
 
-    println!("Browse to: {auth_url}");
+    print_browse_to(auth_url.as_str());
 
     let code = match get_socket_address(redirect_uri) {
         Some(addr) => get_authcode_listener(addr, String::from("Go back to your terminal :)")),
@@ -616,7 +625,7 @@ impl DeviceAuthClient {
         if self.should_open_url {
             open::that_in_background(url);
         }
-        println!("Browse to: {url}");
+        print_browse_to(url);
         println!("If prompted, enter code: {}", auth.user_code());
     }
 
