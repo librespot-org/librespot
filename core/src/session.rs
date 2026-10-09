@@ -640,6 +640,7 @@ impl Session {
         self.0.data.write().expect(SESSION_DATA_POISON_MSG).invalid = true;
         self.mercury().shutdown();
         self.channel().shutdown();
+        self.dealer().shutdown();
     }
 
     pub fn is_invalid(&self) -> bool {
