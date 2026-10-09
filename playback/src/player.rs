@@ -712,6 +712,7 @@ enum PlayerPreload {
     Loading {
         track_id: SpotifyUri,
         loader: Pin<Box<dyn FusedFuture<Output = Result<PlayerLoadedTrackData, ()>> + Send>>,
+        session: Session,
     },
     Ready {
         track_id: SpotifyUri,
@@ -1426,6 +1427,7 @@ impl Future for PlayerInternal {
             if let PlayerPreload::Loading {
                 ref mut loader,
                 ref track_id,
+                ref session,
             } = self.preload
             {
                 let track_id = track_id.clone();
@@ -1438,6 +1440,10 @@ impl Future for PlayerInternal {
                             track_id,
                             loaded_track: Box::new(loaded_track),
                         };
+                    }
+                    Poll::Ready(Err(_)) if session.is_invalid() => {
+                        debug!("Unable to preload {track_id:?}, its session is invalid");
+                        self.preload = PlayerPreload::None;
                     }
                     Poll::Ready(Err(_)) => {
                         debug!("Unable to preload {track_id:?}");
@@ -2152,10 +2158,11 @@ impl PlayerInternal {
         // Try to extract a pending loader from the preloading mechanism
         let loader = if let PlayerPreload::Loading {
             track_id: loaded_track_id,
+            session,
             ..
         } = &self.preload
         {
-            if (track_id == *loaded_track_id) && (position_ms == 0) {
+            if (track_id == *loaded_track_id) && (position_ms == 0) && !session.is_invalid() {
                 let mut preload = PlayerPreload::None;
                 std::mem::swap(&mut preload, &mut self.preload);
                 if let PlayerPreload::Loading { loader, .. } = preload {
@@ -2234,6 +2241,7 @@ impl PlayerInternal {
             self.preload = PlayerPreload::Loading {
                 track_id,
                 loader: Box::pin(loader),
+                session: self.session.clone(),
             }
         }
     }
