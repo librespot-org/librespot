@@ -21,7 +21,6 @@ pub struct PlaylistAnnotation {
     pub abuse_report_state: AbuseReportState,
 }
 
-#[async_trait]
 impl Metadata for PlaylistAnnotation {
     type Message = protocol::playlist_annotate3::PlaylistAnnotation;
 

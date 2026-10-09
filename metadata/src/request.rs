@@ -6,7 +6,6 @@ use librespot_core::{Error, Session};
 
 pub type RequestResult = Result<bytes::Bytes, Error>;
 
-#[async_trait]
 pub trait MercuryRequest {
     async fn request(session: &Session, uri: &str) -> RequestResult {
         let mut metrics_uri = uri.to_owned();
@@ -27,7 +26,7 @@ pub trait MercuryRequest {
         let response = request.await?;
         match response.payload.first() {
             Some(data) => {
-                let data = data.to_vec().into();
+                let data = data.clone().into();
                 trace!("Received metadata: {data:?}");
                 Ok(data)
             }

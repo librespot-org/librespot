@@ -468,14 +468,14 @@ impl ConnectState {
         //  - queue resorting is done by each client and orients itself by the given uid
         //  - if no uid is present, resorting doesn't work or behaves not as intended
         let uid = match ctx_track.uid.as_ref() {
-            Some(uid) if !uid.is_empty() => uid.to_string(),
+            Some(uid) if !uid.is_empty() => uid.clone(),
             // so providing a unique id should allow to resort the queue
             _ => Uuid::new_v4().as_simple().to_string(),
         };
 
         let mut metadata = page_metadata.cloned().unwrap_or_default();
         for (k, v) in &ctx_track.metadata {
-            metadata.insert(k.to_string(), v.to_string());
+            metadata.insert(k.clone(), v.clone());
         }
 
         let mut track = ProvidedTrack {

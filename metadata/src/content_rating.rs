@@ -23,7 +23,7 @@ impl From<&ContentRatingMessage> for ContentRating {
     fn from(content_rating: &ContentRatingMessage) -> Self {
         Self {
             country: content_rating.country().to_owned(),
-            tags: content_rating.tag.to_vec(),
+            tags: content_rating.tag.clone(),
         }
     }
 }

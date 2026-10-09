@@ -183,7 +183,7 @@ impl Login5Manager {
         }
 
         let method = Login_method::StoredCredential(StoredCredential {
-            username: self.session().username().to_string(),
+            username: self.session().username(),
             data: auth_data,
             ..Default::default()
         });

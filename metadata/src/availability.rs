@@ -41,7 +41,7 @@ impl TryFrom<&AvailabilityMessage> for Availability {
     type Error = librespot_core::Error;
     fn try_from(availability: &AvailabilityMessage) -> Result<Self, Self::Error> {
         Ok(Self {
-            catalogue_strs: availability.catalogue_str.to_vec(),
+            catalogue_strs: availability.catalogue_str.clone(),
             start: availability.start.get_or_default().try_into()?,
         })
     }
