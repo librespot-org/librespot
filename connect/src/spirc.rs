@@ -714,11 +714,11 @@ impl SpircTask {
             SpircCommand::Shutdown => {
                 trace!("Received SpircCommand::Shutdown");
                 self.handle_pause();
-                self.handle_disconnect().await?;
                 self.shutdown = true;
                 if let Some(rx) = self.commands.as_mut() {
                     rx.close()
                 }
+                self.handle_disconnect().await?;
             }
             SpircCommand::Transfer(request) if !self.connect_state.is_active() => {
                 let device_id = self.session.device_id();
