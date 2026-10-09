@@ -2092,12 +2092,14 @@ async fn main() {
                 }
 
                 let connect_config = setup.connect_config.clone();
+                let playback = spirc.as_ref().and_then(Spirc::disconnected_playback);
 
-                let (spirc_, spirc_task_) = match Spirc::new(connect_config,
+                let (spirc_, spirc_task_) = match Spirc::with_playback(connect_config,
                                                                 session.clone(),
                                                                 last_credentials.clone().unwrap_or_default(),
                                                                 player.clone(),
-                                                                mixer.clone()).await {
+                                                                mixer.clone(),
+                                                                playback).await {
                     Ok((spirc_, spirc_task_)) => (spirc_, spirc_task_),
                     Err(e) => {
                         error!("could not initialize spirc: {e}");

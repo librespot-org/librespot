@@ -37,8 +37,8 @@ use librespot_protocol::context_page::ContextPage;
 use protobuf::MessageField;
 use std::{
     future::Future,
-    sync::Arc,
     sync::atomic::{AtomicUsize, Ordering},
+    sync::{Arc, Mutex},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use thiserror::Error;
@@ -70,12 +70,14 @@ impl From<SpircError> for Error {
 }
 
 struct SpircTask {
+    disconnected_playback: Arc<Mutex<Option<Arc<PlaybackSnapshot>>>>,
     player: Arc<Player>,
     mixer: Arc<dyn Mixer>,
 
     /// the state management object
     connect_state: ConnectState,
     connect_established: bool,
+    restored: bool,
 
     play_request_id: Option<u64>,
     play_status: SpircPlayStatus,
@@ -118,6 +120,7 @@ static SPIRC_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Debug)]
 enum SpircCommand {
+    Restore(Arc<PlaybackSnapshot>),
     Play,
     PlayPause,
     Pause,
@@ -149,9 +152,73 @@ const UPDATE_STATE_DELAY: Duration = Duration::from_millis(200);
 /// The spotify connect handle
 pub struct Spirc {
     commands: mpsc::UnboundedSender<SpircCommand>,
+    disconnected_playback: Arc<Mutex<Option<Arc<PlaybackSnapshot>>>>,
+}
+
+/// In-memory playback retained when an active Connect session unexpectedly ends.
+///
+/// This includes the resolved contexts, exact shuffled order, previous and next
+/// tracks, manual queue, repeat settings, and unresolved context pages. It can
+/// only be restored by the same account. It contains no login credentials and
+/// is not a persistent storage format.
+///
+/// It also holds the player events sent since the disconnect, until
+/// [`Spirc::with_playback`] takes them.
+pub struct PlaybackSnapshot {
+    state: ConnectState,
+    pending: std::collections::VecDeque<ResolveContext>,
+    username: String,
+    position_ms: u32,
+    playing: bool,
+    play_status: SpircPlayStatus,
+    play_request_id: Option<u64>,
+    player_events: Mutex<Option<PlayerEventChannel>>,
+}
+
+impl PlaybackSnapshot {
+    fn restore_into(
+        &self,
+        username: &str,
+        state: &mut ConnectState,
+        resolver: &mut ContextResolver,
+    ) -> Result<(), Error> {
+        if self.username != username {
+            return Err(Error::failed_precondition(
+                "playback belongs to another account",
+            ));
+        }
+        state.restore_playback(&self.state);
+        resolver.restore_pending(self.pending.clone());
+        Ok(())
+    }
+}
+
+impl std::fmt::Debug for PlaybackSnapshot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PlaybackSnapshot")
+            .field("position_ms", &self.position_ms)
+            .field("playing", &self.playing)
+            .finish_non_exhaustive()
+    }
 }
 
 impl Spirc {
+    /// Playback retained before an unexpected disconnect clears session state.
+    /// Available after the event-loop future returned, and absent for an
+    /// inactive device, stopped playback, or an intentional shutdown.
+    pub fn disconnected_playback(&self) -> Option<Arc<PlaybackSnapshot>> {
+        self.disconnected_playback
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+    }
+
+    /// Restore a disconnected session on this device, retaining queue order.
+    /// New playback already active on this device takes precedence.
+    pub fn restore_playback(&self, snapshot: Arc<PlaybackSnapshot>) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::Restore(snapshot))?)
+    }
+
     /// Initializes a new spotify connect device
     ///
     /// The returned tuple consists out of a handle to the [`Spirc`] that
@@ -164,6 +231,23 @@ impl Spirc {
         credentials: Credentials,
         player: Arc<Player>,
         mixer: Arc<dyn Mixer>,
+    ) -> Result<(Spirc, impl Future<Output = ()>), Error> {
+        Self::with_playback(config, session, credentials, player, mixer, None).await
+    }
+
+    /// Like [`Spirc::new`], continuing the playback from [`Spirc::disconnected_playback`]
+    /// on the same `player`, which kept playing. Once connected, the device claims the
+    /// playback when Spotify reports no other active device, and stops it otherwise.
+    ///
+    /// `None`, or a playback of another account, starts like [`Spirc::new`].
+    /// For a new `player`, use [`Spirc::restore_playback`] instead.
+    pub async fn with_playback(
+        config: ConnectConfig,
+        session: Session,
+        credentials: Credentials,
+        player: Arc<Player>,
+        mixer: Arc<dyn Mixer>,
+        playback: Option<Arc<PlaybackSnapshot>>,
     ) -> Result<(Spirc, impl Future<Output = ()>), Error> {
         fn extract_connection_id(msg: Message) -> Result<String, Error> {
             let connection_id = msg
@@ -229,12 +313,15 @@ impl Spirc {
 
         let player_events = player.get_player_event_channel();
 
+        let disconnected_playback = Arc::new(Mutex::new(None));
         let mut task = SpircTask {
+            disconnected_playback: Arc::clone(&disconnected_playback),
             player,
             mixer,
 
             connect_state,
             connect_established: false,
+            restored: false,
 
             play_request_id: None,
             play_status: SpircPlayStatus::Stopped,
@@ -265,7 +352,33 @@ impl Spirc {
             spirc_id,
         };
 
-        let spirc = Spirc { commands: cmd_tx };
+        let spirc = Spirc {
+            commands: cmd_tx,
+            disconnected_playback,
+        };
+
+        if let Some(playback) = playback {
+            match playback.restore_into(
+                &task.session.username(),
+                &mut task.connect_state,
+                &mut task.context_resolver,
+            ) {
+                Ok(()) => {
+                    if let Some(player_events) = playback
+                        .player_events
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner)
+                        .take()
+                    {
+                        task.player_events = Some(player_events);
+                    }
+                    task.play_status = playback.play_status.clone();
+                    task.play_request_id = playback.play_request_id;
+                    task.restored = true;
+                }
+                Err(why) => warn!("couldn't restore the playback: {why}"),
+            }
+        }
 
         let initial_volume = task.connect_state.device_info().volume;
         task.connect_state.set_volume(0);
@@ -602,6 +715,25 @@ impl SpircTask {
         }
 
         if !self.shutdown && self.connect_state.is_active() {
+            if !matches!(self.play_status, SpircPlayStatus::Stopped)
+                && self.transfer_state.is_none()
+                && self.connect_state.current_track(MessageField::is_some)
+            {
+                let snapshot = PlaybackSnapshot {
+                    state: self.connect_state.clone(),
+                    pending: self.context_resolver.pending(),
+                    username: self.session.username(),
+                    position_ms: self.position(),
+                    playing: self.connect_state.is_playing(),
+                    play_status: self.play_status.clone(),
+                    play_request_id: self.play_request_id,
+                    player_events: Mutex::new(self.player_events.take()),
+                };
+                *self
+                    .disconnected_playback
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(Arc::new(snapshot));
+            }
             warn!("unexpected shutdown");
             if let Err(why) = self.handle_disconnect().await {
                 error!("error during disconnecting: {why}")
@@ -735,6 +867,20 @@ impl SpircTask {
             }
             SpircCommand::Transfer(..) | SpircCommand::Activate => {
                 warn!("SpircCommand::{cmd:?} will be ignored while already active")
+            }
+            SpircCommand::Restore(snapshot) => {
+                if self.connect_state.is_active()
+                    && !matches!(self.play_status, SpircPlayStatus::Stopped)
+                {
+                    return Ok(());
+                }
+                snapshot.restore_into(
+                    &self.session.username(),
+                    &mut self.connect_state,
+                    &mut self.context_resolver,
+                )?;
+                self.handle_activate();
+                self.load_track(snapshot.playing, snapshot.position_ms)?;
             }
             _ if !self.connect_state.is_active() => {
                 warn!("SpircCommand::{cmd:?} will be ignored while Not Active")
@@ -924,6 +1070,18 @@ impl SpircTask {
         );
 
         self.connect_established = true;
+
+        if std::mem::take(&mut self.restored) {
+            let active_device_id = &cluster.active_device_id;
+            if active_device_id.is_empty() || active_device_id == self.session.device_id() {
+                self.handle_activate();
+                return self.notify().await;
+            }
+            info!("active device is <{active_device_id}>");
+            self.handle_stop();
+            self.handle_disconnect().await?;
+            return Ok(());
+        }
 
         let same_session = cluster.player_state.session_id == self.session.session_id()
             || cluster.player_state.session_id.is_empty();
@@ -1948,5 +2106,47 @@ impl SpircTask {
 impl Drop for SpircTask {
     fn drop(&mut self) {
         debug!("drop Spirc[{}]", self.spirc_id);
+    }
+}
+
+#[cfg(test)]
+mod recovery_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn recovery_keeps_unresolved_pages_and_rejects_another_account() {
+        let session = Session::new(Default::default(), None);
+        let mut old = ConnectState::new(Default::default(), &session);
+        old.set_repeat_context(true);
+        let pending = ResolveContext::from_uri(
+            "spotify:playlist:remaining",
+            "",
+            ContextType::Default,
+            ContextAction::Append,
+        );
+        let snapshot = PlaybackSnapshot {
+            state: old,
+            pending: [pending.clone()].into(),
+            username: "original".into(),
+            position_ms: 144_075,
+            playing: false,
+            play_status: SpircPlayStatus::Stopped,
+            play_request_id: None,
+            player_events: Mutex::default(),
+        };
+        let mut state = ConnectState::new(Default::default(), &session);
+        let mut resolver = ContextResolver::new(session);
+        assert!(
+            snapshot
+                .restore_into("different", &mut state, &mut resolver)
+                .is_err()
+        );
+        assert!(!state.repeat_context());
+        assert!(resolver.pending().is_empty());
+        snapshot
+            .restore_into("original", &mut state, &mut resolver)
+            .unwrap();
+        assert!(state.repeat_context());
+        assert_eq!(resolver.pending(), [pending]);
     }
 }
