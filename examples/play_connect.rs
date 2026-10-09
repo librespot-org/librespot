@@ -71,7 +71,7 @@ async fn main() -> Result<(), Error> {
     spirc.play()?;
 
     // starting the connect device and processing the previously "queued" calls
-    spirc_task.await;
+    let _ = spirc_task.await;
 
     Ok(())
 }
