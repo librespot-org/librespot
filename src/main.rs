@@ -2073,9 +2073,9 @@ async fn main() {
                             // Continue shutdown in its own task
                             tokio::spawn(spirc_task);
                         }
-                        if !session.is_invalid() {
-                            session.shutdown();
-                        }
+                        // The old Spirc still needs the old session to pause and sign off.
+                        session = Session::new(setup.session_config.clone(), setup.cache.clone());
+                        player.set_session(session.clone());
 
                         connecting = true;
                     },

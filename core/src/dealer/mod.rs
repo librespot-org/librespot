@@ -482,6 +482,19 @@ impl Dealer {
         )
     }
 
+    pub fn shutdown(&self) {
+        *self
+            .shared
+            .message_handlers
+            .lock()
+            .expect(DEALER_MESSAGE_HANDLERS_POISON_MSG) = SubscriberMap::default();
+        *self
+            .shared
+            .request_handlers
+            .lock()
+            .expect(DEALER_REQUEST_HANDLERS_POISON_MSG) = HandlerMap::default();
+    }
+
     pub async fn close(mut self) {
         debug!("closing dealer");
 
