@@ -2091,7 +2091,11 @@ async fn main() {
                     player.set_session(session.clone());
                 }
 
-                let connect_config = setup.connect_config.clone();
+                let mut connect_config = setup.connect_config.clone();
+                // Only a Spirc that shut down unexpectedly leaves its handle in `spirc`.
+                if spirc.is_some() {
+                    connect_config.initial_volume = mixer.volume();
+                }
 
                 let (spirc_, spirc_task_) = match Spirc::new(connect_config,
                                                                 session.clone(),
