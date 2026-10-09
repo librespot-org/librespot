@@ -135,9 +135,11 @@ impl WebsocketMessage {
 
         let payload = self.payloads.pop().ok_or(ProtocolError::Empty)?;
         let bytes = match payload {
-            MessagePayloadValue::String(string) => BASE64_STANDARD
-                .decode(string)
-                .map_err(ProtocolError::Base64)?,
+            MessagePayloadValue::String(string) => match BASE64_STANDARD.decode(&string) {
+                Ok(bytes) => bytes,
+                // some messages, such as the collection updates, carry plain JSON instead
+                Err(_) => return Ok(PayloadValue::Json(string)),
+            },
             MessagePayloadValue::Bytes(bytes) => bytes,
             MessagePayloadValue::Json(json) => return Ok(PayloadValue::Json(json.to_string())),
         };
