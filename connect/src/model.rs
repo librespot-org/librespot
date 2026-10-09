@@ -147,7 +147,7 @@ impl TryFrom<SkipTo> for PlayingTrack {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(super) enum SpircPlayStatus {
     Stopped,
     LoadingPlay {

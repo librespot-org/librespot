@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - [connect] Retain playback snapshots after an unexpected disconnect so clients can restore context, shuffle order, and queued tracks on a new session
+- [connect] Add `Spirc::with_playback` to continue a disconnected playback on the player that kept playing
 
 - [connect] Add method `add_to_queue` to `Spirc` to add tracks, episodes, albums and playlists to the queue
 - [connect] Add method `clear_queue` to `Spirc` to remove all manually queued tracks
@@ -22,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- [main] Keep playing the queue after the connection to Spotify drops
 - [core] Pass on dealer messages that carry plain JSON, such as collection updates, instead of dropping them with a base64 warning
 - [core] Fixed AP login on Windows on ARM by using the supported desktop platform identifier
 - [audio] Fixed integer overflow in throughput calculation

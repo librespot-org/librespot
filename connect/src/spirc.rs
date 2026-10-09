@@ -77,6 +77,7 @@ struct SpircTask {
     /// the state management object
     connect_state: ConnectState,
     connect_established: bool,
+    restored: bool,
 
     play_request_id: Option<u64>,
     play_status: SpircPlayStatus,
@@ -160,12 +161,18 @@ pub struct Spirc {
 /// tracks, manual queue, repeat settings, and unresolved context pages. It can
 /// only be restored by the same account. It contains no login credentials and
 /// is not a persistent storage format.
+///
+/// It also holds the player events sent since the disconnect, until
+/// [`Spirc::with_playback`] takes them.
 pub struct PlaybackSnapshot {
     state: ConnectState,
     pending: std::collections::VecDeque<ResolveContext>,
     username: String,
     position_ms: u32,
     playing: bool,
+    play_status: SpircPlayStatus,
+    play_request_id: Option<u64>,
+    player_events: Mutex<Option<PlayerEventChannel>>,
 }
 
 impl PlaybackSnapshot {
@@ -224,6 +231,23 @@ impl Spirc {
         credentials: Credentials,
         player: Arc<Player>,
         mixer: Arc<dyn Mixer>,
+    ) -> Result<(Spirc, impl Future<Output = ()>), Error> {
+        Self::with_playback(config, session, credentials, player, mixer, None).await
+    }
+
+    /// Like [`Spirc::new`], continuing the playback from [`Spirc::disconnected_playback`]
+    /// on the same `player`, which kept playing. Once connected, the device claims the
+    /// playback when Spotify reports no other active device, and stops it otherwise.
+    ///
+    /// `None`, or a playback of another account, starts like [`Spirc::new`].
+    /// For a new `player`, use [`Spirc::restore_playback`] instead.
+    pub async fn with_playback(
+        config: ConnectConfig,
+        session: Session,
+        credentials: Credentials,
+        player: Arc<Player>,
+        mixer: Arc<dyn Mixer>,
+        playback: Option<Arc<PlaybackSnapshot>>,
     ) -> Result<(Spirc, impl Future<Output = ()>), Error> {
         fn extract_connection_id(msg: Message) -> Result<String, Error> {
             let connection_id = msg
@@ -297,6 +321,7 @@ impl Spirc {
 
             connect_state,
             connect_established: false,
+            restored: false,
 
             play_request_id: None,
             play_status: SpircPlayStatus::Stopped,
@@ -331,6 +356,29 @@ impl Spirc {
             commands: cmd_tx,
             disconnected_playback,
         };
+
+        if let Some(playback) = playback {
+            match playback.restore_into(
+                &task.session.username(),
+                &mut task.connect_state,
+                &mut task.context_resolver,
+            ) {
+                Ok(()) => {
+                    if let Some(player_events) = playback
+                        .player_events
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner)
+                        .take()
+                    {
+                        task.player_events = Some(player_events);
+                    }
+                    task.play_status = playback.play_status.clone();
+                    task.play_request_id = playback.play_request_id;
+                    task.restored = true;
+                }
+                Err(why) => warn!("couldn't restore the playback: {why}"),
+            }
+        }
 
         let initial_volume = task.connect_state.device_info().volume;
         task.connect_state.set_volume(0);
@@ -677,6 +725,9 @@ impl SpircTask {
                     username: self.session.username(),
                     position_ms: self.position(),
                     playing: self.connect_state.is_playing(),
+                    play_status: self.play_status.clone(),
+                    play_request_id: self.play_request_id,
+                    player_events: Mutex::new(self.player_events.take()),
                 };
                 *self
                     .disconnected_playback
@@ -1019,6 +1070,18 @@ impl SpircTask {
         );
 
         self.connect_established = true;
+
+        if std::mem::take(&mut self.restored) {
+            let active_device_id = &cluster.active_device_id;
+            if active_device_id.is_empty() || active_device_id == self.session.device_id() {
+                self.handle_activate();
+                return self.notify().await;
+            }
+            info!("active device is <{active_device_id}>");
+            self.handle_stop();
+            self.handle_disconnect().await?;
+            return Ok(());
+        }
 
         let same_session = cluster.player_state.session_id == self.session.session_id()
             || cluster.player_state.session_id.is_empty();
@@ -2067,6 +2130,9 @@ mod recovery_tests {
             username: "original".into(),
             position_ms: 144_075,
             playing: false,
+            play_status: SpircPlayStatus::Stopped,
+            play_request_id: None,
+            player_events: Mutex::default(),
         };
         let mut state = ConnectState::new(Default::default(), &session);
         let mut resolver = ContextResolver::new(session);
