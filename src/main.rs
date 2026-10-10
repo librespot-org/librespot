@@ -41,6 +41,11 @@ use url::Url;
 mod player_event_handler;
 use player_event_handler::{EventHandler, run_program_on_sink_events};
 
+#[cfg(feature = "with-mpris")]
+mod mpris;
+#[cfg(feature = "with-mpris")]
+use mpris::{MprisBus, MprisEventHandler};
+
 fn device_id(name: &str) -> String {
     HEXLOWER.encode(&Sha1::digest(name.as_bytes()))
 }
@@ -222,6 +227,8 @@ struct Setup {
     emit_sink_events: bool,
     zeroconf_ip: Vec<std::net::IpAddr>,
     zeroconf_backend: Option<DnsSdServiceBuilder>,
+    #[cfg(feature = "with-mpris")]
+    mpris_bus: MprisBus,
 }
 
 async fn get_setup() -> Setup {
@@ -286,6 +293,8 @@ async fn get_setup() -> Setup {
     const ZEROCONF_INTERFACE: &str = "zeroconf-interface";
     const ZEROCONF_BACKEND: &str = "zeroconf-backend";
     const LOCAL_FILE_DIR: &str = "local-file-dir";
+    #[cfg(feature = "with-mpris")]
+    const MPRIS_BUS: &str = "mpris-bus";
 
     // Mostly arbitrary.
     const AP_PORT_SHORT: &str = "a";
@@ -340,6 +349,8 @@ async fn get_setup() -> Setup {
     const ZEROCONF_PORT_SHORT: &str = "z";
     const ZEROCONF_BACKEND_SHORT: &str = ""; // no short flag
     const LOCAL_FILE_DIR_SHORT: &str = "l";
+    #[cfg(feature = "with-mpris")]
+    const MPRIS_BUS_SHORT: &str = ""; // no short flag
 
     // Options that have different descriptions
     // depending on what backends were enabled at build time.
@@ -675,6 +686,14 @@ async fn get_setup() -> Setup {
         LOCAL_FILE_DIR,
         "Directory to search for local file playback. Can be specified multiple times to add multiple search directories",
         "DIRECTORY"
+    );
+
+    #[cfg(feature = "with-mpris")]
+    opts.optopt(
+        MPRIS_BUS_SHORT,
+        MPRIS_BUS,
+        "D-Bus bus on which to provide the MPRIS interface {session|system}. Defaults to session. Use system when running as a system service.",
+        "BUS",
     );
 
     #[cfg(feature = "passthrough-decoder")]
@@ -1412,6 +1431,22 @@ async fn get_setup() -> Setup {
         })
     });
 
+    #[cfg(feature = "with-mpris")]
+    let mpris_bus = match opt_str(MPRIS_BUS).as_deref() {
+        None | Some("session") => MprisBus::Session,
+        Some("system") => MprisBus::System,
+        Some(invalid) => {
+            invalid_error_msg(
+                MPRIS_BUS,
+                MPRIS_BUS_SHORT,
+                invalid,
+                "session, system",
+                "session",
+            );
+            exit(1);
+        }
+    };
+
     let local_file_directories = matches
         .opt_strs(LOCAL_FILE_DIR)
         .into_iter()
@@ -1887,6 +1922,8 @@ async fn get_setup() -> Setup {
         emit_sink_events,
         zeroconf_ip,
         zeroconf_backend,
+        #[cfg(feature = "with-mpris")]
+        mpris_bus,
     }
 }
 
@@ -2051,6 +2088,24 @@ async fn main() {
         }
     }
 
+    // MPRIS is optional: headless systems usually have no D-Bus session bus.
+    #[cfg(feature = "with-mpris")]
+    let mpris = MprisEventHandler::spawn(
+        player.clone(),
+        setup.mpris_bus,
+        &setup.connect_config.name,
+        setup.connect_config.initial_volume,
+        None,
+    )
+    .await
+    .inspect_err(|e| {
+        warn!(
+            "MPRIS disabled, could not register on the D-Bus {} bus: {e}",
+            setup.mpris_bus
+        )
+    })
+    .ok();
+
     loop {
         tokio::select! {
             credentials = async {
@@ -2104,6 +2159,12 @@ async fn main() {
                         exit(1);
                     }
                 };
+
+                #[cfg(feature = "with-mpris")]
+                if let Some(mpris) = &mpris {
+                    mpris.set_spirc(spirc_.clone());
+                }
+
                 spirc = Some(spirc_);
                 spirc_task = Some(Box::pin(spirc_task_));
 
@@ -2148,6 +2209,11 @@ async fn main() {
     info!("Gracefully shutting down");
 
     let mut shutdown_tasks = tokio::task::JoinSet::new();
+
+    #[cfg(feature = "with-mpris")]
+    if let Some(mpris) = mpris {
+        shutdown_tasks.spawn(mpris.quit_and_join());
+    }
 
     // Shutdown spirc if necessary
     if let Some(spirc) = spirc {
