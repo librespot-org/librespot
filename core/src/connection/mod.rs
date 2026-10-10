@@ -115,7 +115,7 @@ pub async fn authenticate(
         _ => CpuFamily::CPU_UNKNOWN,
     };
 
-    let os = match crate::config::OS {
+    let os = match crate::config::os() {
         "android" => Os::OS_ANDROID,
         "freebsd" | "netbsd" | "openbsd" => Os::OS_FREEBSD,
         "ios" => Os::OS_IPHONE,

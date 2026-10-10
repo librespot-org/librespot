@@ -39,14 +39,14 @@ pub const SPOTIFY_SPIRC_VERSION: &str = "3.2.6";
 pub const FALLBACK_USER_AGENT: &str = "Spotify/124200290 Linux/0 (librespot)";
 
 pub fn spotify_version() -> String {
-    match crate::config::OS {
+    match crate::config::os() {
         "android" | "ios" => SPOTIFY_MOBILE_VERSION.to_owned(),
         _ => SPOTIFY_VERSION.to_string(),
     }
 }
 
 pub fn spotify_semantic_version() -> String {
-    match crate::config::OS {
+    match crate::config::os() {
         "android" | "ios" => SPOTIFY_MOBILE_VERSION.to_owned(),
         _ => SPOTIFY_SEMANTIC_VERSION.to_string(),
     }
