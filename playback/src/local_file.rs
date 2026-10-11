@@ -158,10 +158,49 @@ fn get_uri_from_file(audio_path: &Path, file_extension: &str) -> Result<SpotifyU
             .unwrap_or("".to_owned())
     }
 
+    let track_title = matched_title(track_title, audio_path);
+
     Ok(SpotifyUri::Local {
         artist: format_uri_part(artist),
         album_title: format_uri_part(album_title),
         track_title: format_uri_part(track_title),
         duration: Duration::from_secs(time.seconds),
     })
+}
+
+/// The title a local file is matched and listed under: its title tag, or
+/// the file stem when the tag is missing or empty, so untagged collections
+/// that name their tracks only in the file name still get a distinct,
+/// displayable identity instead of colliding on an empty title.
+fn matched_title(track_title: Option<String>, audio_path: &Path) -> Option<String> {
+    track_title.filter(|title| !title.is_empty()).or_else(|| {
+        audio_path
+            .file_stem()
+            .map(|stem| stem.to_string_lossy().into_owned())
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn title_tag_wins_over_the_file_name() {
+        assert_eq!(
+            matched_title(Some("Snomads Island".to_owned()), Path::new("bootleg.mp3")).as_deref(),
+            Some("Snomads Island")
+        );
+    }
+
+    #[test]
+    fn missing_or_empty_title_falls_back_to_the_file_stem() {
+        assert_eq!(
+            matched_title(None, Path::new("10 Feet (v1.2).mp3")).as_deref(),
+            Some("10 Feet (v1.2)")
+        );
+        assert_eq!(
+            matched_title(Some(String::new()), Path::new("10 Feet (v1.2).mp3")).as_deref(),
+            Some("10 Feet (v1.2)")
+        );
+    }
 }
