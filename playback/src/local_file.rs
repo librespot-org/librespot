@@ -172,7 +172,7 @@ fn get_uri_from_file(audio_path: &Path, file_extension: &str) -> Result<SpotifyU
 /// the file stem when the tag is missing or empty, so untagged collections
 /// that name their tracks only in the file name still get a distinct,
 /// displayable identity instead of colliding on an empty title.
-fn matched_title(track_title: Option<String>, audio_path: &Path) -> Option<String> {
+pub(crate) fn matched_title(track_title: Option<String>, audio_path: &Path) -> Option<String> {
     track_title.filter(|title| !title.is_empty()).or_else(|| {
         audio_path
             .file_stem()
