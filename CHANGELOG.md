@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- [audio] A failed or stalled download no longer skips the track: `read` requests a range again when its download failed (as `fetch_blocking` already did), and a download that makes no progress counts as failed (#1593)
+
 ### Added
 
 - [connect] Add method `add_to_queue` to `Spirc` to add tracks, episodes, albums and playlists to the queue

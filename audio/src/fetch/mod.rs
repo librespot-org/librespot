@@ -547,6 +547,18 @@ impl AudioFileStreaming {
     }
 }
 
+/// How often `read` requests a range again after its download failed, per call.
+const MAX_READ_RETRIES: usize = 3;
+
+/// The part of `wanted` that is neither downloaded nor requested.
+fn missing_ranges(download_status: &AudioFileDownloadStatus, wanted: Range) -> RangeSet {
+    let mut missing = RangeSet::new();
+    missing.add_range(&wanted);
+    missing.subtract_range_set(&download_status.downloaded);
+    missing.subtract_range_set(&download_status.requested);
+    missing
+}
+
 impl Read for AudioFileStreaming {
     fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
         let offset = self.position as usize;
@@ -572,8 +584,7 @@ impl Read for AudioFileStreaming {
             length
         };
 
-        let mut ranges_to_request = RangeSet::new();
-        ranges_to_request.add_range(&Range::new(offset, length_to_request));
+        let wanted = Range::new(offset, length_to_request);
 
         let mut download_status = self
             .shared
@@ -581,16 +592,14 @@ impl Read for AudioFileStreaming {
             .lock()
             .expect(DOWNLOAD_STATUS_POISON_MSG);
 
-        ranges_to_request.subtract_range_set(&download_status.downloaded);
-        ranges_to_request.subtract_range_set(&download_status.requested);
-
-        for &range in ranges_to_request.iter() {
+        for &range in missing_ranges(&download_status, wanted).iter() {
             self.stream_loader_command_tx
                 .send(StreamLoaderCommand::Fetch(range))
                 .map_err(|err| io::Error::new(io::ErrorKind::BrokenPipe, err))?;
         }
 
         let download_timeout = AudioFetchParams::get().download_timeout;
+        let mut retries = 0;
         while !download_status.downloaded.contains(offset) {
             let (new_download_status, wait_result) = self
                 .shared
@@ -604,6 +613,22 @@ impl Read for AudioFileStreaming {
                     io::ErrorKind::TimedOut,
                     Error::deadline_exceeded(AudioFileError::WaitTimeout),
                 ));
+            }
+
+            // A request that failed (e.g. a connection the CDN had closed) gives its range
+            // back as neither downloaded nor requested and wakes us up: request it again,
+            // as `fetch_blocking` does, instead of waiting for data that will never come.
+            if retries < MAX_READ_RETRIES {
+                let missing = missing_ranges(&download_status, wanted);
+                if !missing.is_empty() {
+                    retries += 1;
+                    warn!("Re-requesting {missing} after a failed download (retry {retries})");
+                    for &range in missing.iter() {
+                        self.stream_loader_command_tx
+                            .send(StreamLoaderCommand::Fetch(range))
+                            .map_err(|err| io::Error::new(io::ErrorKind::BrokenPipe, err))?;
+                    }
+                }
             }
         }
         let available_length = download_status
@@ -683,5 +708,122 @@ impl Seek for AudioFile {
             AudioFile::Cached(ref mut file) => file.seek(pos),
             AudioFile::Streaming(ref mut file) => file.seek(pos),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn status(
+        requested: &[(usize, usize)],
+        downloaded: &[(usize, usize)],
+    ) -> AudioFileDownloadStatus {
+        let mut s = AudioFileDownloadStatus {
+            requested: RangeSet::new(),
+            downloaded: RangeSet::new(),
+        };
+        for &(start, length) in requested {
+            s.requested.add_range(&Range::new(start, length));
+        }
+        for &(start, length) in downloaded {
+            s.downloaded.add_range(&Range::new(start, length));
+        }
+        s
+    }
+
+    /// A stream loader that behaves like `audio_file_fetch` + `receive_data`, except that the
+    /// first request fails the way a dropped CDN connection does: its range is marked
+    /// requested, then given back as not requested, and readers are woken up.  Every later
+    /// request is served.
+    fn flaky_loader(
+        shared: Arc<AudioFileShared>,
+        mut commands: mpsc::UnboundedReceiver<StreamLoaderCommand>,
+    ) -> std::thread::JoinHandle<usize> {
+        std::thread::spawn(move || {
+            let mut fetches = 0;
+            while let Some(StreamLoaderCommand::Fetch(range)) = commands.blocking_recv() {
+                fetches += 1;
+                let mut status = shared.download_status.lock().unwrap();
+                status.requested.add_range(&range);
+                if fetches == 1 {
+                    // receive_data's error path
+                    status.requested.subtract_range(&range);
+                } else {
+                    status.downloaded.add_range(&range);
+                }
+                shared.cond.notify_all();
+            }
+            fetches
+        })
+    }
+
+    #[test]
+    fn read_requests_a_failed_range_again() {
+        // fail fast instead of after the default 8s
+        let _ = AudioFetchParams::set(AudioFetchParams {
+            download_timeout: Duration::from_secs(2),
+            ..Default::default()
+        });
+        let data: Vec<u8> = (0..256 * 1024).map(|i| (i % 251) as u8).collect();
+        let mut file = NamedTempFile::new().unwrap();
+        std::io::Write::write_all(&mut file, &data).unwrap();
+        let shared = Arc::new(AudioFileShared {
+            cdn_url: String::new(),
+            file_size: data.len(),
+            bytes_per_second: 40 * 1024,
+            cond: Condvar::new(),
+            download_status: Mutex::new(AudioFileDownloadStatus {
+                requested: RangeSet::new(),
+                downloaded: RangeSet::new(),
+            }),
+            download_streaming: AtomicBool::new(true),
+            download_slots: Semaphore::new(1),
+            ping_time_ms: AtomicUsize::new(0),
+            read_position: AtomicUsize::new(0),
+            throughput: AtomicUsize::new(0),
+        });
+        let (tx, rx) = mpsc::unbounded_channel();
+        let loader = flaky_loader(shared.clone(), rx);
+        let mut audio = AudioFileStreaming {
+            read_file: file.reopen().unwrap(),
+            position: 0,
+            stream_loader_command_tx: tx,
+            shared,
+        };
+
+        let mut buf = vec![0u8; 4096];
+        let n = audio
+            .read(&mut buf)
+            .expect("read() should request the failed range again, not time out");
+        assert!(n > 0);
+        assert_eq!(&buf[..n], &data[..n]);
+
+        drop(audio);
+        assert!(loader.join().unwrap() >= 2, "the range was requested again");
+    }
+
+    #[test]
+    fn nothing_missing_while_a_request_is_in_flight() {
+        let s = status(&[(0, 100)], &[(0, 40)]);
+        assert!(missing_ranges(&s, Range::new(0, 100)).is_empty());
+    }
+
+    #[test]
+    fn a_failed_request_leaves_its_rest_missing() {
+        // receive_data failed after 40 of 100 bytes: the rest is given back
+        let mut s = status(&[(0, 100)], &[(0, 40)]);
+        s.requested.subtract_range(&Range::new(40, 60));
+        let missing = missing_ranges(&s, Range::new(0, 100));
+        assert_eq!(missing.len(), 60);
+        assert!(missing.contains(40) && missing.contains(99) && !missing.contains(39));
+    }
+
+    #[test]
+    fn only_the_wanted_range_is_requested_again() {
+        let s = status(&[], &[(0, 10)]);
+        let missing = missing_ranges(&s, Range::new(5, 20));
+        assert_eq!(missing.len(), 15);
+        assert!(missing.contains(10) && missing.contains(24) && !missing.contains(25));
     }
 }
