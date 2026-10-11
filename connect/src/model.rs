@@ -134,10 +134,11 @@ impl TryFrom<SkipTo> for PlayingTrack {
 
     fn try_from(value: SkipTo) -> Result<Self, Self::Error> {
         // order of checks is important, as the index can be 0, but still has an uid or uri provided,
-        // so we only use the index as last resort
-        if let Some(uri) = value.track_uri {
+        // so we only use the index as last resort. Clients may send an empty uri (or uid) next to
+        // the one that identifies the track, so empty values count as not provided.
+        if let Some(uri) = value.track_uri.filter(|uri| !uri.is_empty()) {
             Ok(PlayingTrack::Uri(uri))
-        } else if let Some(uid) = value.track_uid {
+        } else if let Some(uid) = value.track_uid.filter(|uid| !uid.is_empty()) {
             Ok(PlayingTrack::Uid(uid))
         } else if let Some(index) = value.track_index {
             Ok(PlayingTrack::Index(index))
@@ -164,4 +165,37 @@ pub(super) enum SpircPlayStatus {
         position_ms: u32,
         preloading_of_next_track_triggered: bool,
     },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn skip_to(json: &str) -> Result<PlayingTrack, ()> {
+        serde_json::from_str::<SkipTo>(json).unwrap().try_into()
+    }
+
+    #[test]
+    fn empty_uri_falls_through_to_uid() {
+        // what the Spotify app sends when a track is picked in a list
+        let t = skip_to(r#"{"track_uri":"","track_uid":"7b12c69e4b3a8a8b","track_index":131}"#);
+        assert!(matches!(t, Ok(PlayingTrack::Uid(uid)) if uid == "7b12c69e4b3a8a8b"));
+    }
+
+    #[test]
+    fn empty_uri_and_uid_fall_through_to_index() {
+        let t = skip_to(r#"{"track_uri":"","track_uid":"","track_index":131}"#);
+        assert!(matches!(t, Ok(PlayingTrack::Index(131))));
+    }
+
+    #[test]
+    fn uri_wins_when_given() {
+        let t = skip_to(r#"{"track_uri":"spotify:track:abc","track_uid":"u","track_index":0}"#);
+        assert!(matches!(t, Ok(PlayingTrack::Uri(uri)) if uri == "spotify:track:abc"));
+    }
+
+    #[test]
+    fn nothing_usable_is_an_error() {
+        assert!(skip_to(r#"{"track_uri":"","track_uid":""}"#).is_err());
+    }
 }
