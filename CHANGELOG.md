@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [connect] Add method `clear_queue` to `Spirc` to remove all manually queued tracks
 - [playback] Add `SetQueue` player event, emitting when the queue changes (context loaded, track added to queue, or queue set via Spotify Connect). Gated behind `ConnectConfig::emit_set_queue_events`
 - [examples] Obtain an access token via OAuth to establish a new session and retrieve the stored credentials
+- [playback] Add `AudioKeyUnavailable` player event, emitted when Spotify refuses the audio key of the track being loaded (breaking)
 
 ### Changed
 
@@ -20,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- [playback] Stop instead of skipping through the queue when Spotify refuses a track's audio key
 - [core] Pass on dealer messages that carry plain JSON, such as collection updates, instead of dropping them with a base64 warning
 - [core] Fixed AP login on Windows on ARM by using the supported desktop platform identifier
 - [audio] Fixed integer overflow in throughput calculation
