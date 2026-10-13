@@ -18,6 +18,8 @@ pub struct SymphoniaDecoder {
     probe_result: ProbeResult,
     decoder: Box<dyn Decoder>,
     sample_buffer: Option<SampleBuffer<f64>>,
+    /// Mono input, such as DJ narration, is played on both channels.
+    mono: bool,
 }
 
 #[derive(Default)]
@@ -77,7 +79,8 @@ impl SymphoniaDecoder {
         let channels = decoder.codec_params().channels.ok_or_else(|| {
             DecoderError::SymphoniaDecoder("Could not retrieve channel configuration".into())
         })?;
-        if channels.count() != NUM_CHANNELS as usize {
+        let mono = channels.count() == 1;
+        if !mono && channels.count() != NUM_CHANNELS as usize {
             return Err(DecoderError::SymphoniaDecoder(format!(
                 "Unsupported number of channels: {channels}"
             )));
@@ -89,6 +92,7 @@ impl SymphoniaDecoder {
             // We set the sample buffer when decoding the first full packet,
             // whose duration is also the ideal sample buffer size.
             sample_buffer: None,
+            mono,
         })
     }
 
@@ -253,7 +257,12 @@ impl AudioDecoder for SymphoniaDecoder {
                     };
 
                     sample_buffer.copy_interleaved_ref(decoded);
-                    let samples = AudioPacket::Samples(sample_buffer.samples().to_vec());
+                    let samples = sample_buffer.samples();
+                    let samples = AudioPacket::Samples(if self.mono {
+                        samples.iter().flat_map(|&s| [s, s]).collect()
+                    } else {
+                        samples.to_vec()
+                    });
 
                     return Ok(Some((packet_position, samples)));
                 }
