@@ -1,0 +1,47 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.prerelease.extension;
+
+import "google/protobuf/timestamp.proto";
+
+option optimize_for = CODE_SIZE;
+
+message Entity {
+    string uri = 1;
+    string name = 3;
+    repeated Agent agents = 4;
+    repeated Image covers = 5;
+    
+    oneof _type {
+        string type = 2;
+    }
+}
+
+message Prerelease {
+    string uri = 1;
+    google.protobuf.Timestamp release_time = 2;
+    Entity entity = 3;
+}
+
+message Image {
+    string uri = 1;
+    string size = 2;
+    
+    oneof _width {
+        sint32 width = 3;
+    }
+    
+    oneof _height {
+        sint32 height = 4;
+    }
+}
+
+message Agent {
+    string name = 2;
+    
+    oneof _uri {
+        string uri = 1;
+    }
+}

@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
@@ -6,8 +6,9 @@ package spotify.storage.esperanto.proto;
 
 import "google/protobuf/empty.proto";
 
-option java_package = "com.spotify.storage.esperanto.proto";
 option objc_class_prefix = "ESP";
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.storage.esperanto.proto";
 
 service Storage {
     rpc GetCacheSizeLimit(GetCacheSizeLimitParams) returns (CacheSizeLimit);
@@ -16,23 +17,35 @@ service Storage {
     rpc DeleteUnlockedItems(DeleteUnlockedItemsParams) returns (google.protobuf.Empty);
     rpc GetStats(GetStatsParams) returns (Stats);
     rpc GetFileRanges(GetFileRangesParams) returns (FileRanges);
+    rpc DeleteItem(DeleteItemParams) returns (google.protobuf.Empty);
 }
 
 message CacheSizeLimit {
-    int64 size = 1;
+    int64 effective_limit_mb = 1;
+    int64 minimum_selectable_limit_mb = 3;
+    int64 maximum_selectable_limit_mb = 4;
+    
+    oneof _user_limit_mb {
+        int64 user_limit_mb = 2;
+    }
 }
 
 message GetCacheSizeLimitParams {
+    
 }
 
 message SetCacheSizeLimitParams {
-    CacheSizeLimit limit = 1;
+    oneof _user_limit_mb {
+        int64 user_limit_mb = 1;
+    }
 }
 
 message DeleteExpiredItemsParams {
+    
 }
 
 message DeleteUnlockedItemsParams {
+    
 }
 
 message RealmStats {
@@ -55,20 +68,26 @@ message Stats {
 }
 
 message GetStatsParams {
+    
 }
 
 message FileRanges {
+    bool byte_size_known = 1;
+    uint64 byte_size = 2;
+    
+    repeated Range ranges = 3;
     message Range {
         uint64 from_byte = 1;
         uint64 to_byte = 2;
     }
-
-    bool byte_size_known = 1;
-    uint64 byte_size = 2;
-    repeated Range ranges = 3;
 }
 
 message GetFileRangesParams {
+    Realm realm = 1;
+    string file_id = 2;
+}
+
+message DeleteItemParams {
     Realm realm = 1;
     string file_id = 2;
 }

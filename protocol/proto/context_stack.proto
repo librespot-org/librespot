@@ -1,0 +1,22 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playback_platform.context.v1;
+
+import "spotify/playback_platform/context/v1/context.proto";
+import "spotify/playback_platform/context/v1/sequence_child.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+
+message ContextStack {
+    repeated Entry entries = 1;
+    message Entry {
+        SequenceChild child = 1;
+        
+        oneof _context {
+            Context context = 2;
+        }
+    }
+}

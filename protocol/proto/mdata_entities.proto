@@ -1,0 +1,49 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.mdata.proto;
+
+import "google/protobuf/timestamp.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.mdata.proto";
+
+message AudiobookSpecifics {
+    string uri = 1;
+    Credits credits = 2;
+    string edition = 3;
+    int64 duration_ms = 4;
+    google.protobuf.Timestamp publish_date = 5;
+    string main_title = 6;
+    string subtitle = 7;
+    string series_number = 8;
+    string series_name = 9;
+    string series_position_label = 10;
+}
+
+message Credits {
+    repeated Publisher publishers = 2;
+    message Publisher {
+        string name = 2;
+        
+        reserved 1;
+    }
+    
+    repeated Author authors = 3;
+    message Author {
+        string name = 2;
+        
+        reserved 1;
+    }
+    
+    repeated Narrator narrators = 4;
+    message Narrator {
+        string name = 2;
+        
+        reserved 1;
+    }
+    
+    reserved 1;
+}

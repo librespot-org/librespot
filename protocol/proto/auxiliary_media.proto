@@ -1,0 +1,158 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playlist.proto;
+
+option optimize_for = CODE_SIZE;
+
+message TtsMedia {
+    oneof prompt {
+        string text = 1;
+        string ssml = 2;
+    }
+    
+    oneof _voice {
+        string voice = 3;
+    }
+    
+    oneof _tts_provider {
+        string tts_provider = 4;
+    }
+    
+    oneof _sample_rate {
+        uint32 sample_rate = 5;
+    }
+    
+    oneof _audio_format {
+        string audio_format = 6;
+    }
+    
+    oneof _loudness {
+        float loudness = 7;
+    }
+    
+    oneof _true_peak {
+        float true_peak = 8;
+    }
+}
+
+message AudioUrlMedia {
+    string audio_url = 1;
+}
+
+message IsNarration {
+    
+}
+
+message AuxiliaryMediaMetadata {
+    oneof _uri {
+        string uri = 1;
+    }
+    
+    oneof _title {
+        string title = 2;
+    }
+    
+    oneof _album_title {
+        string album_title = 3;
+    }
+    
+    oneof _artist {
+        string artist = 4;
+    }
+    
+    oneof _provider {
+        string provider = 5;
+    }
+    
+    oneof _custom_reporting_attribution {
+        string custom_reporting_attribution = 6;
+    }
+    
+    oneof _decision_id {
+        string decision_id = 7;
+    }
+    
+    oneof _image_default {
+        string image_default = 8;
+    }
+    
+    oneof _image_small {
+        string image_small = 9;
+    }
+    
+    oneof _image_large {
+        string image_large = 10;
+    }
+    
+    oneof _image_xlarge {
+        string image_xlarge = 11;
+    }
+    
+    oneof _is_narration {
+        IsNarration is_narration = 12;
+    }
+    
+    oneof _suppress_progress {
+        bool suppress_progress = 13;
+    }
+}
+
+message Media {
+    oneof media {
+        TtsMedia tts = 1;
+        AudioUrlMedia audio_url = 2;
+    }
+}
+
+message SkipPoint {
+    oneof _is_forward_skip_target {
+        bool is_forward_skip_target = 1;
+    }
+    
+    oneof _is_backward_skip_target {
+        bool is_backward_skip_target = 2;
+    }
+}
+
+message AuxiliaryMediaItem {
+    string uid = 1;
+    Media media = 2;
+    
+    oneof _metadata {
+        AuxiliaryMediaMetadata metadata = 4;
+    }
+    
+    oneof _play_once {
+        bool play_once = 5;
+    }
+    
+    oneof _skip_point {
+        SkipPoint skip_point = 6;
+    }
+}
+
+message ListItemFade {
+    int32 duration_ms = 1;
+    int32 to_bed_duration_ms = 2;
+    int32 from_bed_duration_ms = 3;
+    float bed_gain = 4;
+    
+    oneof _offset_ms {
+        int32 offset_ms = 5;
+    }
+}
+
+message AuxiliaryMediaItems {
+    repeated AuxiliaryMediaItem items = 1;
+    
+    oneof fade {
+        ListItemFade list_item_fade = 2;
+    }
+}
+
+message AuxiliaryMedia {
+    AuxiliaryMediaItems intro_items = 1;
+    AuxiliaryMediaItems outro_items = 2;
+}

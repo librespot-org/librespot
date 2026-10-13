@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
@@ -19,7 +19,7 @@ message ListDevicesResponse {
 
 message PutDeviceRequest {
     string user_id = 1;
-
+    
     Body body = 2;
     message Body {
         Device device = 1;
@@ -34,32 +34,33 @@ message GetDeviceResponse {
     Device device = 1;
 }
 
-message RemoveDeviceRequest {
-    DeviceKey key = 1;
-    bool is_force_remove = 2;
-}
-
 message OfflineEnableDeviceRequest {
-    message Body {
-      bool auto_opc = 1;
-    }
-
     DeviceKey key = 1;
+    
     Body body = 2;
+    message Body {
+        bool auto_opc = 1;
+    }
+    
     string name = 9;
     int32 platform = 7;
     string client_id = 8;
 }
 
 message OfflineEnableDeviceResponse {
-    enum StatusCode {
-      UNKNOWN = 0;
-      OK = 1;
-      DEVICE_LIMIT_REACHED = 2;
-    }
-
     Restrictions restrictions = 1;
+    
     StatusCode status_code = 2;
+    enum StatusCode {
+        UNKNOWN = 0;
+        OK = 1;
+        DEVICE_LIMIT_REACHED = 2;
+    }
+}
+
+message ListResourcesRequest {
+    DeviceKey key = 1;
+    string username = 2;
 }
 
 message ListResourcesResponse {
@@ -69,13 +70,15 @@ message ListResourcesResponse {
 
 message WriteResourcesRequest {
     DeviceKey key = 1;
-
+    
     Body body = 2;
     message Body {
         repeated ResourceOperation operations = 1;
         string source_device_id = 2;
         string source_cache_id = 3;
     }
+    
+    string pushMessageIdentifier = 3;
 }
 
 message ResourcesUpdate {
@@ -85,7 +88,8 @@ message ResourcesUpdate {
 
 message DeltaResourcesRequest {
     DeviceKey key = 1;
-
+    string username = 3;
+    
     Body body = 2;
     message Body {
         google.protobuf.Timestamp last_known_server_time = 1;
@@ -100,6 +104,7 @@ message DeltaResourcesResponse {
 
 message GetResourceRequest {
     DeviceKey key = 1;
+    string username = 3;
     string uri = 2;
 }
 
@@ -109,41 +114,40 @@ message GetResourceResponse {
 
 message WriteResourcesDetailsRequest {
     DeviceKey key = 1;
-
+    
     Body body = 2;
     message Body {
         repeated Resource resources = 1;
     }
 }
 
-message GetResourceForDevicesRequest {
-    string user_id = 1;
-    string uri = 2;
-}
-
-message GetResourceForDevicesResponse {
-    repeated Device devices = 1;
-    repeated ResourceForDevice resources = 2;
-}
-
 message ListDevicesWithResourceRequest {
-    message Body {
-        string uri = 1;
-    }
-
     string user_id = 1;
     string username = 2;
+    
     Body body = 3;
+    message Body {
+        string uri = 1;
+        
+        Filters filters = 2;
+        message Filters {
+            bool include_only_is_supported = 1;
+            bool include_only_remote_downloads_enabled = 2;
+        }
+    }
 }
 
 message ListDevicesWithResourceResponse {
+    repeated DeviceWithResource deviceWithResource = 1;
     message DeviceWithResource {
         Device device = 1;
         bool is_supported = 2;
-        optional Resource resource = 3;
+        
+        oneof _resource {
+            Resource resource = 3;
+        }
     }
-
-    repeated DeviceWithResource deviceWithResource = 1;
+    
     FetchStrategy fetch_strategy = 2;
 }
 
@@ -159,5 +163,28 @@ message PollStrategy {
 }
 
 message SubStrategy {
+    
 }
 
+message ClearUserDataRequest {
+    string user_id = 1;
+}
+
+message ClearDeltaResourcesRequest {
+    string user_id = 1;
+    string cache_id = 2;
+}
+
+message DeleteResourceListRequest {
+    string user_id = 1;
+    string cache_id = 2;
+}
+
+message LicenseStatusRequest {
+    string user_id = 1;
+}
+
+message LicenseStatusResponse {
+    int32 max_licenses = 1;
+    int32 free_licenses = 2;
+}

@@ -1,0 +1,40 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playback_platform.context.v1.behavior;
+
+import "spotify/playback_platform/context/v1/sequence_query.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.playback_platform.context.v1.behavior";
+
+message Navigation {
+    repeated Transitions move_to_prev = 1;
+    message Transitions {
+        SequenceQuery sources = 1;
+        SequenceQuery targets = 2;
+        AllowWrap allow_wrap = 3;
+        MoveStack move_stack = 4;
+    }
+    
+    repeated Transitions move_to_next = 2;
+    repeated Transitions skip_to_prev = 3;
+    repeated Transitions skip_to_next = 4;
+    repeated Transitions fail_to_prev = 5;
+    repeated Transitions fail_to_next = 6;
+    
+    enum AllowWrap {
+        ALLOW_WRAP_NEVER = 0;
+        ALLOW_WRAP_REPEATING_SEQUENCE = 1;
+        ALLOW_WRAP_REPEATING_TIMELINE = 2;
+        ALLOW_WRAP_ALWAYS = 3;
+    }
+    
+    enum MoveStack {
+        MOVE_STACK_UNUSED = 0;
+        MOVE_STACK_REQUIRED = 1;
+        MOVE_STACK_PREFERRED = 2;
+    }
+}

@@ -1,0 +1,45 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.parametric_eq_esperanto.proto;
+
+option objc_class_prefix = "ESP";
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.parametric_eq_esperanto.proto";
+
+message FilterSpec {
+    BiquadFilterType type = 1;
+    double frequency_hz = 2;
+    double q = 3;
+    double gain_db = 4;
+}
+
+message ParametricEqConfig {
+    double pre_amp_gain_db = 1;
+    repeated FilterSpec filters = 2;
+}
+
+message SetConfigResponse {
+    SetConfigError error = 1;
+}
+
+enum BiquadFilterType {
+    PEAKING = 0;
+    LOW_PASS = 1;
+    HIGH_PASS = 2;
+    BAND_PASS = 3;
+    LOW_SHELF = 4;
+    HIGH_SHELF = 5;
+    NOTCH = 6;
+    ALL_PASS = 7;
+}
+
+enum SetConfigError {
+    OK = 0;
+    TOO_MANY_FILTERS = 1;
+    INVALID_FREQUENCY = 2;
+    INVALID_Q = 3;
+    INVALID_GAIN = 4;
+    INVALID_PRE_AMP_GAIN = 5;
+}

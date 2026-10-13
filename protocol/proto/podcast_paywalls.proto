@@ -1,0 +1,21 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.podcast_paywalls_esperanto.proto;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.podcast_paywalls_esperanto.proto";
+
+service PodcastPaywalls {
+    rpc PutShowSubscription(PodcastPaywallsShowSubscriptionRequest) returns (PodcastPaywallsShowSubscriptionResponse);
+}
+
+message PodcastPaywallsShowSubscriptionRequest {
+    string show_uri = 1;
+}
+
+message PodcastPaywallsShowSubscriptionResponse {
+    bool is_user_subscribed = 1;
+}

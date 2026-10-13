@@ -1,0 +1,64 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.progress_playback_esperanto.proto;
+
+import "google/protobuf/duration.proto";
+
+option optimize_for = CODE_SIZE;
+
+service ResumptionProgressPlayback {
+    rpc OnUpdate(OnUpdateRequest) returns (OnUpdateResponse);
+}
+
+message OnUpdateRequest {
+    string item_uri = 1;
+    google.protobuf.Duration position = 2;
+    google.protobuf.Duration duration = 3;
+    bool played_until_completion = 4;
+    string page_identifier = 6;
+    string use_case_identifier = 7;
+    Reason reason = 8;
+    
+    oneof _playback_id {
+        string playback_id = 5;
+    }
+}
+
+message OnUpdateResponse {
+    ResponseResult result = 1;
+}
+
+enum Reason {
+    REASON_UNSPECIFIED = 0;
+    REASON_ACTIVATION_UNMUTE = 1;
+    REASON_ACTIVATION_ADDED_TO_LIBRARY = 2;
+    REASON_ACTIVATION_ADDED_TO_PLAYLIST = 3;
+    REASON_ACTIVATION_DOWNLOADED = 4;
+    REASON_ACTIVATION_TIME_THRESHOLD_EXCEEDED = 5;
+    REASON_ACTIVATION_GENERIC = 6;
+    REASON_PLAYBACK_PERIODIC = 8;
+    REASON_PLAYBACK_ENDED = 9;
+    REASON_PLAYBACK_GENERIC = 10;
+    REASON_ACTIVATION_SHARED = 7;
+    REASON_ACTIVATION_ADDED_TO_QUEUE = 11;
+    REASON_ACTIVATION_PAGE_MATCH = 12;
+    REASON_ACTIVATION_SEEK = 13;
+}
+
+enum ResponseResult {
+    RESPONSE_RESULT_UNSPECIFIED = 0;
+    RESPONSE_RESULT_SUCCESS = 1;
+    RESPONSE_RESULT_INVALID_URI = 2;
+    RESPONSE_RESULT_INVALID_POSITION = 3;
+    RESPONSE_RESULT_INVALID_DURATION = 4;
+    RESPONSE_RESULT_INVALID_REASON = 5;
+    RESPONSE_RESULT_POSITION_EXCEEDS_DURATION = 6;
+    RESPONSE_RESULT_PAGE_IDENTIFIER_TOO_LONG = 7;
+    RESPONSE_RESULT_PAGE_IDENTIFIER_EMPTY = 8;
+    RESPONSE_RESULT_USE_CASE_IDENTIFIER_TOO_LONG = 9;
+    RESPONSE_RESULT_USE_CASE_IDENTIFIER_EMPTY = 10;
+    RESPONSE_RESULT_PLAYBACK_ID_TOO_LONG = 11;
+    RESPONSE_RESULT_PLAYBACK_ID_EMPTY = 12;
+}

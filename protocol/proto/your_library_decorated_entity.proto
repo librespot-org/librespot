@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
@@ -9,17 +9,19 @@ import "policy/supported_link_types_in_playlists.proto";
 option optimize_for = CODE_SIZE;
 
 message YourLibraryEntityInfo {
-    enum Pinnable {
-        YES = 0;
-        NO_IN_FOLDER = 1;
-    }
-
     string name = 2;
     string uri = 3;
     string group_label = 5;
     string image_uri = 6;
     bool pinned = 7;
+    
     Pinnable pinnable = 8;
+    enum Pinnable {
+        YES = 0;
+        NO_IN_FOLDER = 1;
+        NOT_VALID_TYPE = 2;
+    }
+    
     Offline.Availability offline_availability = 9;
     int64 add_time = 11;
     int64 last_played = 12;
@@ -34,22 +36,23 @@ message Offline {
         DOWNLOADING = 3;
         WAITING = 4;
     }
-
 }
 
 message YourLibraryAlbumExtraInfo {
+    string artist_name = 1;
+    string artist_uri = 2;
+    
+    Type type = 3;
     enum Type {
         ALBUM = 0;
         SINGLE = 1;
         COMPILATION = 2;
         EP = 3;
     }
-
-    string artist_name = 1;
-    string artist_uri = 2;
-    Type type = 3;
+    
     bool is_premium_only = 4;
     bool new_release = 5;
+    int64 release_date = 6;
 }
 
 message YourLibraryArtistExtraInfo {
@@ -79,12 +82,27 @@ message YourLibraryPlaylistExtraInfo {
     bool owned_by_self = 13;
     YourLibraryPlaylistFolderInfo from_folder = 14;
     string name_prefix = 15;
+    bool mixing_active = 16;
+    bool is_empty_predefined = 17;
+    
+    GenerationStatus prompt_generation_status = 18;
+    enum GenerationStatus {
+        MESSAGE_STATUS_UNKNOWN = 0;
+        MESSAGE_STATUS_SUCCESS = 1;
+        MESSAGE_STATUS_QUEUED = 2;
+        MESSAGE_STATUS_PROCESSING = 3;
+        MESSAGE_STATUS_ERROR = 4;
+    }
+    
+    bool prompt_is_personalized = 19;
+    bool is_prompt_playlist = 20;
+    bool is_published = 21;
+    bool is_private = 22;
 }
 
 message YourLibraryShowExtraInfo {
     string creator_name = 1;
     int64 publish_date = 4;
-    bool is_music_and_talk = 5;
     int32 number_of_downloaded_episodes = 6;
 }
 
@@ -93,14 +111,6 @@ message YourLibraryFolderExtraInfo {
     int32 number_of_folders = 3;
     string row_id = 4;
     repeated YourLibraryDecoratedEntity entity = 5;
-}
-
-message YourLibraryLikedSongsExtraInfo {
-    int32 number_of_songs = 3;
-}
-
-message YourLibraryYourEpisodesExtraInfo {
-    int32 number_of_downloaded_episodes = 4;
 }
 
 message YourLibraryNewEpisodesExtraInfo {
@@ -112,39 +122,36 @@ message YourLibraryLocalFilesExtraInfo {
 }
 
 message YourLibraryBookExtraInfo {
+    string author_name = 1;
+    
+    Access access = 2;
     enum Access {
         OPEN = 0;
         LOCKED = 1;
         CAPPED = 2;
     }
-
+    
+    int64 milliseconds_left = 3;
+    int32 percent_done = 4;
+    
+    State state = 5;
     enum State {
         NOT_STARTED = 0;
         IN_PROGRESS = 1;
         FINISHED = 2;
     }
-
-    string author_name = 1;
-    Access access = 2;
-    int64 milliseconds_left = 3;
-    int32 percent_done = 4;
-    State state = 5;
-}
-
-message YourLibraryCachedFilesExtraInfo {
-    int32 number_of_items = 1;
-    int32 duration_in_seconds = 2;
 }
 
 message YourLibraryPreReleaseExtraInfo {
+    string artist_name = 1;
+    string artist_uri = 2;
+    
+    Type type = 3;
     enum Type {
         ALBUM = 0;
         BOOK = 1;
     }
-
-    string artist_name = 1;
-    string artist_uri = 2;
-    Type type = 3;
+    
     YourLibraryAlbumExtraInfo.Type album_type = 4;
 }
 
@@ -155,25 +162,48 @@ message YourLibraryEventExtraInfo {
 }
 
 message YourLibraryAuthorExtraInfo {
+    
+}
+
+message YourLibraryVenueExtraInfo {
+    string address_name = 1;
+    string city_name = 2;
+}
+
+message YourLibraryConcertCampaignExtraInfo {
+    Status status = 1;
+    enum Status {
+        UNSPECIFIED = 0;
+        RESERVED = 1;
+        FCFS = 2;
+        WAITLISTED = 3;
+        PURCHASED = 4;
+        INELIGIBLE = 5;
+        SOLD_OUT = 6;
+        CANCELLED = 7;
+        SALE_ENDED = 8;
+    }
+    
+    int64 start_time = 2;
+    int64 end_time = 3;
 }
 
 message YourLibraryDecoratedEntity {
     YourLibraryEntityInfo entity_info = 1;
+    
     oneof entity {
         YourLibraryAlbumExtraInfo album = 2;
         YourLibraryArtistExtraInfo artist = 3;
         YourLibraryPlaylistExtraInfo playlist = 4;
         YourLibraryShowExtraInfo show = 5;
         YourLibraryFolderExtraInfo folder = 6;
-        YourLibraryLikedSongsExtraInfo liked_songs = 8;
-        YourLibraryYourEpisodesExtraInfo your_episodes = 9;
         YourLibraryNewEpisodesExtraInfo new_episodes = 10;
         YourLibraryLocalFilesExtraInfo local_files = 11;
         YourLibraryBookExtraInfo book = 12;
-        YourLibraryCachedFilesExtraInfo cached_files = 13;
         YourLibraryPreReleaseExtraInfo prerelease = 15;
         YourLibraryEventExtraInfo event = 16;
         YourLibraryAuthorExtraInfo author = 17;
+        YourLibraryVenueExtraInfo venue = 19;
+        YourLibraryConcertCampaignExtraInfo concert_campaign = 20;
     }
 }
-

@@ -1,0 +1,18 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playback_platform.timeline.v1;
+
+import "spotify/playback_platform/external/legacy/v1/legacy_metadata.proto";
+import "spotify/playback_platform/timeline/v1/metadata/artist.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.playback_platform.timeline.v1";
+
+message TimelineMetadata {
+    map<string, string> unmapped = 1;
+    repeated metadata.Artist artists = 2;
+    external.legacy.v1.LegacyMetadata legacy = 2352 [deprecated = true];
+}

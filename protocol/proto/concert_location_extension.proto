@@ -1,0 +1,21 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.concerts.metadata.v1;
+
+option optimize_for = CODE_SIZE;
+
+message PhysicalLocation {
+    string city = 1;
+}
+
+message Location {
+    string name = 2;
+    
+    oneof details {
+        PhysicalLocation physical_location = 4;
+    }
+    
+    reserved 1, 3;
+}

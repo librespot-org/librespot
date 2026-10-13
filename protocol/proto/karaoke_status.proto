@@ -1,0 +1,15 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.karaoke_esperanto.proto;
+
+option objc_class_prefix = "ESP";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.karaoke.esperanto.proto";
+
+enum KaraokeStatus {
+    ENABLED = 0;
+    DISABLED = 1;
+}

@@ -1,0 +1,34 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.contentagnostic.v2;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.contentagnostic.v2";
+
+message EntityTypeTrait {
+    EntityType type = 1;
+}
+
+enum EntityType {
+    ENTITY_TYPE_UNSPECIFIED = 0;
+    ENTITY_TYPE_TRACK = 1;
+    ENTITY_TYPE_ALBUM = 2;
+    ENTITY_TYPE_PODCAST_EPISODE = 3;
+    ENTITY_TYPE_PODCAST_SHOW = 4;
+    ENTITY_TYPE_AUDIOBOOK_CHAPTER = 5;
+    ENTITY_TYPE_AUDIOBOOK = 6;
+    ENTITY_TYPE_LEARNING_COURSE = 7;
+    ENTITY_TYPE_LEARNING_LESSON = 8;
+    ENTITY_TYPE_USER_HIGHLIGHT = 9;
+    ENTITY_TYPE_AUTHOR = 10;
+    ENTITY_TYPE_ARTIST = 11;
+    ENTITY_TYPE_PLAYLIST = 12;
+    ENTITY_TYPE_USER = 13;
+    ENTITY_TYPE_PODCAST_CHAPTER = 14;
+    ENTITY_TYPE_KALLAX = 15;
+    ENTITY_TYPE_CONCERT = 16;
+    ENTITY_TYPE_VENUE = 17;
+}

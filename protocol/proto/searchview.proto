@@ -1,0 +1,506 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.searchview;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+import "searchview_shared.proto";
+
+option java_multiple_files = true;
+option java_outer_classname = "Searchview";
+option java_package = "com.spotify.searchview.proto";
+
+message NativeViewResponse {
+    repeated SearchRow rows = 1;
+    message SearchRow {
+        oneof type {
+            EntityRow entity_row = 1;
+        }
+    }
+    
+    message EntityRow {
+        string uri = 1;
+        Snippet snippet = 2;
+    }
+}
+
+message MainViewResponse {
+    repeated Entity hits = 1;
+    Recommendations recommendations = 2;
+    string next_page_token = 4;
+    BannerContent banner_content = 5;
+    Filters flat_filters = 10;
+    
+    reserved 3, 6, 7, 8, 9;
+    
+    reserved "autocomplete_queries", "entity_types", "related_searches", "sections", "filters";
+}
+
+message Section {
+    SectionType type = 1;
+    repeated SectionItem items = 2;
+    string attribution_uri = 3;
+    string description = 4;
+    RenderHint render_hint = 5;
+    ChatEntryPoint chat_entry_point = 6;
+}
+
+message SectionItem {
+    oneof item {
+        VideoCarouselItem video_carousel_item = 1;
+        GenericItem generic_item = 2;
+        DiscoveryFeedItem discovery_feed_item = 3;
+        InstantMixItem instant_mix_item = 4;
+        RelatedSearchItem related_search_item = 5;
+        ConversationStarterItem chat_starter_item = 6;
+    }
+}
+
+message VideoCarouselItem {
+    string title = 1;
+    string subtitle = 2;
+    string thumbnailUri = 3;
+    string videoId = 4;
+    int32 start = 5;
+    int32 end = 6;
+    bool isExplicit = 7;
+    string videoSpotifyUri = 8;
+    bool mogef19 = 9;
+}
+
+message GenericItem {
+    Entity entity = 1;
+}
+
+message DiscoveryFeedItem {
+    string uri = 1;
+    string title = 2;
+    string thumbnailUri = 3;
+    string videoUri = 4;
+    string navigation_uri = 5;
+    string first_item_uri = 6;
+}
+
+message InstantMixItem {
+    Entity entity = 1;
+    string sessionId = 2;
+    string messageId = 3;
+}
+
+message RelatedSearchItem {
+    string suggestion = 1;
+    string uri = 2;
+}
+
+message DrillDownViewResponse {
+    repeated Entity hits = 1;
+    string next_page_token = 2;
+}
+
+message PodcastViewResponse {
+    repeated Entity shows = 1;
+    repeated Entity episodes = 2;
+}
+
+message AutocompleteViewResponse {
+    repeated Entity hits = 1;
+    BannerContent banner_content = 2;
+    
+    reserved 1000;
+    
+    reserved "autocomplete_queries";
+}
+
+message Recommendations {
+    RecommendationsType type = 1;
+    repeated Entity entities = 2;
+}
+
+message Entity {
+    string uri = 1;
+    string name = 2;
+    string image_uri = 3;
+    string serp_metadata = 2047;
+    string signifier_text = 24;
+    
+    oneof entity {
+        Artist artist = 4;
+        Track track = 5;
+        Album album = 6;
+        Playlist playlist = 7;
+        Genre genre = 8;
+        AudioShow audio_show = 9;
+        AudioEpisode audio_episode = 10;
+        Profile profile = 11;
+        Audiobook audiobook = 13;
+        Section section = 14;
+        Author author = 17;
+        Concert concert = 19;
+        Venue venue = 21;
+        Kallax kallax = 22;
+        PodcastChapter podcast_chapter = 23;
+        AutocompleteQuery autocomplete = 2046;
+    }
+    
+    oneof highlightType {
+        HighlightTypeNewRelease new_release = 16;
+        HighlightTypeRecentSearch recent_search = 18;
+        HighlightTypeBestMatch best_match = 20;
+    }
+    
+    reserved 12, 15;
+    
+    reserved "topic";
+}
+
+message HighlightTypeNewRelease {
+    
+}
+
+message HighlightTypeRecentSearch {
+    
+}
+
+message HighlightTypeBestMatch {
+    
+}
+
+message DateWithOffset {
+    string date = 1;
+    int32 utcOffsetInMinutes = 2;
+}
+
+message Kallax {
+    bool explicit = 1;
+    bool mogef19 = 2;
+}
+
+message Concert {
+    string uri = 1;
+    DateWithOffset date = 2;
+    string title = 3;
+    string subtitle = 4;
+}
+
+message Venue {
+    string subtitle = 1;
+}
+
+message Artist {
+    bool verified = 1;
+    bool has_concerts = 2;
+    Concert user_local_concert = 3;
+    ConcertCampaign concert_campaign = 4;
+}
+
+message ConcertCampaign {
+    string uri = 1;
+    string name = 2;
+    string image_url = 3;
+    string featured_performers = 4;
+    ConcertCampaignUserState user_state = 5;
+    string ubi_reason = 6;
+}
+
+message ConcertCampaignUserState {
+    oneof state {
+        CampaignUserStateBeforeSale before_sale = 1;
+        CampaignUserStateOnSale on_sale = 2;
+    }
+}
+
+message CampaignUserStateBeforeSale {
+    
+}
+
+message CampaignUserStateOnSale {
+    string highlight_color = 1;
+}
+
+message Track {
+    bool explicit = 1;
+    bool windowed = 2 [deprecated = true];
+    RelatedEntity track_album = 3;
+    repeated RelatedEntity track_artists = 4;
+    bool mogef19 = 6;
+    bool lyrics_match = 7;
+    OnDemand on_demand = 8;
+    bool premium_only = 10;
+    string alternate_image_uri = 11;
+    string release_signifier_text = 12 [deprecated = true];
+    string alternate_uri = 13;
+    
+    TrackType type = 14;
+    enum TrackType {
+        UNKNOWN = 0;
+        AUDIO_ONLY = 1;
+        AUDIO_WITH_VIDEO = 2;
+        VIDEO_MAPPED = 3;
+        VIDEO_UNMAPPED = 4;
+    }
+    
+    bool age_assured = 15;
+    Snippet lyrics = 16;
+    
+    TrackClassification classification = 17;
+    enum TrackClassification {
+        TRACK_CLASSIFICATION_UNKNOWN = 0;
+        TRACK_CLASSIFICATION_PERFORMANCE = 1;
+        TRACK_CLASSIFICATION_MTV = 2;
+    }
+    
+    google.protobuf.Duration duration = 18;
+    
+    reserved 5, 9, 2045, 2046, 2047;
+}
+
+message RelatedEntity {
+    string uri = 1;
+    string name = 2;
+}
+
+message Album {
+    repeated string artist_names = 1 [deprecated = true];
+    
+    Type type = 2;
+    enum Type {
+        UNDEFINED = 0;
+        ALBUM = 1;
+        SINGLE = 2;
+        COMPILATION = 3;
+        EP = 4;
+        AUDIOBOOK = 5;
+        PODCAST = 6;
+    }
+    
+    int32 release_year = 3;
+    
+    State state = 4;
+    enum State {
+        UNKNOWN = 0;
+        PRERELEASE = 1;
+        LIVE = 2;
+    }
+    
+    google.protobuf.Timestamp release_time = 5 [deprecated = true];
+    string user_country_release_iso_time = 6;
+    repeated RelatedEntity album_artists = 7;
+    int64 followersCount = 8;
+    bool premium_only = 9;
+    bool explicit = 10;
+    string release_signifier_text = 11 [deprecated = true];
+    bool mogef19 = 12;
+}
+
+message Playlist {
+    bool personalized = 1;
+    bool owned_by_spotify = 2;
+    int32 number_of_tracks = 3;
+    int64 followersCount = 4;
+    string owner_name = 5;
+    repeated string tags = 6;
+    bool mats = 7;
+    bool prompted = 8;
+}
+
+message Genre {
+    GenreType type = 1;
+    enum GenreType {
+        UNKNOWN = 0;
+        DEFAULT = 1;
+        CONTENT = 2;
+    }
+    
+    bool spotify_branded = 2;
+}
+
+message Author {
+    
+}
+
+message Audiobook {
+    repeated string author_names = 1;
+    repeated string narrator_names = 2;
+    bool explicit = 3;
+    google.protobuf.Duration duration = 4;
+    string description = 5;
+    
+    Access access = 6;
+    message Access {
+        string signifier_text = 1;
+        bool book_is_unlocked_by_user = 2;
+    }
+    
+    State state = 7;
+    enum State {
+        UNKNOWN = 0;
+        PRERELEASE = 1;
+        LIVE = 2;
+    }
+    
+    google.protobuf.Timestamp release_time = 8;
+    google.protobuf.DoubleValue rating = 9;
+    repeated Tag tags = 10;
+}
+
+message Tag {
+    string name = 1;
+}
+
+message AudioShow {
+    string publisher_name = 1;
+    bool music_and_talk = 3;
+    string category = 4;
+    bool verified = 6;
+    
+    reserved 2, 5;
+}
+
+message AudioEpisode {
+    string show_name = 1;
+    bool explicit = 2;
+    google.protobuf.Duration duration = 3;
+    bool music_and_talk = 6;
+    string description = 7;
+    google.protobuf.Timestamp publication_time = 8;
+    bool mogef19 = 9;
+    Snippet snippet = 10;
+    bool video = 12;
+    string video_image_uri = 14;
+    repeated Tag tags = 15;
+    bool age_assured = 16;
+    google.protobuf.Int64Value stream_count = 17;
+    string show_uri = 2000;
+    bool video_format = 2002 [deprecated = true];
+    
+    reserved 4, 5, 2001, 11;
+    
+    reserved "played_state", "chapter_count";
+}
+
+message Snippet {
+    repeated Segment segments = 1;
+    message Segment {
+        string value = 1;
+        bool matched = 2;
+    }
+}
+
+message Profile {
+    bool verified = 1;
+}
+
+message OnDemand {
+    string track_uri = 1;
+    string playlist_uri = 2;
+}
+
+message BannerContent {
+    string id = 1;
+    string title = 2;
+    string description = 3;
+    string button_title = 4;
+    string navigation_url = 5;
+}
+
+message AutocompleteQuery {
+    string uri = 1;
+    Snippet snippet = 2;
+    bool recentHighlight = 3;
+}
+
+message Filters {
+    repeated Filter filters = 1;
+}
+
+message Filter {
+    string id = 1;
+    
+    oneof filter {
+        ContentFilter content_filter = 2;
+        UploadDateFilter upload_date_filter = 3;
+        EntityFilter entity_filter = 4;
+    }
+}
+
+message ContentFilter {
+    ContentFilterType type = 1;
+    enum ContentFilterType {
+        CONTENT_FILTER_TYPE_UNKNOWN = 0;
+        CONTENT_FILTER_TYPE_VIDEOS = 1;
+        CONTENT_FILTER_TYPE_PODCAST = 2;
+    }
+}
+
+message UploadDateFilter {
+    UploadDateFilterType type = 1;
+    enum UploadDateFilterType {
+        UPLOAD_DATE_FILTER_TYPE_UNKNOWN = 0;
+        UPLOAD_DATE_FILTER_TYPE_MOST_RECENT = 3;
+    }
+}
+
+message EntityFilter {
+    EntityFilterType type = 1;
+    enum EntityFilterType {
+        ENTITY_FILTER_TYPE_UNKNOWN = 0;
+        ENTITY_FILTER_TYPE_ARTIST = 1;
+        ENTITY_FILTER_TYPE_TRACK = 2;
+        ENTITY_FILTER_TYPE_ALBUM = 3;
+        ENTITY_FILTER_TYPE_PLAYLIST = 4;
+        ENTITY_FILTER_TYPE_GENRE = 5;
+        ENTITY_FILTER_TYPE_PROFILE = 6;
+        ENTITY_FILTER_TYPE_AUDIOBOOK = 7;
+    }
+}
+
+enum RenderHint {
+    UNKNOWN_RENDERING = 0;
+    CAROUSEL = 1;
+    LIST = 2;
+}
+
+enum SectionType {
+    SECTION_TYPE_UNKNOWN = 0;
+    SECTION_TYPE_VIDEO_CAROUSEL = 1;
+    SECTION_TYPE_GENERIC = 2;
+    SECTION_TYPE_DISCOVERY_FEED = 3;
+    SECTION_TYPE_CROSSWORD = 4;
+    SECTION_TYPE_INSTANT_MIX = 5;
+    SECTION_TYPE_DIVIDER = 6;
+    SECTION_TYPE_AGENT = 7;
+    SECTION_TYPE_RELATED_SEARCHES = 8;
+    SECTION_TYPE_CROSS_CONTENT_RELATED = 9;
+    SECTION_TYPE_START_A_CHAT = 10;
+    SECTION_TYPE_TRACK_VERSIONS = 11;
+}
+
+enum RecommendationsType {
+    RECOMMENDATIONS_TYPE_UNKNOWN = 0;
+    RECOMMENDATIONS_TYPE_PLAYLISTS_WITH_ARTIST = 1;
+    RECOMMENDATIONS_TYPE_PLAYLISTS_WITH_GENRE = 2;
+    RECOMMENDATIONS_TYPE_PODCASTS_FOR_CATEGORY = 3;
+    RECOMMENDATIONS_TYPE_PLAYLISTS_WITH_TRACK = 4;
+    RECOMMENDATIONS_TYPE_PERSONALIZED_PODCASTS_FOR_CATEGORY = 6;
+}
+
+enum EntityType {
+    ENTITY_TYPE_UNKNOWN = 0;
+    ENTITY_TYPE_ARTIST = 1;
+    ENTITY_TYPE_TRACK = 2;
+    ENTITY_TYPE_ALBUM = 3;
+    ENTITY_TYPE_PLAYLIST = 4;
+    ENTITY_TYPE_GENRE = 5;
+    ENTITY_TYPE_AUDIO_SHOW = 6;
+    ENTITY_TYPE_AUDIO_EPISODE = 7;
+    ENTITY_TYPE_PROFILE = 8;
+    ENTITY_TYPE_AUDIOBOOK = 10;
+    ENTITY_TYPE_SECTION = 11;
+    ENTITY_TYPE_CONCERT = 13;
+    ENTITY_TYPE_VENUE = 14;
+    ENTITY_TYPE_KALLAX = 15;
+    ENTITY_TYPE_PODCAST_CHAPTER = 16;
+}

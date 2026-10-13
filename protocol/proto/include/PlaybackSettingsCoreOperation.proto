@@ -1,0 +1,19 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message PlaybackSettingsCoreOperation {
+    optional string operation = 1;
+    optional string result = 2;
+    optional string setting_type = 3;
+    optional int32 retry_count = 4;
+    optional int32 duration_ms = 5;
+    optional string error_message = 6;
+    optional string content_id = 7;
+    optional string settings = 8;
+    optional string timestamp = 9;
+}

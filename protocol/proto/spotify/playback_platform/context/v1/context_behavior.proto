@@ -1,0 +1,39 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playback_platform.context.v1;
+
+import "spotify/playback_platform/context/v1/behavior/disable.proto";
+import "spotify/playback_platform/context/v1/behavior/events.proto";
+import "spotify/playback_platform/context/v1/behavior/ledger.proto";
+import "spotify/playback_platform/context/v1/behavior/navigation.proto";
+import "spotify/playback_platform/context/v1/behavior/queue.proto";
+import "spotify/playback_platform/context/v1/behavior/shuffle_algorithm.proto";
+import "spotify/playback_platform/context/v1/behavior/shuffle_placement.proto";
+import "spotify/playback_platform/context/v1/behavior/signals.proto";
+import "spotify/playback_platform/context/v1/behavior/skips.proto";
+import "spotify/playback_platform/context/v1/behavior/start.proto";
+import "spotify/playback_platform/context/v1/behavior/timeline.proto";
+import "spotify/playback_platform/context/v1/behavior/timers.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.playback_platform.context.v1";
+
+message ContextBehavior {
+    behavior.Events events = 1;
+    behavior.Timers timers = 2;
+    behavior.Signals signals = 3;
+    behavior.Disable disable = 4;
+    behavior.Navigation navigation = 5;
+    behavior.Start start = 6;
+    behavior.Skips skips = 7;
+    behavior.Queue queue = 8;
+    behavior.Timeline timeline = 9;
+    behavior.Ledger ledger = 10;
+    behavior.ShuffleAlgorithm shuffle_algorithm = 14;
+    behavior.ShufflePlacement shuffle_placement = 15;
+    
+    reserved 11 to 13;
+}

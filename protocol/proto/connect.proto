@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
@@ -8,8 +8,8 @@ import "player.proto";
 import "devices.proto";
 import "media.proto";
 
-option java_package = "com.spotify.connectstate.model";
 option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.connectstate.model";
 
 message ClusterUpdate {
     Cluster cluster = 1;
@@ -26,8 +26,6 @@ message Device {
 }
 
 message Cluster {
-    reserved 7;
-
     int64 changed_timestamp_ms = 1;
     string active_device_id = 2;
     PlayerState player_state = 3;
@@ -36,8 +34,20 @@ message Cluster {
     uint64 transfer_data_timestamp = 6;
     bool need_full_player_state = 8;
     int64 server_timestamp_ms = 9;
-    optional bool needs_state_updates = 10;
-    optional uint64 started_playing_at_timestamp = 11;
+    
+    oneof _needs_state_updates {
+        bool needs_state_updates = 10;
+    }
+    
+    oneof _started_playing_at_timestamp {
+        uint64 started_playing_at_timestamp = 11;
+    }
+    
+    oneof _needs_local_devices {
+        bool needs_local_devices = 13;
+    }
+    
+    reserved 7, 12;
 }
 
 message PutStateRequest {
@@ -60,8 +70,6 @@ message PrivateDeviceInfo {
 }
 
 message DeviceInfo {
-    reserved 5;
-
     bool can_play = 1;
     uint32 volume = 2;
     string name = 3;
@@ -79,7 +87,7 @@ message DeviceInfo {
     string product_id = 17;
     string deduplication_id = 18;
     uint32 selected_alias_id = 19;
-    map<string, devices.DeviceAlias> device_aliases = 20;
+    map<uint32, devices.DeviceAlias> device_aliases = 20;
     bool is_offline = 21;
     string public_ip = 22;
     string license = 23;
@@ -87,20 +95,47 @@ message DeviceInfo {
     bool is_dynamic_device = 26;
     repeated string disallow_playback_reasons = 27;
     repeated string disallow_transfer_reasons = 28;
-    optional AudioOutputDeviceInfo audio_output_device_info = 24;
+    bool is_locally_discovered = 29;
+    bool is_public = 32;
+    
+    oneof _audio_output_device_info {
+        AudioOutputDeviceInfo audio_output_device_info = 24;
+    }
+    
+    oneof _group_instance {
+        string group_instance = 31;
+    }
+    
+    oneof _is_wol_capable {
+        bool is_wol_capable = 34;
+    }
+    
+    reserved 5, 30;
 }
 
 message AudioOutputDeviceInfo {
-    optional AudioOutputDeviceType audio_output_device_type = 1;
-    optional string device_name = 2;
+    oneof _audio_output_device_type {
+        AudioOutputDeviceType audio_output_device_type = 1;
+    }
+    
+    oneof _device_name {
+        string device_name = 2;
+    }
+    
+    oneof _brand {
+        string brand = 3;
+    }
+    
+    oneof _model {
+        string model = 4;
+    }
+    
+    oneof _category {
+        AudioOutputCategory category = 5;
+    }
 }
 
 message Capabilities {
-    reserved "supported_contexts";
-    reserved "supports_lossless_audio";
-    reserved 1;
-    reserved 4;
-    reserved 24;
     bool can_be_player = 2;
     bool restrict_to_local = 3;
     bool gaia_eq_connect_id = 5;
@@ -128,6 +163,18 @@ message Capabilities {
     bool supports_rooms = 28;
     bool supports_dj = 29;
     common.media.AudioQuality supported_audio_quality = 30;
+    bool supports_smart_shuffle_mode = 33;
+    bool supports_remote_sleep_timer = 34;
+    bool supports_ping_request = 35;
+    bool supports_playlist_mixing = 36;
+    bool supports_remote_audio_quality_control = 37;
+    bool supports_zephyr = 38;
+    bool supports_gapless = 39;
+    bool supports_crossfade = 40;
+    
+    reserved 1, 4, 24, 31, 32;
+    
+    reserved "supported_contexts", "supports_lossless_audio", "supports_playback_speed", "play_token_lost_behavior";
 }
 
 message CapabilitySupportDetails {
@@ -139,6 +186,8 @@ message CapabilitySupportDetails {
 message ConnectCommandOptions {
     int32 message_id = 1;
     uint32 target_alias_id = 3;
+    
+    reserved 4;
 }
 
 message ConnectLoggingParams {
@@ -155,6 +204,15 @@ message SetVolumeCommand {
     ConnectCommandOptions command_options = 2;
     ConnectLoggingParams logging_params = 3;
     string connection_type = 4;
+    string sent_by_device_id = 5;
+    
+    oneof _group_device_identifier {
+        string group_device_identifier = 6;
+    }
+    
+    oneof _group_instance {
+        string group_instance = 7;
+    }
 }
 
 message RenameCommand {
@@ -162,8 +220,169 @@ message RenameCommand {
     ConnectCommandOptions command_options = 2;
 }
 
+message ProxyTransferCommand {
+    string player_command_json = 1;
+    ConnectCommandOptions command_options = 2;
+    string target_device_id = 3;
+    ConnectLoggingParams logging_params = 4;
+    string command_id = 5;
+    
+    oneof _wol_info {
+        WakeOnLanInfo wol_info = 6;
+    }
+}
+
+message ProxyWakeCommand {
+    string target_device_id = 1;
+    WakeOnLanInfo wol_info = 2;
+    ConnectLoggingParams logging_params = 3;
+    string command_id = 4;
+}
+
 message SetBackendMetadataCommand {
     map<string, string> metadata = 1;
+}
+
+message LocalDevice {
+    string device_id = 1;
+    string device_name = 2;
+    devices.DeviceType device_type = 3;
+    string client_id = 4;
+    string product_id = 5;
+    string brand = 6;
+    string model = 7;
+    string local_ip = 8;
+    repeated string supported_media_types = 11;
+    bool supports_dj = 12;
+    bool supports_on_demand = 13;
+    bool is_voice_enabled = 14;
+    string license = 15;
+    CapabilitySupportDetails supports_hifi = 16;
+    repeated string disallow_reasons = 17;
+    bool supports_external_episodes = 19;
+    
+    oneof _alias_id {
+        uint32 alias_id = 9;
+    }
+    
+    oneof _connect_capabilities {
+        string connect_capabilities = 18;
+    }
+    
+    oneof _wol_info {
+        WakeOnLanInfo wol_info = 20;
+    }
+}
+
+message WakeOnLanInfo {
+    bytes mac_address = 1;
+    uint32 port = 2;
+    uint32 retries = 3;
+    uint32 delay_ms = 4;
+    bool broadcast_on_all_interfaces = 5;
+}
+
+message AddDeviceToGroupCommand {
+    string group_device_identifier = 1;
+    ConnectCommandOptions command_options = 2;
+    ConnectLoggingParams logging_params = 3;
+    string group_instance = 4;
+}
+
+message AddDeviceToGroupCommandResponse {
+    bool success = 1;
+    
+    oneof _error {
+        Error error = 2;
+    }
+    
+    enum Error {
+        UNKNOWN_ERROR = 0;
+        TIMEOUT = 1;
+        DEVICE_NOT_GROUPABLE = 3;
+        MAX_NUMBER_OF_DEVICES_REACHED = 4;
+        NOT_IMPLEMENTED = 6;
+        NOT_SUPPORTED = 7;
+        INTEGRATION_ERROR = 8;
+        SDK_ERROR = 9;
+        CONNECT_ERROR = 10;
+        GROUP_NOT_FOUND = 11;
+        INVALID_GROUP = 12;
+    }
+}
+
+message RemoveDeviceFromGroupCommand {
+    string group_device_identifier = 1;
+    ConnectCommandOptions command_options = 2;
+    ConnectLoggingParams logging_params = 3;
+    string group_instance = 4;
+}
+
+message RemoveDeviceFromGroupCommandResponse {
+    bool success = 1;
+    
+    oneof _error {
+        Error error = 2;
+    }
+    
+    enum Error {
+        UNKNOWN_ERROR = 0;
+        TIMEOUT = 1;
+        DEVICE_NOT_REMOVABLE = 3;
+        NOT_IMPLEMENTED = 5;
+        NOT_SUPPORTED = 6;
+        INTEGRATION_ERROR = 7;
+        SDK_ERROR = 8;
+        CONNECT_ERROR = 9;
+        GROUP_NOT_FOUND = 10;
+        INVALID_GROUP = 11;
+    }
+}
+
+message DeleteGroupCommand {
+    ConnectCommandOptions command_options = 1;
+    ConnectLoggingParams logging_params = 2;
+    string group_instance = 3;
+}
+
+message DeleteGroupCommandResponse {
+    bool success = 1;
+    
+    oneof _error {
+        Error error = 2;
+    }
+    
+    enum Error {
+        UNKNOWN_ERROR = 0;
+        TIMEOUT = 1;
+        NOT_IMPLEMENTED = 4;
+        NOT_SUPPORTED = 5;
+        INTEGRATION_ERROR = 6;
+        SDK_ERROR = 7;
+        CONNECT_ERROR = 8;
+        GROUP_NOT_FOUND = 9;
+        INVALID_GROUP = 10;
+    }
+}
+
+message ResyncGroupDataCommand {
+    
+}
+
+message ResyncGroupDataCommandResponse {
+    bool success = 1;
+    
+    oneof _error {
+        Error error = 2;
+    }
+    
+    enum Error {
+        UNKNOWN_ERROR = 0;
+        TIMEOUT = 1;
+        NOT_IMPLEMENTED = 2;
+        SDK_ERROR = 3;
+        CONNECT_ERROR = 4;
+    }
 }
 
 enum AudioOutputDeviceType {
@@ -172,8 +391,18 @@ enum AudioOutputDeviceType {
     LINE_OUT = 2;
     BLUETOOTH = 3;
     AIRPLAY = 4;
-    AUTOMOTIVE = 5;
+    AUTOMOTIVE = 5 [deprecated = true];
     CAR_PROJECTED = 6;
+}
+
+enum AudioOutputCategory {
+    AUDIO_OUTPUT_CATEGORY_UNKNOWN = 0;
+    AUDIO_OUTPUT_CATEGORY_CAR = 1;
+    AUDIO_OUTPUT_CATEGORY_HEADPHONES = 2;
+    AUDIO_OUTPUT_CATEGORY_SPEAKER = 3;
+    AUDIO_OUTPUT_CATEGORY_WEARABLE = 4;
+    AUDIO_OUTPUT_CATEGORY_GLASSES = 5;
+    AUDIO_OUTPUT_CATEGORY_APP = 6;
 }
 
 enum PutStateReason {
@@ -191,6 +420,9 @@ enum PutStateReason {
     AUDIO_DRIVER_INFO_CHANGED = 11;
     PUT_STATE_RATE_LIMITED = 12;
     BACKEND_METADATA_APPLIED = 13;
+    LOCAL_DEVICES_CHANGED = 14;
+    GROUP_STATE_CHANGED = 15;
+    PRIVATE_SESSION_CHANGED = 16;
 }
 
 enum MemberType {
@@ -211,4 +443,3 @@ enum ClusterUpdateReason {
     DEVICE_ALIAS_CHANGED = 5;
     DEVICE_NEW_CONNECTION = 6;
 }
-

@@ -1,0 +1,35 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.ads.esperanto.proto;
+
+import "google/protobuf/empty.proto";
+
+option objc_class_prefix = "ESP";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.ads.esperanto.proto";
+
+service State {
+    rpc GetState(StateRequest) returns (StateResponse);
+    rpc SubState(StateRequest) returns (stream StateResponse);
+    rpc PutState(PutStateRequest) returns (google.protobuf.Empty);
+}
+
+message AdStateValue {
+    string value = 1;
+    uint64 changed = 2;
+}
+
+message StateRequest {
+    
+}
+
+message StateResponse {
+    map<string, AdStateValue> state = 1;
+}
+
+message PutStateRequest {
+    map<string, string> state = 1;
+}

@@ -1,0 +1,20 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playlist.proto;
+
+option optimize_for = CODE_SIZE;
+
+message ItemReportingContext {
+    string content_uri = 1;
+    string displayed_content_uri = 2;
+    string provider = 7;
+    string decision_id = 9;
+    string custom_reporting_attribution = 10;
+    string connect_controller_device_id = 11;
+    string interaction_id = 17;
+    string page_instance_id = 18;
+    
+    reserved 3, 4, 5, 6, 8, 12, 13, 14, 15, 16;
+}

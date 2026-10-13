@@ -1,0 +1,15 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.pending_events.proto;
+
+option optimize_for = CODE_SIZE;
+
+message CountersStorage {
+    map<string, CountersArray> counters_by_event_name = 1;
+}
+
+message CountersArray {
+    repeated int64 counters = 1;
+}

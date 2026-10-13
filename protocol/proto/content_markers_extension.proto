@@ -1,0 +1,28 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.scdcontentmarkers;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "ContentMarkersProto";
+option java_package = "com.spotify.scdcontentmarkers";
+
+message ContentMarkers {
+    string audio_uri = 1;
+    int32 audio_duration_ms = 2;
+    repeated ContentMarker markers = 3;
+}
+
+message ContentMarker {
+    int32 start_ms = 1;
+    int32 end_ms = 2;
+    ContentMarkerType type = 3;
+}
+
+enum ContentMarkerType {
+    CONTENT_MARKER_TYPE_UNSPECIFIED = 0;
+    CONTENT_MARKER_TYPE_INTRO = 1;
+    CONTENT_MARKER_TYPE_OUTRO = 2;
+}

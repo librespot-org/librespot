@@ -1,0 +1,52 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.player.proto.state_restore;
+
+option optimize_for = CODE_SIZE;
+
+message PlaybackQuality {
+    optional BitrateLevel bitrate_level = 1;
+    enum BitrateLevel {
+        UNKNOWN_BITRATE_LEVEL = 0;
+        LOW = 1;
+        NORMAL = 2;
+        HIGH = 3;
+        VERY_HIGH = 4;
+        HI_FI = 5;
+        HI_FI24 = 6;
+        PETREL = 7;
+    }
+    
+    optional BitrateStrategy strategy = 2;
+    enum BitrateStrategy {
+        UNKNOWN_BITRATE_STRATEGY = 0;
+        BEST_MATCHING = 1;
+        BACKEND_ADVISED = 2;
+        OFFLINED_FILE = 3;
+        CACHED_FILE = 4;
+        LOCAL_FILE = 5;
+    }
+    
+    optional BitrateLevel target_bitrate_level = 3;
+    optional bool target_bitrate_available = 4;
+    
+    optional HiFiStatus hifi_status = 5;
+    enum HiFiStatus {
+        NONE = 0;
+        OFF = 1;
+        ON = 2;
+    }
+    
+    optional BitrateLevel highest_available_quality = 6;
+    
+    optional FileOrigin file_origin = 7;
+    enum FileOrigin {
+        UNKNOWN_FILE_ORIGIN = 0;
+        INTERNAL = 1;
+        EXTERNAL = 2;
+        LOCAL = 3;
+        GENERATED = 4;
+    }
+}

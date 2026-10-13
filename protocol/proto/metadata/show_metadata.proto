@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto2";
 
@@ -10,6 +10,11 @@ import "metadata/image_group.proto";
 option java_multiple_files = true;
 option optimize_for = CODE_SIZE;
 option java_package = "com.spotify.cosmos.util.proto";
+
+message ShowListAttribute {
+    optional string key = 1;
+    optional string value = 2;
+}
 
 message ShowMetadata {
     optional string link = 1;
@@ -29,4 +34,5 @@ message ShowMetadata {
     repeated Extension extension = 15;
     optional bool is_book = 16;
     optional bool is_creator_channel = 17;
+    repeated ShowListAttribute format_list_attributes = 18;
 }

@@ -1,8 +1,10 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
 package spotify.your_library.proto;
+
+import "your_library_decorated_entity.proto";
 
 option optimize_for = CODE_SIZE;
 
@@ -18,6 +20,10 @@ message YourLibraryRootlistPlaylist {
     bool can_view = 9;
     bool can_add = 10;
     bool owned_by_self = 11;
+    YourLibraryPlaylistExtraInfo.GenerationStatus prompt_generation_status = 12;
+    bool prompt_is_personalized = 13;
+    bool is_prompt_playlist = 14;
+    bool is_private = 15;
 }
 
 message YourLibraryPredefinedPlaylist {
@@ -40,17 +46,16 @@ message YourLibraryRootlistFolder {
 }
 
 message YourLibraryRootlistPseudoPlaylist {
+    Kind kind = 1;
     enum Kind {
         LIKED_SONGS = 0;
         YOUR_EPISODES = 1;
         NEW_EPISODES = 2;
         LOCAL_FILES = 3;
         CACHED_FILES = 4;
-        CONTENT_FEED = 5;
-        YOUR_HIGHLIGHTS = 6;
+        HIGHLIGHTS = 6;
+        KALLAX = 7;
     }
-
-    Kind kind = 1;
 }
 
 message YourLibraryRootlistEntity {
@@ -59,29 +64,33 @@ message YourLibraryRootlistEntity {
     string creator_name = 3;
     int64 add_time = 4;
     int64 last_played = 5;
+    int64 last_updated = 6;
+    
     oneof entity {
-        YourLibraryRootlistPlaylist playlist = 6;
-        YourLibraryRootlistFolder folder = 7;
-        YourLibraryRootlistPseudoPlaylist pseudo_playlist = 8;
-        YourLibraryPredefinedPlaylist predefined_playlist = 9;
+        YourLibraryRootlistPlaylist playlist = 7;
+        YourLibraryRootlistFolder folder = 8;
+        YourLibraryRootlistPseudoPlaylist pseudo_playlist = 9;
+        YourLibraryPredefinedPlaylist predefined_playlist = 10;
     }
 }
 
 message YourLibraryPreReleaseEntity {
-    enum Type {
-        ALBUM = 0;
-        BOOK = 1;
-    }
-
     string entity_name = 1;
     string uri = 2;
     string creator_name = 3;
     string creator_uri = 4;
     string image_uri = 5;
     int64 add_time = 6;
-    int64 release_time = 9;
-    Type type = 7;
-    string type_str = 8;
+    int64 release_time = 7;
+    int64 last_played = 8;
+    
+    Type type = 9;
+    enum Type {
+        ALBUM = 0;
+        BOOK = 1;
+    }
+    
+    string type_str = 10;
 }
 
 message YourLibraryEventEntity {
@@ -96,3 +105,21 @@ message YourLibraryEventEntity {
     string city_name = 9;
 }
 
+message YourLibraryVenueEntity {
+    string uri = 1;
+    string venue_name = 2;
+    string image_uri = 3;
+    string address_name = 4;
+    string city_name = 5;
+    int64 add_time = 6;
+}
+
+message YourLibraryConcertCampaignEntity {
+    string uri = 1;
+    string name = 2;
+    string image_uri = 3;
+    int64 add_time = 4;
+    YourLibraryConcertCampaignExtraInfo.Status status = 5;
+    int64 start_time = 6;
+    int64 end_time = 7;
+}

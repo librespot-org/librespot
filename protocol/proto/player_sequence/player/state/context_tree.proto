@@ -1,0 +1,26 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.player.sequence.proto;
+
+import "spotify/playback_platform/context/v1/context_environment.proto";
+import "spotify/playback_platform/context/v1/context_state.proto";
+
+option optimize_for = CODE_SIZE;
+
+message ContextTree {
+    Node root_node = 1;
+    message Node {
+        NodeData data = 1;
+        map<string, Node> children = 2;
+    }
+    
+    message NodeData {
+        playback_platform.context.v1.ContextEnvironment context_environment = 2;
+        
+        oneof _state {
+            playback_platform.context.v1.ContextState state = 1;
+        }
+    }
+}

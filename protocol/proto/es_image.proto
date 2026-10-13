@@ -1,0 +1,61 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.image.esperanto.proto;
+
+import "google/protobuf/empty.proto";
+import "image_resolve.proto";
+
+option objc_class_prefix = "ESP";
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.image.esperanto.proto";
+
+service Image {
+    rpc GetImage(GetImageParams) returns (ImageData);
+    rpc GetCacheStatus(GetCacheStatusParams) returns (CacheStatus);
+    rpc SetProjectionMap(SetProjectionMapParams) returns (google.protobuf.Empty);
+}
+
+message ImageData {
+    int32 error = 1;
+    ImageSource source = 2;
+    bytes data = 3;
+    
+    oneof _scale_factor {
+        float scale_factor = 4;
+    }
+}
+
+message Size {
+    int32 width = 1;
+    int32 height = 2;
+}
+
+message GetImageParams {
+    string uri = 1;
+    
+    Resolve resolve = 2;
+    message Resolve {
+        Size size = 1;
+    }
+}
+
+message CacheStatus {
+    map<string, bool> status = 1;
+}
+
+message GetCacheStatusParams {
+    repeated string urls = 1;
+}
+
+message SetProjectionMapParams {
+    imageresolve.proto.ProjectionMap projection_map = 1;
+}
+
+enum ImageSource {
+    UNKNOWN = 0;
+    LOCAL_FILE = 1;
+    CACHE = 2;
+    NETWORK = 3;
+}

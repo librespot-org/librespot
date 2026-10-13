@@ -1,0 +1,17 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.capping.metadata.v1;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.capping.metadata.v1";
+
+message EntityCapping {
+    CappingGroup capping_group = 1;
+    enum CappingGroup {
+        NO_CAPPING = 0;
+        ABP = 1;
+    }
+}

@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
@@ -59,6 +59,7 @@ message CollectionArtistEntry {
     string artist_name = 2;
     int64 add_time = 4;
     int64 last_played = 8;
+    int64 last_modified_at = 9;
 }
 
 message CollectionAuthorEntry {
@@ -75,4 +76,3 @@ message CollectionEpisodeEntry {
     int64 add_time = 5;
     int64 publish_time = 6;
 }
-

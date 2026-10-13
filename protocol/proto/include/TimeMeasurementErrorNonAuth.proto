@@ -1,0 +1,24 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message TimeMeasurementErrorNonAuth {
+    optional int32 error_code = 1;
+    map<string, string> error_data = 2;
+    map<string, int64> ongoing_point_timestamps = 3;
+    map<string, string> ongoing_point_feature_ids = 4;
+    optional string category = 5;
+    map<string, string> dimensions = 6;
+    map<string, int64> point_timestamps = 7;
+    map<string, int64> point_durations = 8;
+    map<string, string> point_feature_ids = 9;
+    optional string feature_id = 10;
+    optional string measurement_id = 11;
+    optional string parent_measurement_id = 12;
+    optional int64 parent_epoch_offset = 13;
+    map<string, string> metadata = 14;
+}

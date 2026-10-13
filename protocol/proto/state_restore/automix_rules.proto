@@ -1,9 +1,12 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
 syntax = "proto2";
 
 package spotify.player.proto.state_restore;
 
-message AutomixRules {
-  required bool automix = 1;
-  required string current_track_uri = 2;
-}
+option optimize_for = CODE_SIZE;
 
+message AutomixRules {
+    required bool automix = 1;
+    required string current_track_uri = 2;
+}

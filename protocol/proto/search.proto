@@ -1,0 +1,43 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.search.proto;
+
+option objc_class_prefix = "SPTSearchCoreProto";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.search.proto";
+
+message OfflineAlbum {
+    string name = 1;
+    string uri = 2;
+    string image_uri = 3;
+    repeated string artist_names = 4;
+}
+
+message OfflineAudioEpisode {
+    string name = 1;
+    string uri = 2;
+    string image_uri = 3;
+    string show_name = 4;
+    bool explicit = 5;
+    bool mogef19 = 6;
+}
+
+message OfflinePlaylist {
+    string name = 1;
+    string uri = 2;
+    string image_uri = 3;
+}
+
+message OfflineTrack {
+    string name = 1;
+    string uri = 2;
+    string image_uri = 3;
+    string album_name = 4;
+    repeated string artist_names = 5;
+    bool explicit = 6;
+    bool mogef19 = 7;
+    bool premium_only = 8;
+}

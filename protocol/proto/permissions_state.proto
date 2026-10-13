@@ -1,0 +1,21 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.restrictions.proto;
+
+option optimize_for = CODE_SIZE;
+
+message PermissionsState {
+    MusicLicense license = 1;
+    bool is_remote_session = 2;
+}
+
+enum MusicLicense {
+    PREMIUM = 0;
+    TABLET_FREE_TIER = 1;
+    MOBILE_FREE_TIER = 2;
+    DMCA = 3;
+    MUSIC_ON_DEMAND = 4;
+    UNKNOWN = 5;
+}

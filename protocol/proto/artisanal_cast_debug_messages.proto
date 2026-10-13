@@ -1,0 +1,114 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.connect.discovery.cast.esperanto.proto;
+
+option objc_class_prefix = "SPTArtisanalCastDebugEsperanto";
+option optimize_for = CODE_SIZE;
+
+message ArtisanalCastEndpoint {
+    string discovery_device_id = 1;
+    string cast_endpoint_id = 2;
+    string discovery_name = 4;
+    string ip = 5;
+    uint32 port = 6;
+    
+    oneof _receiver_side_id {
+        string receiver_side_id = 3;
+    }
+}
+
+message ArtisanalCastSessionEvent {
+    uint64 sequence = 1;
+    int64 monotonic_timestamp_ms = 2;
+    bool retained = 3;
+    ArtisanalCastReleaseReason release_reason = 4;
+    uint64 generation = 5;
+    ArtisanalCastEndpoint endpoint = 6;
+}
+
+message ArtisanalCastMultizoneDevice {
+    string device_id = 1;
+    string normalized_device_id = 2;
+    string friendly_name = 3;
+    uint64 capabilities = 4;
+    double volume_level = 5;
+    bool muted = 6;
+    string ip_address = 7;
+    uint32 port = 8;
+    bool removable = 9;
+    bool audio_channel = 10;
+}
+
+message ArtisanalCastPlaybackSession {
+    string session_id = 1;
+    string session_name = 2;
+    bool has_video_content = 3;
+    bool stream_transfer_supported = 4;
+    bool app_allows_grouping = 5;
+}
+
+message ArtisanalCastMultizoneSessionEndpoint {
+    string device_id = 1;
+    string normalized_device_id = 2;
+    string session_id = 3;
+    string ip_address = 4;
+    uint32 port = 5;
+    string local_device_id = 6;
+}
+
+message ArtisanalCastMultizoneState {
+    uint64 generation = 1;
+    bool has_status = 2;
+    string receiver_transport_id = 3;
+    string receiver_session_id = 4;
+    repeated ArtisanalCastMultizoneDevice devices = 5;
+    repeated ArtisanalCastMultizoneDevice multichannel_devices = 6;
+    ArtisanalCastPlaybackSession playback_session = 7;
+    int64 last_request_id = 8;
+    repeated string changed_device_ids = 9;
+    repeated string failed_device_ids = 10;
+    ArtisanalCastMultizoneSessionEndpoint session_endpoint = 11;
+    ArtisanalCastMultizoneProtocolError latest_error = 12;
+    repeated ArtisanalCastMultizoneDevice groupable_devices = 13;
+}
+
+message ArtisanalCastSessionSnapshot {
+    ArtisanalCastConnectionState state = 1;
+    uint64 generation = 2;
+    ArtisanalCastEndpoint endpoint = 3;
+    repeated ArtisanalCastSessionEvent events = 4;
+    bool artisanal_cast_enabled = 5;
+    bool multizone_enabled = 6;
+    ArtisanalCastMultizoneState multizone = 7;
+}
+
+message ArtisanalCastDebugResponse {
+    Result result = 1;
+    enum Result {
+        OK = 0;
+        NOT_FOUND = 1;
+    }
+}
+
+enum ArtisanalCastConnectionState {
+    ARTISANAL_CAST_CONNECTION_STATE_IDLE = 0;
+    ARTISANAL_CAST_CONNECTION_STATE_CONNECTED = 1;
+}
+
+enum ArtisanalCastReleaseReason {
+    ARTISANAL_CAST_RELEASE_REASON_NONE = 0;
+    ARTISANAL_CAST_RELEASE_REASON_REPLACED = 1;
+    ARTISANAL_CAST_RELEASE_REASON_LOGOUT = 2;
+    ARTISANAL_CAST_RELEASE_REASON_RESET = 3;
+    ARTISANAL_CAST_RELEASE_REASON_CONNECTION_ENDED = 4;
+    ARTISANAL_CAST_RELEASE_REASON_ERROR = 5;
+}
+
+enum ArtisanalCastMultizoneProtocolError {
+    ARTISANAL_CAST_MULTIZONE_PROTOCOL_ERROR_NONE = 0;
+    ARTISANAL_CAST_MULTIZONE_PROTOCOL_ERROR_MALFORMED_MESSAGE = 1;
+    ARTISANAL_CAST_MULTIZONE_PROTOCOL_ERROR_INVALID_REQUEST = 2;
+    ARTISANAL_CAST_MULTIZONE_PROTOCOL_ERROR_SEND_FAILED = 3;
+}

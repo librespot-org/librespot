@@ -1,0 +1,48 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.bumblebee.audio_associations.v1;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.bumblebee.AudioAssociations.v1";
+
+message AudioAssociations {
+    repeated AudioAssociation audio_association = 1;
+}
+
+message AudioAssociation {
+    string track_uri = 1;
+    ImageGroup images = 2;
+}
+
+message ImageGroup {
+    repeated Image image = 1;
+}
+
+message Image {
+    oneof _file_id {
+        bytes file_id = 1;
+    }
+    
+    oneof _size {
+        Size size = 2;
+    }
+    
+    oneof _width {
+        sint32 width = 3;
+    }
+    
+    oneof _height {
+        sint32 height = 4;
+    }
+    
+    enum Size {
+        DEFAULT = 0;
+        SMALL = 1;
+        LARGE = 2;
+        XLARGE = 3;
+        XXLARGE = 4;
+    }
+}

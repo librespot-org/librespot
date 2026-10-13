@@ -1,0 +1,28 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playlist_esperanto.proto;
+
+import "response_status.proto";
+
+option objc_class_prefix = "ESP";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.playlist.esperanto.proto";
+
+message PlaylistFindRequest {
+    string playlist_uri = 1;
+    repeated string item_uris = 2;
+}
+
+message ItemUriToRowIds {
+    string uri = 1;
+    repeated string row_ids = 2;
+    repeated uint32 positions = 3;
+}
+
+message PlaylistFindResponse {
+    ResponseStatus status = 1;
+    repeated ItemUriToRowIds items = 2;
+}

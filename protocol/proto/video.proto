@@ -1,0 +1,38 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.contentagnostic.v2;
+
+import "audio.proto";
+import "flat_file.proto";
+import "image.proto";
+import "transcript.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.contentagnostic.v2";
+
+message Video {
+    VideoAsset asset = 1;
+    Image fallback_image = 2;
+    
+    oneof _fallback_audio {
+        Audio fallback_audio = 3;
+    }
+    
+    oneof _transcript {
+        Transcript transcript = 4;
+    }
+}
+
+message VideoAsset {
+    oneof video_type {
+        FlatFile flat_file = 1;
+        HLSVideo hls = 2;
+    }
+}
+
+message HLSVideo {
+    string manifest_id = 1;
+}

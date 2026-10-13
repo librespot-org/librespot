@@ -1,0 +1,23 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message AdConfigMetricsEvent {
+    optional string app_startup_id = 1;
+    optional string fetch_type = 2;
+    optional bool fallback_triggered = 3;
+    optional int32 response_status = 4;
+    
+    repeated Spans spans = 5;
+    message Spans {
+        optional string name = 1;
+        optional int64 start = 2;
+        optional int64 end = 3;
+    }
+    
+    repeated string enabled_slots = 6;
+}

@@ -1,20 +1,24 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
 package spotify.automix.proto;
 
 option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.automix.proto";
 
 message Cuepoint {
     int64 position_ms = 1;
     float tempo_bpm = 2;
     Origin origin = 3;
+    double confidence = 4;
 }
 
 message Cuepoints {
-    Cuepoint fade_in_cuepoint = 1;
-    Cuepoint fade_out_cuepoint = 2;
+    Cuepoint best_fade_in_cuepoint = 1;
+    Cuepoint best_fade_out_cuepoint = 2;
+    repeated Cuepoint fade_in_cuepoints = 3;
+    repeated Cuepoint fade_out_cuepoints = 4;
 }
 
 enum Origin {

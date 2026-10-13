@@ -1,0 +1,345 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.automix.proto;
+
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.automix.proto";
+
+message Point {
+    double x = 1;
+    double y = 2;
+}
+
+message AutomationCurve {
+    repeated Point points = 1;
+    double start = 2;
+    double end = 3;
+}
+
+message AutomationCurves {
+    repeated AutomationCurve curves = 1;
+    double minimum = 3;
+    double maximum = 4;
+    
+    reserved 2;
+}
+
+message VolumeStyle {
+    int32 id = 1;
+}
+
+message VolumeStyleCurves {
+    VolumeStyle style = 1;
+    
+    oneof _fade_out_curves {
+        AutomationCurves fade_out_curves = 2;
+    }
+    
+    oneof _fade_in_curves {
+        AutomationCurves fade_in_curves = 3;
+    }
+}
+
+message EqStyle {
+    int32 id = 1;
+}
+
+message EqStyleCurves {
+    EqStyle style = 1;
+    
+    oneof _low_eq_out_curves {
+        AutomationCurves low_eq_out_curves = 2;
+    }
+    
+    oneof _mid_eq_out_curves {
+        AutomationCurves mid_eq_out_curves = 3;
+    }
+    
+    oneof _high_eq_out_curves {
+        AutomationCurves high_eq_out_curves = 4;
+    }
+    
+    oneof _low_eq_in_curves {
+        AutomationCurves low_eq_in_curves = 5;
+    }
+    
+    oneof _mid_eq_in_curves {
+        AutomationCurves mid_eq_in_curves = 6;
+    }
+    
+    oneof _high_eq_in_curves {
+        AutomationCurves high_eq_in_curves = 7;
+    }
+}
+
+message FilterFxStyle {
+    int32 id = 1;
+}
+
+message FilterFxStyleCurves {
+    FilterFxStyle style = 1;
+    
+    oneof _filter_cutoff_out_curves {
+        AutomationCurves filter_cutoff_out_curves = 2;
+    }
+    
+    oneof _filter_resonance_out_curves {
+        AutomationCurves filter_resonance_out_curves = 3;
+    }
+    
+    oneof _filter_cutoff_in_curves {
+        AutomationCurves filter_cutoff_in_curves = 4;
+    }
+    
+    oneof _filter_resonance_in_curves {
+        AutomationCurves filter_resonance_in_curves = 5;
+    }
+    
+    oneof _noise_color_out_curves {
+        AutomationCurves noise_color_out_curves = 6;
+    }
+    
+    oneof _noise_color_in_curves {
+        AutomationCurves noise_color_in_curves = 7;
+    }
+}
+
+message FxStyle {
+    int32 id = 1;
+}
+
+message FxStyleCurves {
+    FxStyle style = 1;
+    
+    oneof _echo_dry_wet_out_curves {
+        AutomationCurves echo_dry_wet_out_curves = 2;
+    }
+    
+    oneof _echo_dry_wet_in_curves {
+        AutomationCurves echo_dry_wet_in_curves = 3;
+    }
+    
+    oneof _reverb_dry_wet_out_curves {
+        AutomationCurves reverb_dry_wet_out_curves = 4;
+    }
+    
+    oneof _reverb_dry_wet_in_curves {
+        AutomationCurves reverb_dry_wet_in_curves = 5;
+    }
+    
+    oneof _delay_dry_wet_out_curves {
+        AutomationCurves delay_dry_wet_out_curves = 6;
+    }
+    
+    oneof _delay_dry_wet_in_curves {
+        AutomationCurves delay_dry_wet_in_curves = 7;
+    }
+}
+
+message JogwheelStyle {
+    int32 id = 1;
+}
+
+message LoopingStyle {
+    int32 id = 1;
+}
+
+message StyleBlock {
+    StyleBlockType type = 1;
+    float beats = 2;
+    float start = 3;
+    float end = 4;
+}
+
+message BlockSequence {
+    repeated StyleBlock blocks = 1;
+}
+
+message JogwheelStyleBlocks {
+    JogwheelStyle style = 1;
+    
+    oneof _out {
+        BlockSequence out = 2;
+    }
+    
+    oneof _in {
+        BlockSequence in = 3;
+    }
+}
+
+message LoopingStyleBlocks {
+    LoopingStyle style = 1;
+    
+    oneof _out {
+        BlockSequence out = 2;
+    }
+    
+    oneof _in {
+        BlockSequence in = 3;
+    }
+}
+
+message EqCurveOverrides {
+    oneof _low {
+        AutomationCurves low = 1;
+    }
+    
+    oneof _mid {
+        AutomationCurves mid = 2;
+    }
+    
+    oneof _high {
+        AutomationCurves high = 3;
+    }
+}
+
+message FilterCurveOverrides {
+    oneof _cutoff {
+        AutomationCurves cutoff = 1;
+    }
+    
+    oneof _resonance {
+        AutomationCurves resonance = 2;
+    }
+    
+    oneof _noise_color {
+        AutomationCurves noise_color = 3;
+    }
+}
+
+message FxCurveOverrides {
+    oneof _echo_dry_wet {
+        AutomationCurves echo_dry_wet = 1;
+    }
+    
+    oneof _reverb_dry_wet {
+        AutomationCurves reverb_dry_wet = 2;
+    }
+    
+    oneof _delay_dry_wet {
+        AutomationCurves delay_dry_wet = 3;
+    }
+}
+
+message Preset {
+    int32 id = 1;
+    PresetType type = 2;
+    
+    oneof _volume_style_override {
+        VolumeStyle volume_style_override = 3;
+    }
+    
+    oneof _eq_style_override {
+        EqStyle eq_style_override = 4;
+    }
+    
+    oneof _filter_fx_style_override {
+        FilterFxStyle filter_fx_style_override = 5;
+    }
+    
+    oneof _volume_out_curve_override {
+        AutomationCurves volume_out_curve_override = 6;
+    }
+    
+    oneof _volume_in_curve_override {
+        AutomationCurves volume_in_curve_override = 7;
+    }
+    
+    oneof _eq_out_curve_overrides {
+        EqCurveOverrides eq_out_curve_overrides = 8;
+    }
+    
+    oneof _eq_in_curve_overrides {
+        EqCurveOverrides eq_in_curve_overrides = 9;
+    }
+    
+    oneof _filter_out_curve_overrides {
+        FilterCurveOverrides filter_out_curve_overrides = 10;
+    }
+    
+    oneof _filter_in_curve_overrides {
+        FilterCurveOverrides filter_in_curve_overrides = 11;
+    }
+    
+    oneof _fx_style_override {
+        FxStyle fx_style_override = 12;
+    }
+    
+    oneof _fx_out_curve_overrides {
+        FxCurveOverrides fx_out_curve_overrides = 13;
+    }
+    
+    oneof _fx_in_curve_overrides {
+        FxCurveOverrides fx_in_curve_overrides = 14;
+    }
+    
+    oneof _jogwheel_style_override {
+        JogwheelStyle jogwheel_style_override = 15;
+    }
+    
+    oneof _looping_style_override {
+        LoopingStyle looping_style_override = 16;
+    }
+}
+
+message Overlap {
+    string track_a_row_id = 1;
+    string track_b_row_id = 2;
+    int32 start_a_ms = 3;
+    int32 start_b_ms = 4;
+    int32 duration_ms = 5;
+    bool is_beatmatched = 9;
+    string track_a_uri = 10;
+    string track_b_uri = 11;
+    string track_a_playable_uri = 12;
+    string track_b_playable_uri = 13;
+    string track_a_playable_beats_hash = 14;
+    string track_b_playable_beats_hash = 15;
+    float bpm_a = 16;
+    float bpm_b = 17;
+    double item_speed_a = 18;
+    double item_speed_b = 19;
+    
+    oneof _speed_a {
+        float speed_a = 6;
+    }
+    
+    oneof _speed_b {
+        float speed_b = 7;
+    }
+    
+    oneof _duration_bars {
+        int32 duration_bars = 8;
+    }
+}
+
+message Transition {
+    Overlap overlap = 1;
+    Preset preset = 2;
+    bool is_overlap_override = 3;
+    bool is_preset_id_override = 4;
+    BeatmatchPreference beatmatch_preference = 5;
+}
+
+enum StyleBlockType {
+    STYLE_BLOCK_TYPE_UNSPECIFIED = 0;
+    STYLE_BLOCK_TYPE_LOOP = 1;
+    STYLE_BLOCK_TYPE_SPINBACK = 2;
+    STYLE_BLOCK_TYPE_VINYL_STOP = 3;
+}
+
+enum PresetType {
+    PRESET_TYPE_UNSPECIFIED = 0;
+    PRESET_TYPE_FADE = 1;
+    PRESET_TYPE_CUT = 2;
+    PRESET_TYPE_BEATMATCHED_FADE = 3;
+    PRESET_TYPE_BEATMATCHED_CUT = 4;
+}
+
+enum BeatmatchPreference {
+    BEATMATCH_PREFERENCE_AUTO = 0;
+    BEATMATCH_PREFERENCE_OFF = 1;
+    BEATMATCH_PREFERENCE_ON = 2;
+}

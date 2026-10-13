@@ -1,0 +1,21 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message WasapiAudioDriverFormatError {
+    optional string mix_format_type = 1;
+    optional int32 mix_format_tag = 2;
+    optional int32 mix_channels = 3;
+    optional int32 mix_samples_per_sec = 4;
+    optional int32 mix_avg_bytes_per_sec = 5;
+    optional int32 mix_block_align = 6;
+    optional int32 mix_bits_per_sample = 7;
+    optional int32 mix_cb_size = 8;
+    optional int32 mix_valid_bits_per_sample = 9;
+    optional int32 mix_channel_mask = 10;
+    optional string mix_sub_format = 11;
+}

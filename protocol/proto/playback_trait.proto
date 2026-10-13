@@ -1,0 +1,146 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.contentagnostic.v2;
+
+import "google/protobuf/duration.proto";
+import "flat_file.proto";
+import "shared_enums.proto";
+import "spotify/playback_platform/transition/v1/transition_maps.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.contentagnostic.v2";
+
+message PlaybackOffsets {
+    google.protobuf.Duration start = 1;
+    google.protobuf.Duration end = 2;
+}
+
+message VideoHosted {
+    bytes video_id = 1;
+}
+
+message VideoPlayback {
+    string reporting_uri = 2;
+    
+    oneof asset {
+        VideoHosted hosted = 1;
+    }
+    
+    oneof _offsets {
+        PlaybackOffsets offsets = 3;
+    }
+    
+    oneof _uri_for_migration_purposes {
+        string uri_for_migration_purposes = 4;
+    }
+}
+
+message AdDetection {
+    oneof _fallback_offsets {
+        PlaybackOffsets fallback_offsets = 1;
+    }
+}
+
+message AudioPassThrough {
+    FlatFile flat_file = 1;
+    
+    oneof _fallback {
+        AudioHosted fallback = 3;
+    }
+    
+    oneof _ad_detection {
+        AdDetection ad_detection = 4;
+    }
+    
+    oneof _offsets {
+        PlaybackOffsets offsets = 5;
+    }
+    
+    reserved 2;
+}
+
+message AudioFile {
+    bytes file_id = 1;
+    audiophile.Format format = 2;
+    int32 average_bitrate = 3;
+}
+
+message NormalizationParams {
+    float loudness_db = 1;
+    float true_peak_db = 2;
+}
+
+message AudioHosted {
+    repeated AudioFile files = 1;
+    bytes audio_id = 2;
+    NormalizationParams file_norm = 3;
+    
+    oneof _group_norm {
+        NormalizationParams group_norm = 4;
+    }
+    
+    oneof _offsets {
+        PlaybackOffsets offsets = 5;
+    }
+}
+
+message AudioHls {
+    oneof hls_type {
+        FlatFile flat_file = 1;
+    }
+    
+    oneof _offsets {
+        PlaybackOffsets offsets = 2;
+    }
+}
+
+message AudioPlayback {
+    string reporting_uri = 3;
+    
+    oneof asset {
+        AudioPassThrough pass_through = 1;
+        AudioHosted hosted = 2;
+        AudioHls hls = 5;
+    }
+    
+    oneof _offsets {
+        PlaybackOffsets offsets = 4 [deprecated = true];
+    }
+    
+    oneof _uri_for_migration_purposes {
+        string uri_for_migration_purposes = 6;
+    }
+}
+
+message PlaybackTrait {
+    repeated AudioMapEntry audio = 1;
+    message AudioMapEntry {
+        AudioMediaFormat key = 1;
+        AudioPlayback value = 2;
+    }
+    
+    repeated VideoMapEntry video = 2;
+    message VideoMapEntry {
+        VideoMediaFormat key = 1;
+        VideoPlayback value = 2;
+    }
+    
+    oneof _transition_maps {
+        playback_platform.transition.v1.TransitionMaps transition_maps = 3;
+    }
+}
+
+enum VideoMediaFormat {
+    VIDEO_MEDIA_FORMAT_UNSPECIFIED = 0;
+    VIDEO_MEDIA_FORMAT_ADAPTIVE = 1;
+}
+
+enum AudioMediaFormat {
+    AUDIO_MEDIA_FORMAT_UNSPECIFIED = 0;
+    AUDIO_MEDIA_FORMAT_STEREO = 1;
+    AUDIO_MEDIA_FORMAT_SPATIAL = 2;
+    AUDIO_MEDIA_FORMAT_ADAPTIVE = 3;
+}

@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
@@ -11,9 +11,26 @@ option java_multiple_files = true;
 option optimize_for = CODE_SIZE;
 option java_package = "com.spotify.playlist.policy.proto";
 
+message AvailableConcepts {
+    oneof _filter_weight_threshold {
+        float filter_weight_threshold = 1;
+    }
+    
+    oneof _max_concepts {
+        uint32 max_concepts = 2;
+    }
+}
+
+message AvailableLanguages {
+    oneof _min_tracks {
+        uint32 min_tracks = 1;
+    }
+}
+
 message PlaylistAllowsDecorationPolicy {
     bool insert = 1;
     bool remove = 2;
+    bool can_delete = 3;
 }
 
 message PlaylistDecorationPolicy {
@@ -67,4 +84,10 @@ message PlaylistDecorationPolicy {
     bool ai_curation_reference_id = 48;
     bool unranged_length = 49;
     bool unfiltered_length = 50;
+    bool created_at = 51;
+    AvailableConcepts available_concepts = 52;
+    bool content_signature = 53;
+    bool deleted_by_owner = 54;
+    bool user_created = 55;
+    AvailableLanguages available_languages = 56;
 }

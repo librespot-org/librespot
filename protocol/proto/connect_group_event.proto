@@ -1,0 +1,35 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.connectgroup.v1;
+
+import "connect_group.proto";
+
+option optimize_for = CODE_SIZE;
+
+message GroupDataEvent {
+    repeated GroupData group_data = 1;
+}
+
+message GroupDeviceVolumeEvent {
+    repeated GroupDeviceVolume volumes = 1;
+}
+
+message GetAllGroupDataResponse {
+    repeated GroupData group_data = 1;
+    repeated GroupDeviceVolume group_device_volumes = 2;
+}
+
+message KnownGroupInstance {
+    string spotify_device_id = 1;
+    string group_instance = 2;
+    
+    oneof _timestamp_ms {
+        int64 timestamp_ms = 3;
+    }
+}
+
+message RefreshGroupDataRequest {
+    repeated KnownGroupInstance known_instances = 1;
+}

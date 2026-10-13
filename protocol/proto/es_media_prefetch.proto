@@ -1,0 +1,72 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.prefetch_esperanto.proto;
+
+import "google/protobuf/empty.proto";
+
+option objc_class_prefix = "ESP";
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.prefetch_esperanto.proto";
+
+service MediaPrefetch {
+    rpc UpdateFuture(UpdateFutureRequest) returns (google.protobuf.Empty);
+    rpc UpdateSegmentProfileSelectionConfig(SegmentProfileSelectionConfig) returns (google.protobuf.Empty);
+}
+
+message AudioPreviewResource {
+    string url = 1;
+}
+
+message ProgressiveVideoResource {
+    string url = 1;
+}
+
+message SegmentedVideoResource {
+    bytes video_id = 1;
+    
+    oneof _start_ms {
+        int32 start_ms = 2;
+    }
+    
+    oneof _end_ms {
+        int32 end_ms = 3;
+    }
+}
+
+message Item {
+    oneof resource {
+        AudioPreviewResource audio_preview_resource = 1;
+        ProgressiveVideoResource progressive_video_resource = 2;
+        SegmentedVideoResource segmented_video_resource = 3;
+    }
+}
+
+message Future {
+    repeated Item items = 1;
+}
+
+message UpdateFutureRequest {
+    string feature_id = 1;
+    Future future = 2;
+}
+
+message SegmentProfileSelectionConfig {
+    repeated EncryptionScheme supported_encryption_schemes = 1;
+    repeated VideoCodecFamily supported_video_codecs = 2;
+    bool video_codecs_are_priority_ordered = 3;
+}
+
+enum EncryptionScheme {
+    ENCRYPTION_SCHEME_UNKNOWN = 0;
+    ENCRYPTION_SCHEME_CBCS = 1;
+    ENCRYPTION_SCHEME_CTR = 2;
+}
+
+enum VideoCodecFamily {
+    VIDEO_CODEC_FAMILY_UNKNOWN = 0;
+    VIDEO_CODEC_FAMILY_H264 = 1;
+    VIDEO_CODEC_FAMILY_HEVC = 2;
+    VIDEO_CODEC_FAMILY_AV1 = 3;
+}

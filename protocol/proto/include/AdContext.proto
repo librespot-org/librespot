@@ -1,0 +1,31 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message AdContext {
+    optional string preceding_content_uri = 1;
+    optional string preceding_playback_id = 2;
+    optional int32 preceding_end_position = 3;
+    repeated string ad_ids = 4;
+    optional string ad_request_id = 5;
+    optional string succeeding_content_uri = 6;
+    optional string succeeding_playback_id = 7;
+    optional int32 succeeding_start_position = 8;
+    optional int32 preceding_duration = 9;
+    repeated string ad_slot_ids = 10;
+    optional string app_startup_id = 11;
+    optional string context_uri = 12;
+    
+    repeated PlayedAds played_ads = 13;
+    message PlayedAds {
+        optional string ad_id = 1;
+        optional string playback_rendering_id = 2;
+        optional string ad_request_id = 3;
+        optional string ad_slot_id = 4;
+        optional string ad_break_id = 5;
+    }
+}

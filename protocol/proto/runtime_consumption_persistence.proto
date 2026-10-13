@@ -1,0 +1,14 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.runtime_consumption.proto;
+
+option optimize_for = CODE_SIZE;
+
+message PersistedConsumptionEntry {
+    string content_uri = 1;
+    int64 ms_played = 2;
+    int64 ms_played_nominal = 3;
+    int64 wall_timestamp_seconds = 4;
+}

@@ -1,0 +1,117 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.resumption.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/any.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "ResumePointProto";
+option java_package = "com.spotify.resumption.v1";
+
+message ListResumePoint {
+    string uri = 1;
+    ResumePoint resume_point = 2;
+    Affinity affinity = 3;
+    
+    oneof _uid {
+        bytes uid = 4;
+    }
+    
+    oneof _shuffle_seed {
+        string shuffle_seed = 5;
+    }
+}
+
+message RelativePosition {
+    google.protobuf.Duration start_offset = 1;
+    google.protobuf.Duration content_duration = 2;
+}
+
+message ResumePoint {
+    string resume_point_id = 1;
+    
+    oneof resume_point {
+        google.protobuf.Duration position = 2;
+        google.protobuf.Empty started = 3;
+        google.protobuf.Empty finished = 4;
+        int32 counter = 5;
+        string uri = 6;
+        google.protobuf.Any custom = 7;
+        google.protobuf.Empty marked_as_finished = 8;
+        google.protobuf.Empty unmarked_as_finished = 9;
+        RelativePosition relative_position = 10;
+        google.protobuf.Empty tombstone = 11;
+        ListResumePoint list_resume_point = 12;
+    }
+}
+
+message ResumePointRevision {
+    string resume_point_revision_id = 1;
+    ResumePoint snapshot = 2;
+    google.protobuf.Timestamp create_time = 3;
+    google.protobuf.Timestamp update_time = 4;
+}
+
+message ListResumePointRevisionsRequest {
+    string user_id = 1;
+    string uri = 2;
+    int32 page_size = 3;
+    string page_token = 4;
+}
+
+message ListResumePointRevisionsResponse {
+    repeated ResumePointRevision resume_point_revisions = 1;
+    string next_page_token = 2;
+}
+
+message CreateResumePointRevisionRequest {
+    string user_id = 1;
+    string uri = 2;
+    ResumePointRevision resume_point_revision = 4;
+}
+
+message CreateResumePointRevisionResponse {
+    ResumePointRevision resume_point_revision = 1;
+}
+
+message BatchCreateResumePointRevisionsRequest {
+    string user_id = 1;
+    repeated CreateResumePointRevisionRequest requests = 2;
+}
+
+message BatchCreateResumePointRevisionsResponse {
+    map<string, ResumePointRevisionList> resume_point_revisions = 1;
+}
+
+message ResumePointRevisionList {
+    repeated ResumePointRevision resume_point_revisions = 1;
+}
+
+message CurrentState {
+    string uri = 1;
+    repeated ResumePointRevision resume_point_revisions = 2;
+}
+
+message ListCurrentStatesRequest {
+    string user_id = 1;
+    int32 page_size = 2;
+    string page_token = 3;
+    string filter = 4;
+}
+
+message ListCurrentStatesResponse {
+    repeated CurrentState current_states = 1;
+    string next_page_token = 2;
+}
+
+enum Affinity {
+    AFFINITY_UNSPECIFIED = 0;
+    AFFINITY_PARENT = 1;
+    AFFINITY_SELF = 2;
+}

@@ -1,0 +1,66 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.recently_played_esperanto.proto;
+
+import "recently_played_decoration_policy.proto";
+import "recently_played_item.proto";
+
+option objc_class_prefix = "ESP";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.recently_played_esperanto.proto";
+
+message GetRecentlyPlayedRequest {
+    uint32 limit = 1;
+    uint32 playlist_resync_limit = 2;
+    bool exclude_shows_mixed = 3;
+    bool exclude_shows_audio = 4;
+    bool exclude_shows_video = 5;
+    bool exclude_track_contexts = 6;
+    bool include_hidden = 7;
+    bool include_collection_songs = 8;
+    bool include_your_episodes = 9;
+    bool include_own_deleted_playlists = 10;
+    bool include_podcast_shorts = 11;
+    RecentlyPlayedArtistDecorationPolicy artist_policy = 12;
+    RecentlyPlayedAlbumDecorationPolicy album_policy = 13;
+    RecentlyPlayedTrackDecorationPolicy track_policy = 14;
+    RecentlyPlayedShowDecorationPolicy show_policy = 15;
+    RecentlyPlayedPlaylistDecorationPolicy playlist_policy = 16;
+    RecentlyPlayedCollectionTracksDecorationPolicy collection_tracks_policy = 17;
+    RecentlyPlayedProfileDecorationPolicy profile_policy = 18;
+    RecentlyPlayedEpisodeDecorationPolicy episode_policy = 19;
+    uint32 update_throttling = 20;
+    bool initial_response_from_cache = 21;
+}
+
+message RecentlyPlayedContext {
+    oneof context {
+        RecentlyPlayedArtist artist = 1;
+        RecentlyPlayedAlbum album = 2;
+        RecentlyPlayedTrack track = 3;
+        RecentlyPlayedShow show = 4;
+        RecentlyPlayedProfile profile = 5;
+        RecentlyPlayedPlaylist playlist = 6;
+        RecentlyPlayedCollectionTracks collection_tracks = 7;
+        RecentlyPlayedEpisode episode = 8;
+    }
+}
+
+message GetRecentlyPlayedResponse {
+    repeated RecentlyPlayedContext context = 1;
+    bool loaded = 2;
+    uint32 status = 3;
+    string error = 4;
+}
+
+message HideRecentlyPlayedRequest {
+    repeated string uri = 1;
+}
+
+message HideRecentlyPlayedResponse {
+    uint32 status = 1;
+    string error = 2;
+}

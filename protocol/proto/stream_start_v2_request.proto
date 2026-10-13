@@ -1,0 +1,84 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.stream_reporting_esperanto.proto;
+
+import "google/protobuf/timestamp.proto";
+import "media_type.proto";
+import "play_reason.proto";
+import "playback_stack_v2.proto";
+import "streaming_rule.proto";
+import "stream_handle.proto";
+import "video_surface.proto";
+
+option objc_class_prefix = "ESP";
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.stream_reporting_esperanto.proto";
+
+message StreamStartV2Request {
+    StreamHandle stream_handle = 1;
+    bytes parent_playback_id = 2;
+    string video_session_id = 3;
+    string play_context = 4;
+    string content_uri = 5;
+    string displayed_content_uri = 6;
+    string provider = 7;
+    string referrer = 8;
+    StreamingRule streaming_rule = 9;
+    string connect_controller_device_id = 10;
+    string page_instance_id = 11;
+    string interaction_id = 12;
+    string source_start = 13;
+    PlayReason reason_start = 14;
+    bool is_shuffle = 15;
+    string media_id = 16;
+    MediaType media_type = 17;
+    uint64 playback_start_time = 18;
+    uint64 start_position = 19;
+    bool is_live = 20;
+    bool content_is_downloaded = 21;
+    bool client_offline = 22;
+    string feature_uuid = 23;
+    string decision_id = 24;
+    string custom_reporting_attribution = 25;
+    string play_context_decision_id = 26;
+    google.protobuf.Timestamp client_timestamp = 27;
+    bool is_video_on = 31;
+    string player_session_id = 33;
+    PlaybackStackV2 playback_stack = 39;
+    
+    oneof _is_repeating_track {
+        bool is_repeating_track = 28;
+    }
+    
+    oneof _is_repeating_context {
+        bool is_repeating_context = 29;
+    }
+    
+    oneof _is_audio_on {
+        bool is_audio_on = 30;
+    }
+    
+    oneof _preview_impression_uri {
+        string preview_impression_uri = 34;
+    }
+    
+    oneof _video_surface_v2 {
+        VideoSurface video_surface_v2 = 36;
+    }
+    
+    oneof _on_demand_type {
+        string on_demand_type = 37;
+    }
+    
+    oneof _entrypoint_uri {
+        string entrypoint_uri = 38;
+    }
+    
+    oneof _agentic_product_type {
+        string agentic_product_type = 40;
+    }
+    
+    reserved 32, 35;
+}

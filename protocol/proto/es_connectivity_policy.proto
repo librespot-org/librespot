@@ -1,0 +1,118 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.connectivity.esperanto.proto;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.connectivity.esperanto.proto";
+
+service ConnectivityPolicy {
+    rpc setRules(PutRulesRequest) returns (PutRulesResponse);
+    rpc setForceOffline(ForceOfflineRequest) returns (ForceOfflineResponse);
+    rpc subState(SubStateRequest) returns (stream GetStateResponse);
+    rpc getState(GetStateRequest) returns (GetStateResponse);
+    rpc getRules(GetRulesRequest) returns (GetRulesResponse);
+    rpc setConnectionType(SetConnectionTypeRequest) returns (SetConnectionTypeResponse);
+}
+
+message PutRulesRequest {
+    oneof _allow_sync_over_cellular {
+        bool allow_sync_over_cellular = 1;
+    }
+    
+    oneof _allow_network {
+        bool allow_network = 2;
+    }
+    
+    oneof _allow_network_if_roaming {
+        bool allow_network_if_roaming = 3;
+    }
+    
+    oneof _allow_sync_over_wifi {
+        bool allow_sync_over_wifi = 4;
+    }
+}
+
+message ForceOfflineRequest {
+    bool force_offline = 1;
+}
+
+message SubStateRequest {
+    
+}
+
+message GetStateRequest {
+    
+}
+
+message GetRulesRequest {
+    
+}
+
+message SetConnectionTypeRequest {
+    ConnectionType type = 1;
+    bool roaming = 2;
+}
+
+message PutRulesResponse {
+    
+}
+
+message ForceOfflineResponse {
+    StatusCode status_code = 1;
+    enum StatusCode {
+        SUCCESS = 0;
+        NOT_FOUND = 2;
+    }
+    
+    oneof _error_message {
+        string error_message = 2;
+    }
+}
+
+message GetStateResponse {
+    StatusCode status_code = 1;
+    enum StatusCode {
+        SUCCESS = 0;
+        NOT_FOUND = 2;
+    }
+    
+    string status = 3;
+    
+    oneof _error_message {
+        string error_message = 2;
+    }
+}
+
+message GetRulesResponse {
+    bool allow_network = 1;
+    bool allow_network_if_roaming = 2;
+    bool allow_sync_over_cellular = 3;
+    bool allow_sync_over_wifi = 4;
+}
+
+message SetConnectionTypeResponse {
+    StatusCode status_code = 1;
+    enum StatusCode {
+        SUCCESS = 0;
+        BAD_REQUEST = 1;
+    }
+    
+    oneof _error_message {
+        string error_message = 2;
+    }
+}
+
+enum ConnectionType {
+    CONNECTION_TYPE_UNKNOWN = 0;
+    CONNECTION_TYPE_NONE = 1;
+    CONNECTION_TYPE_GPRS = 2;
+    CONNECTION_TYPE_EDGE = 3;
+    CONNECTION_TYPE_3G = 4;
+    CONNECTION_TYPE_4G = 5;
+    CONNECTION_TYPE_WLAN = 6;
+    CONNECTION_TYPE_ETHERNET = 7;
+    CONNECTION_TYPE_5G = 8;
+}

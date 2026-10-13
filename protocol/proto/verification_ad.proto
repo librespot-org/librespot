@@ -1,0 +1,30 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.ads.proto;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+
+message SKAdNetworkData {
+    string signature_store_kit = 1;
+    string signature_view_through = 2;
+    string version = 3;
+    string network_identifier = 4;
+    string source_identifier = 5;
+    int64 timestamp = 6;
+    string nonce = 7;
+    string source_app_identifier = 8;
+    string advertised_app_identifier = 9;
+}
+
+message Verification {
+    oneof type {
+        SKAdNetworkData sk_ad_network = 1;
+    }
+}
+
+message VerificationAd {
+    repeated Verification verifications = 17;
+}

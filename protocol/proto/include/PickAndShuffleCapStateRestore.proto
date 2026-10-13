@@ -1,0 +1,16 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message PickAndShuffleCapStateRestore {
+    optional int64 cap_day = 1;
+    optional int64 cap_month = 2;
+    optional int64 stream_count = 3;
+    optional int64 time_cap = 4;
+    optional string cap_configuration_origin = 5;
+    optional bool dynamic_cap_enabled = 6;
+}

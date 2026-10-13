@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
@@ -11,8 +11,6 @@ option optimize_for = CODE_SIZE;
 option java_package = "com.spotify.cosmos.util.policy.proto";
 
 message EpisodeDecorationPolicy {
-    reserved 19;
-    reserved 20;
     bool link = 1;
     bool length = 2;
     bool name = 3;
@@ -36,6 +34,8 @@ message EpisodeDecorationPolicy {
     bool is_book_chapter = 23;
     bool is_podcast_short = 24;
     bool is_curated = 25;
+    
+    reserved 19, 20;
 }
 
 message EpisodeCollectionDecorationPolicy {
@@ -56,4 +56,3 @@ message EpisodePlayedStateDecorationPolicy {
     bool playability_restriction = 4;
     bool last_played_at = 5;
 }
-

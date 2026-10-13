@@ -1,0 +1,11 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.player.proto.state_restore;
+
+option optimize_for = CODE_SIZE;
+
+message ExplicitFilterBypass {
+    repeated string uris = 1;
+}

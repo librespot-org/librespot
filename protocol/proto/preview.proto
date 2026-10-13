@@ -1,0 +1,35 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.automix.proto;
+
+import "cuepoints.proto";
+import "transition.proto";
+
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.automix.proto";
+
+message Preview {
+    string track_uri_1 = 1;
+    string track_uri_2 = 2;
+    string automix_mode = 3;
+    string transition_uri = 4;
+    int64 start_position_ms = 5;
+    bool relative_start_position = 6;
+    Cuepoints cuepoints = 7;
+    string playable_track_uri_1 = 10;
+    string playable_track_uri_2 = 11;
+    string context_uri = 12;
+    string arm_id = 13;
+    double item_speed_a = 14;
+    double item_speed_b = 15;
+    
+    oneof _stop_position_ms {
+        int64 stop_position_ms = 8;
+    }
+    
+    oneof _transition_recipe {
+        Transition transition_recipe = 9;
+    }
+}

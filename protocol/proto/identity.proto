@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
@@ -38,6 +38,8 @@ message UserProfile {
     google.protobuf.BoolValue edit_image_disabled = 19;
     google.protobuf.BoolValue edit_bio_disabled = 20;
     google.protobuf.BoolValue is_kid = 21;
+    google.protobuf.StringValue social_handle = 22;
+    google.protobuf.StringValue account_id = 24;
 }
 
 message UserProfileUpdateRequest {
@@ -50,4 +52,3 @@ message UserProfileChangedEvent {
     string userid = 1;
     UserProfile user_profile = 2;
 }
-

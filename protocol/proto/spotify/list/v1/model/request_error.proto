@@ -1,0 +1,104 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.list.v1.model;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "RequestErrorProto";
+option java_package = "com.spotify.list.v1.model";
+
+message RequestError {
+    oneof _retry_strategy {
+        RetryStrategy retry_strategy = 1;
+    }
+    
+    oneof _not_found {
+        NotFound not_found = 2;
+    }
+    
+    oneof _forbidden {
+        Forbidden forbidden = 3;
+    }
+    
+    oneof _bad_request {
+        BadRequest bad_request = 4;
+    }
+    
+    oneof _transport {
+        Transport transport = 5;
+    }
+    
+    oneof _message {
+        string message = 6;
+    }
+    
+    message RetryStrategy {
+        oneof _can_retry {
+            bool can_retry = 1;
+        }
+    }
+    
+    message NotFound {
+        oneof _permanently_removed {
+            bool permanently_removed = 1;
+        }
+    }
+    
+    message LegalReasons {
+        oneof _dsa {
+            bool dsa = 1;
+        }
+    }
+    
+    message Forbidden {
+        oneof _legal_reasons {
+            LegalReasons legal_reasons = 1;
+        }
+        
+        oneof _no_access {
+            bool no_access = 2;
+        }
+    }
+    
+    message BadRequest {
+        oneof _malformed_request {
+            bool malformed_request = 1;
+        }
+        
+        oneof _revision_mismatch {
+            bool revision_mismatch = 2;
+        }
+        
+        oneof _failed_precondition {
+            bool failed_precondition = 3;
+        }
+        
+        oneof _not_supported {
+            bool not_supported = 4;
+        }
+        
+        oneof _already_exists {
+            bool already_exists = 5;
+        }
+    }
+    
+    message Transport {
+        oneof _timed_out {
+            bool timed_out = 1;
+        }
+        
+        oneof _rate_limit_exceeded {
+            bool rate_limit_exceeded = 2;
+        }
+        
+        oneof _too_many_requests {
+            bool too_many_requests = 3;
+        }
+        
+        oneof _upstream_error {
+            bool upstream_error = 4;
+        }
+    }
+}

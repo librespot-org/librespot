@@ -1,0 +1,229 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.show_esperanto.proto;
+
+import "show_request.proto";
+import "decorate_request.proto";
+import "unfinished_episodes_request.proto";
+import "policy/show_decoration_policy.proto";
+import "policy/episode_decoration_policy.proto";
+
+option objc_class_prefix = "ESP";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.show_esperanto.proto";
+
+service ShowService {
+    rpc GetShow(GetShowRequest) returns (GetShowResponse);
+    rpc SubShow(GetShowRequest) returns (stream GetShowResponse);
+    rpc GetShowEpisode(GetShowRequest) returns (GetShowResponse);
+    rpc SubShowEpisode(GetShowRequest) returns (stream GetShowResponse);
+    rpc GetDecorate(GetDecorateRequest) returns (GetDecorateResponse);
+    rpc SubDecorate(GetDecorateRequest) returns (stream GetDecorateResponse);
+    rpc GetUnfinishedEpisodes(GetUnfinishedEpisodesRequest) returns (GetUnfinishedEpisodesResponse);
+    rpc SubUnfinishedEpisodes(GetUnfinishedEpisodesRequest) returns (stream GetUnfinishedEpisodesResponse);
+    rpc MarkShowAsPlayed(MarkShowAsPlayedRequest) returns (MarkShowAsPlayedResponse);
+}
+
+message Status {
+    Code code = 1;
+    enum Code {
+        SUCCESS = 0;
+        BAD_REQUEST = 1;
+        INTERNAL_ERROR = 2;
+        NOT_FOUND = 3;
+    }
+    
+    string reason = 2;
+}
+
+message HeaderPolicy {
+    cosmos_util.proto.ShowDecorationPolicy show_policy = 1;
+    cosmos_util.proto.ShowPlayedStateDecorationPolicy show_played_state_policy = 2;
+    cosmos_util.proto.ShowCollectionDecorationPolicy show_collection_policy = 3;
+    
+    oneof _show_offline_state_policy {
+        cosmos_util.proto.ShowOfflineStateDecorationPolicy show_offline_state_policy = 4;
+    }
+}
+
+message ListPolicy {
+    cosmos_util.proto.EpisodeDecorationPolicy episode_policy = 1;
+    cosmos_util.proto.EpisodeCollectionDecorationPolicy episode_collection_policy = 2;
+    cosmos_util.proto.EpisodeSyncDecorationPolicy episode_sync_policy = 3;
+    cosmos_util.proto.EpisodePlayedStateDecorationPolicy episode_played_state_policy = 4;
+    bool progress = 5;
+    
+    oneof _show_policy {
+        HeaderPolicy show_policy = 6;
+    }
+}
+
+message SectionsPolicy {
+    bool continue_listening = 1;
+    bool trailer_section = 2;
+    bool latest_unplayed_episode = 3;
+    bool next_best_episode = 4;
+    bool saved_episodes = 5;
+}
+
+message QueryFilter {
+    Availability availability = 1;
+    enum Availability {
+        AVAILABILITY_NONE = 0;
+        AVAILABILITY_AVAILABLE = 1;
+    }
+    
+    OfflineStatus offline_status = 2;
+    enum OfflineStatus {
+        OFFLINE_STATUS_NONE = 0;
+        OFFLINE_STATUS_AVAILABLE_OFFLINE = 1;
+    }
+    
+    PlayedState played_state = 3;
+    enum PlayedState {
+        PLAYED_STATE_NONE = 0;
+        PLAYED_STATE_UNPLAYED = 1;
+        PLAYED_STATE_IN_PROGRESS = 2;
+    }
+    
+    CollectionStatus collection_status = 5;
+    enum CollectionStatus {
+        COLLECTION_STATUS_NONE = 0;
+        COLLECTION_STATUS_IN_YOUR_EPISODES = 1;
+    }
+    
+    SubscriptionStatus subscription_status = 6;
+    enum SubscriptionStatus {
+        SUBSCRIPTION_STATUS_NONE = 0;
+        SUBSCRIPTION_STATUS_PAYWALLED = 1;
+        SUBSCRIPTION_STATUS_AVAILABLE = 2;
+    }
+    
+    oneof _contains_text {
+        string contains_text = 4;
+    }
+}
+
+message GetShowRequest {
+    string show_id = 1;
+    uint32 update_throttling = 2;
+    int32 range_start = 3;
+    string sort = 5;
+    string filter = 6;
+    string include_in_range = 7;
+    SectionsPolicy sections_policy = 11;
+    SortOrder sort_order = 12;
+    
+    Range range = 13;
+    message Range {
+        uint32 limit = 3;
+        
+        oneof selection {
+            uint32 start = 1;
+            Focus focus = 2;
+        }
+        
+        message Focus {
+            Type type = 1;
+            enum Type {
+                LATEST_PLAYED = 0;
+                CONTINUE_LISTENING = 1;
+                URI = 2;
+            }
+            
+            string data = 2;
+        }
+    }
+    
+    QueryFilter query_filter = 14;
+    bool include_extensions_on_error = 15;
+    bool prefer_cache = 16;
+    
+    oneof _range_length {
+        int32 range_length = 4;
+    }
+    
+    oneof _force_include_context {
+        int32 force_include_context = 8;
+    }
+    
+    oneof _header_policy {
+        HeaderPolicy header_policy = 9;
+    }
+    
+    oneof _list_policy {
+        ListPolicy list_policy = 10;
+    }
+}
+
+message GetShowResponse {
+    show_cosmos.proto.Response response = 1;
+    Status status = 2;
+}
+
+message GetDecorateRequest {
+    repeated string item = 1;
+    bool prefer_cached = 2;
+    uint32 update_throttling = 3;
+    
+    oneof _show_policy {
+        HeaderPolicy show_policy = 4;
+    }
+    
+    oneof _episode_policy {
+        ListPolicy episode_policy = 5;
+    }
+}
+
+message GetDecorateResponse {
+    show_cosmos.decorate_request.proto.Response response = 1;
+    Status status = 2;
+}
+
+message GetUnfinishedEpisodesRequest {
+    int32 range_start = 1;
+    string sort = 3;
+    string filter = 4;
+    uint32 update_throttling = 5;
+    uint32 abs_time_left_tolerance = 6;
+    double rel_time_left_tolerance = 7;
+    bool prefer_cached = 8;
+    
+    oneof _range_length {
+        int32 range_length = 2;
+    }
+    
+    oneof _policy {
+        ListPolicy policy = 9;
+    }
+}
+
+message GetUnfinishedEpisodesResponse {
+    show_cosmos.unfinished_episodes_request.proto.Response response = 1;
+    Status status = 2;
+}
+
+message MarkShowAsPlayedRequest {
+    string show_id = 1;
+    
+    State state = 2;
+    enum State {
+        PLAYED = 0;
+        UNPLAYED = 1;
+    }
+}
+
+message MarkShowAsPlayedResponse {
+    Status status = 1;
+}
+
+enum SortOrder {
+    NONE = 0;
+    CONSUMPTION_ORDER_ASC = 1;
+    PUBLISH_DATE_ASC = 2;
+    PUBLISH_DATE_DESC = 3;
+    POPULARITY_DESC = 4;
+}

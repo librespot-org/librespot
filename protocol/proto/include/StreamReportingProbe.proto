@@ -1,0 +1,16 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message StreamReportingProbe {
+    optional bytes stream_id = 1;
+    optional int64 core_version = 2;
+    optional string type = 3;
+    optional string content = 4;
+    repeated string config_params = 5;
+    optional bytes playback_id = 6;
+}

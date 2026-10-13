@@ -1,0 +1,78 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.ubiquity.v1;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.ubiquity.v1";
+
+message Output {
+    oneof _name {
+        string name = 1;
+    }
+    
+    oneof _brand {
+        string brand = 2;
+    }
+    
+    oneof _model {
+        string model = 3;
+    }
+    
+    oneof _category {
+        OutputCategory category = 4;
+    }
+    
+    oneof _connection_type {
+        OutputConnectionType connection_type = 5;
+    }
+}
+
+message Device {
+    oneof _brand {
+        string brand = 1;
+    }
+    
+    oneof _model {
+        string model = 2;
+    }
+    
+    oneof _device_type {
+        string device_type = 3;
+    }
+    
+    oneof _output {
+        Output output = 4;
+    }
+}
+
+message ClientTaxonomy {
+    oneof _streaming_device {
+        Device streaming_device = 1;
+    }
+    
+    oneof _controlling_device {
+        Device controlling_device = 2;
+    }
+}
+
+enum OutputCategory {
+    OUTPUT_CATEGORY_UNKNOWN = 0;
+    OUTPUT_CATEGORY_CAR = 1;
+    OUTPUT_CATEGORY_HEADPHONES = 2;
+    OUTPUT_CATEGORY_SPEAKER = 3;
+    OUTPUT_CATEGORY_WEARABLE = 4;
+    OUTPUT_CATEGORY_GLASSES = 5;
+    OUTPUT_CATEGORY_APP = 6;
+}
+
+enum OutputConnectionType {
+    OUTPUT_CONNECTION_TYPE_UNKNOWN = 0;
+    OUTPUT_CONNECTION_TYPE_WIRED = 1;
+    OUTPUT_CONNECTION_TYPE_CAR_PROJECTED = 2;
+    OUTPUT_CONNECTION_TYPE_BLUETOOTH = 3;
+    OUTPUT_CONNECTION_TYPE_AIRPLAY = 4;
+    OUTPUT_CONNECTION_TYPE_BUILT_IN_SPEAKER = 5;
+}

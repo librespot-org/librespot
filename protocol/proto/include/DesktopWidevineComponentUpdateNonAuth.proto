@@ -1,0 +1,16 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message DesktopWidevineComponentUpdateNonAuth {
+    optional string trigger = 1;
+    optional string version_before = 2;
+    optional int32 state_before = 3;
+    optional string version_after = 4;
+    optional int32 state_after = 5;
+    optional int32 error_code = 6;
+}

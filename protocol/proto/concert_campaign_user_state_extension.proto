@@ -1,0 +1,66 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.concertcampaignextension.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option optimize_for = CODE_SIZE;
+
+message ConcertCampaignUserState {
+    oneof state {
+        CampaignUserStateReserved reserved = 1;
+        CampaignUserStateFCFS fcfs = 2;
+        CampaignUserStateWaitlistable waitlistable = 3;
+        CampaignUserStateWaitlisted waitlisted = 4;
+        CampaignUserStateIneligible ineligible = 5;
+        CampaignUserStatePurchased purchased = 6;
+    }
+}
+
+message CampaignUserStateReserved {
+    int32 allocated_count = 1;
+    google.protobuf.Timestamp reservation_start = 3;
+    google.protobuf.Timestamp reservation_end = 4;
+    bool few_left = 6;
+}
+
+message CampaignUserStateFCFS {
+    int32 allocated_count = 1;
+    google.protobuf.Timestamp sale_start = 3;
+    google.protobuf.Timestamp sale_end = 4;
+    bool few_left = 6;
+}
+
+message CampaignUserStateWaitlistable {
+    
+}
+
+message CampaignUserStateWaitlisted {
+    
+}
+
+message CampaignUserStateIneligible {
+    CampaignUserStateIneligibleReason reason = 1;
+}
+
+message CampaignUserStatePurchased {
+    repeated CampaignUserStatePurchase purchases = 1;
+    int32 total_count = 2;
+}
+
+message CampaignUserStatePurchase {
+    string concert_uri = 1;
+    int32 count = 2;
+}
+
+enum CampaignUserStateIneligibleReason {
+    CAMPAIGN_USER_STATE_INELIGIBLE_REASON_UNSPECIFIED = 0;
+    CAMPAIGN_USER_STATE_INELIGIBLE_FRAUD_SUSPECTED = 1;
+    CAMPAIGN_USER_STATE_INELIGIBLE_ACCOUNT_AGE = 2;
+    CAMPAIGN_USER_STATE_INELIGIBLE_AGE_RESTRICTION = 3;
+    CAMPAIGN_USER_STATE_INELIGIBLE_SOLD_OUT = 4;
+    CAMPAIGN_USER_STATE_INELIGIBLE_CANCELLED = 5;
+    CAMPAIGN_USER_STATE_INELIGIBLE_SALE_ENDED = 6;
+}

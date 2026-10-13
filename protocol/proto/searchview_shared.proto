@@ -1,0 +1,45 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.searchview;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+option swift_prefix = "Proto";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "SearchviewShared";
+option java_package = "com.spotify.searchview.proto";
+
+message ChatEntryPoint {
+    string placeholder = 1;
+    repeated ConversationStarterItem chat_starter_items = 2;
+    string conversation_id = 3;
+}
+
+message ConversationStarterItem {
+    string prompt = 1;
+    string conversation_id = 2;
+    string uri = 3;
+}
+
+message PodcastChapter {
+    string subtitle = 1;
+    string show_name = 2;
+    google.protobuf.Duration duration = 3;
+    bool explicit = 4;
+    bool mogef19 = 5;
+    bool age_assured = 6;
+    google.protobuf.Timestamp publication_time = 7;
+    bool video = 8;
+    string video_image_uri = 9;
+    
+    ChapterType type = 10;
+    enum ChapterType {
+        CHAPTER_TYPE_UNKNOWN = 0;
+        CHAPTER_TYPE_TALK = 1;
+        CHAPTER_TYPE_MUSIC = 2;
+    }
+}

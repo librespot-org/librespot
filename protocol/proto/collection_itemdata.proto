@@ -1,0 +1,88 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.collection.itemdata;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+import "save_source.proto";
+
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.collection2.itemdata.proto";
+
+message ItemData {
+    oneof data {
+        PlayContextBansItemData play_context_bans_item_data = 1001;
+        BanItemData ban_item_data = 1002;
+        ArtistBanItemData artistban_item_data = 1003;
+        BanIntentItemData ban_intent_item_data = 1004;
+        SnoozedRecsItemData snoozedrecs_item_data = 1005;
+        RatingItemData rating_item_data = 1006;
+        PageMatchItemData page_match_item_data = 1007;
+        HiddenFromHomeItemData hidden_from_home_item_data = 1008;
+        IsbnScanItemData isbn_scan_item_data = 1009;
+    }
+    
+    oneof _save_source {
+        list_collection.save_source.proto.SaveSource save_source = 1;
+    }
+}
+
+message PlayContextBansItemData {
+    ItemProvider item_provider = 1;
+    enum ItemProvider {
+        PROVIDER_UNSPECIFIED = 0;
+        PROVIDER_CONTEXT = 1;
+        PROVIDER_AUTOPLAY = 2;
+        PROVIDER_ENHANCE = 3;
+    }
+}
+
+message BanItemData {
+    bool banned_for_managed_account = 1;
+}
+
+message ArtistBanItemData {
+    bool banned_for_managed_account = 1;
+}
+
+message BanIntentItemData {
+    bool banned_for_managed_account = 1;
+}
+
+message SnoozedRecsItemData {
+    google.protobuf.Timestamp expires_at = 1;
+    
+    oneof _snooze_context_uri {
+        string snooze_context_uri = 2;
+    }
+}
+
+message RatingItemData {
+    RatingValue rating_value = 1;
+    enum RatingValue {
+        UNSET = 0;
+        RATING_1 = 1;
+        RATING_2 = 2;
+        RATING_3 = 3;
+        RATING_4 = 4;
+        RATING_5 = 5;
+    }
+}
+
+message PageMatchItemData {
+    google.protobuf.Duration page_match_offset = 1;
+}
+
+message HiddenFromHomeItemData {
+    repeated HiddenFromSection hidden_from_section = 1;
+    message HiddenFromSection {
+        string section_name = 1;
+        google.protobuf.Timestamp updated_at = 2;
+    }
+}
+
+message IsbnScanItemData {
+    string latest_isbn = 1;
+}

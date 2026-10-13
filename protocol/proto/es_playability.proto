@@ -1,0 +1,27 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playability.esperanto.proto;
+
+option objc_class_prefix = "ESP";
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.playability.esperanto.proto";
+
+service Playability {
+    rpc GetLocallyPlayable(GetLocallyPlayableRequest) returns (GetLocallyPlayableResponse);
+    rpc SubscribeLocallyPlayable(GetLocallyPlayableRequest) returns (stream GetLocallyPlayableResponse);
+}
+
+message GetLocallyPlayableRequest {
+    repeated string uris = 1;
+}
+
+message LocallyPlayable {
+    string uri = 1;
+    bool locally_playable = 2;
+}
+
+message GetLocallyPlayableResponse {
+    repeated LocallyPlayable items = 1;
+}

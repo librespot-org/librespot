@@ -1,0 +1,29 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playback_platform.timeline.v1.behavior;
+
+import "spotify/playback_platform/common/v1/duration.proto";
+import "spotify/playback_platform/timeline/v1/timeline_match.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.playback_platform.timeline.v1.behavior";
+
+message SeekInto {
+    TimelineMatch from_prev_timelines = 2;
+    TimelineMatch from_next_timelines = 3;
+    common.v1.Duration from_prev_threshold = 4;
+    common.v1.Duration from_next_threshold = 5;
+    
+    oneof _carry {
+        Carry carry = 1;
+    }
+    
+    enum Carry {
+        CARRY_MERGED = 0;
+        CARRY_ALWAYS = 1;
+        CARRY_NEVER = 15;
+    }
+}

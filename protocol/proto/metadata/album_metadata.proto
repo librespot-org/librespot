@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto2";
 
@@ -26,4 +26,11 @@ message AlbumMetadata {
     optional uint32 num_tracks = 8;
     optional bool playability = 9;
     optional bool is_premium_only = 10;
+    
+    optional ContentAccess content_access = 11;
+    enum ContentAccess {
+        CONTENT_ACCESS_NONE = 0;
+        CONTENT_ACCESS_WINDOWING = 1;
+        CONTENT_ACCESS_GATED = 2;
+    }
 }

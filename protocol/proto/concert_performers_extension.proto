@@ -1,0 +1,23 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.concerts.metadata.v1;
+
+option optimize_for = CODE_SIZE;
+
+message Performer {
+    string artist_uri = 1;
+    Act act = 2;
+    string artist_name = 3;
+}
+
+message PerformerGroup {
+    repeated Performer performers = 1;
+}
+
+enum Act {
+    ACT_UNKNOWN = 0;
+    ACT_HEADLINER = 1;
+    ACT_SUPPORTING = 2;
+}

@@ -1,0 +1,107 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playlist_cache.proto;
+
+import "playlist_api.proto";
+import "playlist_permission.proto";
+import "cache_hint.proto";
+import "google/protobuf/timestamp.proto";
+
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.playlist.proto";
+
+message ContextSyncErrorCode {
+    oneof _code {
+        int32 code = 1;
+    }
+}
+
+message CacheHintInfo {
+    oneof _cache_hint {
+        playlist.messages.CacheHint cache_hint = 1;
+    }
+    
+    oneof _last_updated_timestamp {
+        google.protobuf.Timestamp last_updated_timestamp = 2;
+    }
+}
+
+message PlaylistCacheInfo {
+    oneof _cache_producer_version {
+        int32 cache_producer_version = 1;
+    }
+    
+    oneof _cache_refresh_needed {
+        bool cache_refresh_needed = 2;
+    }
+    
+    oneof _headless_state {
+        bool headless_state = 3;
+    }
+    
+    oneof _error_code {
+        ContextSyncErrorCode error_code = 4;
+    }
+    
+    oneof _cache_hint_info {
+        CacheHintInfo cache_hint_info = 5;
+    }
+    
+    oneof _content_generation_version {
+        uint32 content_generation_version = 6;
+    }
+}
+
+message PendingPlaylistChanges {
+    repeated playlist4.proto.Delta changes = 1;
+}
+
+message AdditionalData {
+    repeated string requested_lenses = 1;
+}
+
+message Playlist {
+    oneof _cache_info {
+        PlaylistCacheInfo cache_info = 1;
+    }
+    
+    oneof _selected_list_content {
+        playlist4.proto.SelectedListContent selected_list_content = 2;
+    }
+    
+    oneof _playlist_members {
+        playlist_permission.proto.GetMemberPermissionsResponse playlist_members = 3;
+    }
+    
+    oneof _pending_changes {
+        PendingPlaylistChanges pending_changes = 4;
+    }
+    
+    oneof _additional_data {
+        AdditionalData additional_data = 6;
+    }
+    
+    oneof _permissions {
+        playlist_permission.proto.Permissions permissions = 7;
+    }
+}
+
+message GeneralInfo {
+    oneof _personalized_lists_disabled {
+        bool personalized_lists_disabled = 1;
+    }
+    
+    oneof _owner_capabilities_response {
+        playlist_permission.proto.DefaultOwnerCapabilitiesResponse owner_capabilities_response = 2;
+    }
+    
+    oneof _owner_capabilities_expires_at {
+        google.protobuf.Timestamp owner_capabilities_expires_at = 3;
+    }
+    
+    oneof _current_content_generation_version {
+        uint32 current_content_generation_version = 4;
+    }
+}

@@ -1,0 +1,24 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.collection_cosmos.proto;
+
+import "status.proto";
+
+option objc_class_prefix = "ESP";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.collection.esperanto.proto";
+
+message CollectionContainsRequest {
+    uint32 update_throttling = 1;
+    repeated string uri = 2;
+    string context_uri = 3;
+}
+
+message CollectionContainsResponse {
+    Status status = 1;
+    repeated bool found = 2;
+    repeated bool ban_found = 3;
+}

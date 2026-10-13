@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
@@ -15,7 +15,10 @@ message ContextPlayerOptions {
     bool repeating_context = 2;
     bool repeating_track = 3;
     map<string, string> modes = 5;
-    optional float playback_speed = 4;
+    
+    oneof _playback_speed {
+        float playback_speed = 4;
+    }
 }
 
 message ContextPlayerOptionOverrides {
@@ -23,5 +26,8 @@ message ContextPlayerOptionOverrides {
     OptionalBoolean repeating_context = 2;
     OptionalBoolean repeating_track = 3;
     map<string, string> modes = 5;
-    optional float playback_speed = 4;
+    
+    oneof _playback_speed {
+        float playback_speed = 4;
+    }
 }

@@ -1,0 +1,16 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message ConnectTransferIncarnation {
+    optional string transfer_intent_id = 1;
+    optional string incarnation_client_id = 2;
+    optional string incarnation_device_id = 3;
+    optional bool incarnation_is_cast = 4;
+    optional bool incarnation_is_preferred = 5;
+    optional string preferred_protocol_reason = 6;
+}

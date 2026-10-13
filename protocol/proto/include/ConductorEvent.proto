@@ -1,0 +1,28 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message ConductorEvent {
+    optional string list_uri = 1;
+    optional bytes list_ref = 2;
+    optional string list_instance_id = 3;
+    optional string item_uri = 4;
+    optional string item_uid = 5;
+    optional string item_instance_id = 6;
+    optional string clip_uri = 7;
+    optional string clip_uid = 8;
+    optional string event = 9;
+    optional string reason = 10;
+    optional string feature_identifier = 11;
+    optional int64 seek_position = 12;
+    optional bool paused = 13;
+    optional int64 seek_creator_position = 14;
+    optional float playback_speed = 15;
+    optional int64 clip_slice_begin = 16;
+    optional int64 clip_slice_end = 17;
+    optional bytes clip_playback_id = 18;
+}

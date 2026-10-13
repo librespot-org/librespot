@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
@@ -13,13 +13,14 @@ option java_outer_classname = "ShowAccessProto";
 option java_package = "com.spotify.podcast.access.proto";
 
 message ShowAccess {
-    reserved 7;
-    AccountLinkPrompt prompt = 5;
+    AccountLinkPrompt prompt = 5 [deprecated = true];
     bool is_user_member_of_at_least_one_group = 8;
-    repeated UnlockingMethod unlocked_by = 10;
-    repeated UnlockingMethod unlocking_methods = 14;
+    repeated UnlockingMethod unlocked_by = 10 [deprecated = true];
+    repeated UnlockingMethod unlocking_methods = 14 [deprecated = true];
     Signifier signifier = 15;
     Disclaimer disclaimer = 16;
+    PromotionalBanner promotional_banner = 19;
+    
     oneof explanation {
         NoExplanation none = 1;
         LegacyExplanation legacy = 2;
@@ -31,6 +32,8 @@ message ShowAccess {
         FreeCheckoutExplanation freeCheckout = 12;
         ConsumptionCappedExplanation consumptionCapped = 13;
     }
+    
+    reserved 7;
 }
 
 message Signifier {
@@ -44,9 +47,11 @@ message BasicExplanation {
 }
 
 message LegacyExplanation {
+    
 }
 
 message NoExplanation {
+    
 }
 
 message UpsellLinkExplanation {
@@ -64,6 +69,8 @@ message EngagementExplanation {
     string dismiss = 5;
     string action_type = 6;
     string body_secondary = 7;
+    audiobookcashier.v1.AudiobookPrice price = 8;
+    bool is_price_displayed = 9;
 }
 
 message CheckoutOnWebOverlayExplanation {
@@ -88,7 +95,7 @@ message ConsumptionCappedExplanation {
 message MultiPassExplanation {
     string title = 1;
     string soa_description = 2;
-    repeated .spotify.podcast_paywalls.SOAPartner soa_partner = 3;
+    repeated SOAPartner soa_partner = 3;
 }
 
 message SOAPartner {
@@ -109,6 +116,13 @@ message Disclaimer {
     string body = 2;
 }
 
+message PromotionalBanner {
+    string title = 1;
+    string body = 2;
+    string cta_text = 3;
+    string cta_url = 4;
+}
+
 enum UnlockingMethod {
     UNKNOWN = 0;
     ANCHOR_PAYWALL = 1;
@@ -118,4 +132,3 @@ enum UnlockingMethod {
     ABP = 5;
     AUDIOBOOK_PROMOTION = 6;
 }
-

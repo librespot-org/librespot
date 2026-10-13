@@ -1,0 +1,180 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.desktop.login_esperanto.proto;
+
+option optimize_for = CODE_SIZE;
+
+service DesktopLogin {
+    rpc LoginWithQRCode(LoginWithQRCodeRequest) returns (stream LoginWithQRCodeResponse);
+    rpc LoginWithAccounts(LoginWithAccountsRequest) returns (LoginWithAccountsResponse);
+    rpc LoginWithConnect(LoginWithConnectRequest) returns (stream LoginWithConnectResponse);
+    rpc ApproveConnectLogin(ApproveConnectLoginRequest) returns (ApproveConnectLoginResponse);
+    rpc Logout(LogoutRequest) returns (LogoutResponse);
+    rpc GetSessionState(GetSessionStateRequest) returns (GetSessionStateResponse);
+    rpc GetStoredAccounts(GetStoredAccountsRequest) returns (GetStoredAccountsResponse);
+    rpc LoginWithStoredCredentials(LoginWithStoredCredentialsRequest) returns (LoginWithStoredCredentialsResponse);
+    rpc SaveCurrentCredentials(SaveCurrentCredentialsRequest) returns (SaveCurrentCredentialsResponse);
+    rpc ClearAllStoredCredentials(ClearAllStoredCredentialsRequest) returns (ClearAllStoredCredentialsResponse);
+    rpc SetSwitchTarget(SetSwitchTargetRequest) returns (SetSwitchTargetResponse);
+    rpc GetSwitchTarget(GetSwitchTargetRequest) returns (GetSwitchTargetResponse);
+    rpc ClearSwitchTarget(ClearSwitchTargetRequest) returns (ClearSwitchTargetResponse);
+    rpc RemoveStoredAccount(RemoveStoredAccountRequest) returns (RemoveStoredAccountResponse);
+}
+
+message AuthorizationRequired {
+    string verification_uri = 1;
+    string user_code = 2;
+}
+
+message ConfirmationRequired {
+    
+}
+
+message LoginError {
+    int32 error_code = 1;
+    string error_category = 2;
+    string error_reference = 3;
+}
+
+message LoginSuccess {
+    
+}
+
+message LoginWithQRCodeRequest {
+    
+}
+
+message LoginWithQRCodeResponse {
+    oneof entity {
+        AuthorizationRequired authorization_required = 1;
+        LoginSuccess success = 2;
+        bool timeout = 3;
+        LoginError error = 4;
+    }
+}
+
+message LoginWithAccountsRequest {
+    bool enable_signup = 1;
+    string action_hash = 2;
+    bool use_dpop = 3;
+}
+
+message LoginWithAccountsResponse {
+    oneof entity {
+        LoginSuccess success = 1;
+        LoginError error = 2;
+    }
+}
+
+message LoginWithConnectRequest {
+    
+}
+
+message LoginWithConnectResponse {
+    oneof entity {
+        ConfirmationRequired confirmation_required = 1;
+        AuthorizationRequired authorization_required = 2;
+        LoginSuccess success = 3;
+        bool timeout = 4;
+        LoginError error = 5;
+    }
+}
+
+message ApproveConnectLoginRequest {
+    bool approved = 1;
+}
+
+message ApproveConnectLoginResponse {
+    
+}
+
+message LogoutRequest {
+    bool keep_credentials = 1;
+}
+
+message LogoutResponse {
+    
+}
+
+message SaveCurrentCredentialsRequest {
+    
+}
+
+message SaveCurrentCredentialsResponse {
+    bool success = 1;
+}
+
+message GetSessionStateRequest {
+    
+}
+
+message GetSessionStateResponse {
+    bool has_active_session = 1;
+    string username = 2;
+}
+
+message GetStoredAccountsRequest {
+    
+}
+
+message StoredAccountInfo {
+    string username = 1;
+    string canonical_username = 2;
+}
+
+message GetStoredAccountsResponse {
+    repeated StoredAccountInfo accounts = 1;
+}
+
+message LoginWithStoredCredentialsRequest {
+    string canonical_username = 1;
+}
+
+message LoginWithStoredCredentialsResponse {
+    oneof result {
+        LoginSuccess success = 1;
+        LoginError error = 2;
+    }
+}
+
+message ClearAllStoredCredentialsRequest {
+    
+}
+
+message ClearAllStoredCredentialsResponse {
+    
+}
+
+message RemoveStoredAccountRequest {
+    string canonical_username = 1;
+}
+
+message RemoveStoredAccountResponse {
+    
+}
+
+message SetSwitchTargetRequest {
+    string canonical_username = 1;
+}
+
+message SetSwitchTargetResponse {
+    
+}
+
+message GetSwitchTargetRequest {
+    
+}
+
+message GetSwitchTargetResponse {
+    string canonical_username = 1;
+}
+
+message ClearSwitchTargetRequest {
+    
+}
+
+message ClearSwitchTargetResponse {
+    
+}

@@ -1,0 +1,20 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message AudioRouteSegmentEnd {
+    optional string playback_id = 1;
+    optional string reason = 2;
+    optional string current_route_id = 3;
+    optional string current_route_name = 4;
+    optional string current_route_type = 5;
+    optional string previous_route_id = 6;
+    optional string previous_route_name = 7;
+    optional string previous_route_type = 8;
+    optional int32 current_route_car_connection_type = 9;
+    optional int32 previous_route_car_connection_type = 10;
+}

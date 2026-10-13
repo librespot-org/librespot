@@ -1,0 +1,28 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.playback_platform.context.v1;
+
+import "spotify/playback_platform/context/v1/context_behavior.proto";
+import "spotify/playback_platform/context/v1/context_metadata.proto";
+import "spotify/playback_platform/timeline/v1/timeline_behavior.proto";
+import "spotify/playback_platform/timeline/v1/timeline_metadata.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.playback_platform.context.v1";
+
+message SequenceChild {
+    string context_id = 1;
+    string uid = 2;
+    repeated uint64 tags = 3;
+    ContextBehavior behavior_override = 6;
+    ContextMetadata metadata_override = 7;
+    timeline.v1.TimelineBehavior timeline_behavior = 8;
+    timeline.v1.TimelineMetadata timeline_metadata = 9;
+    
+    reserved 4 to 5, 10 to 11;
+    
+    reserved "behavior", "metadata", "timeline_behavior_override", "timeline_metadata_override";
+}

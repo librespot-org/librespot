@@ -1,0 +1,22 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message ShuffleContextEvent {
+    optional string player_session_id = 1;
+    optional bool history_aware = 2;
+    optional bool track_separation = 3;
+    optional bool artist_separation = 4;
+    optional int32 history_track_count = 5;
+    optional int32 context_history_track_count = 6;
+    optional int32 context_track_count = 7;
+    optional int32 max_distance = 8;
+    optional int32 max_size = 9;
+    optional string shuffle_algorithm_setting = 10;
+    optional string context_shuffle_algorithm = 11;
+    optional string shuffle_sequence_uuid = 12;
+}

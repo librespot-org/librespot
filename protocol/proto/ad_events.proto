@@ -1,0 +1,124 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.ads.esperanto.proto;
+
+import "ad_common.proto";
+import "google/protobuf/empty.proto";
+
+option objc_class_prefix = "ESP";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.ads.esperanto.proto";
+
+service Events {
+    rpc postEvent(EventRequest) returns (EventResponse);
+    rpc postUnmanagedEvent(UnmanagedEventRequest) returns (google.protobuf.Empty);
+    rpc subEvent(SubEventRequest) returns (stream SubEventResponse);
+}
+
+message EventRequest {
+    string ad_id = 1;
+    string event_type = 2;
+    
+    oneof _playback_position {
+        uint64 playback_position = 3;
+    }
+    
+    oneof _event_reason {
+        string event_reason = 4;
+    }
+    
+    oneof _event_source {
+        string event_source = 5;
+    }
+    
+    oneof _slot_id {
+        string slot_id = 6;
+    }
+    
+    oneof _client_payload {
+        string client_payload = 7;
+    }
+    
+    oneof _playback_duration {
+        uint64 playback_duration = 8;
+    }
+    
+    oneof _asset_id {
+        string asset_id = 9;
+    }
+}
+
+message EventResponse {
+    Status status = 1;
+    enum Status {
+        ACCEPTED = 0;
+        AD_NOT_FOUND = 1;
+    }
+}
+
+message UnmanagedEventRequest {
+    string ad_id = 1;
+    string event_type = 2;
+    string lineitem_id = 5;
+    string creative_id = 6;
+    string request_id = 7;
+    string product_name = 8;
+    string slot_id = 9;
+    repeated string tracking_urls = 12;
+    
+    oneof _playback_position {
+        uint64 playback_position = 3;
+    }
+    
+    oneof _event_reason {
+        string event_reason = 4;
+    }
+    
+    oneof _event_source {
+        string event_source = 10;
+    }
+    
+    oneof _format {
+        AdFormat format = 11;
+    }
+    
+    oneof _duration_seconds {
+        uint32 duration_seconds = 13;
+    }
+    
+    oneof _asset_id {
+        string asset_id = 14;
+    }
+}
+
+message SubEventRequest {
+    string event_type = 1;
+    
+    oneof _format {
+        AdFormat format = 2;
+    }
+    
+    oneof _slot_id {
+        string slot_id = 3;
+    }
+}
+
+message AdEvent {
+    string event_type = 1;
+    string slot_id = 2;
+    Ad ad = 3;
+}
+
+message SubEventResponse {
+    Status status = 1;
+    enum Status {
+        OK = 0;
+        INVALID_SLOT = 1;
+        INVALID_FORMAT = 2;
+    }
+    
+    AdEvent adEvent = 2;
+}

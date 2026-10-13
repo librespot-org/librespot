@@ -1,0 +1,15 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message PendingEventsInternalErrorNonAuth {
+    optional string operation = 1;
+    optional string error_type = 2;
+    optional string underlying_error = 3;
+    optional string event_type = 4;
+    optional int64 event_sequence_no = 5;
+}

@@ -1,0 +1,19 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message PartnerApiEventNonAuth {
+    optional string connection_type = 1;
+    optional string client_id = 2;
+    optional string client_name = 3;
+    optional string action = 4;
+    optional string parameters = 5;
+    optional string error = 6;
+    optional int64 time_ms = 7;
+    optional string app_variant = 8;
+    optional string client_version = 9;
+}

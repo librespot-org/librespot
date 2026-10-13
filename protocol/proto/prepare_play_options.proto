@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto2";
 
@@ -24,6 +24,7 @@ message PreparePlayOptions {
     optional PrefetchLevel prefetch_level = 11;
     optional string session_id = 12;
     optional AudioStream audio_stream = 13;
+    optional string seek_to_creator_timestamp = 14;
 }
 
 enum PrefetchLevel {

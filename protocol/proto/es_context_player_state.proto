@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.2.52.442 (windows)
+// Extracted from: Spotify 1.2.96.518 (Windows)
 
 syntax = "proto3";
 
@@ -10,6 +10,8 @@ import "es_optional.proto";
 import "es_provided_track.proto";
 import "es_context_player_options.proto";
 import "es_prepare_play_options.proto";
+import "es_ad_break_context.proto";
+import "es_sleep_timer.proto";
 
 option objc_class_prefix = "ESP";
 option optimize_for = CODE_SIZE;
@@ -21,6 +23,7 @@ message ContextIndex {
 }
 
 message PlaybackQuality {
+    BitrateLevel bitrate_level = 1;
     enum BitrateLevel {
         UNKNOWN = 0;
         LOW = 1;
@@ -29,8 +32,10 @@ message PlaybackQuality {
         VERY_HIGH = 4;
         HIFI = 5;
         HIFI24 = 6;
+        PETREL = 7;
     }
-
+    
+    BitrateStrategy strategy = 2;
     enum BitrateStrategy {
         UNKNOWN_STRATEGY = 0;
         BEST_MATCHING = 1;
@@ -39,18 +44,27 @@ message PlaybackQuality {
         CACHED_FILE = 4;
         LOCAL_FILE = 5;
     }
-
+    
+    BitrateLevel target_bitrate_level = 3;
+    bool target_bitrate_available = 4;
+    
+    HiFiStatus hifi_status = 5;
     enum HiFiStatus {
         NONE = 0;
         OFF = 1;
         ON = 2;
     }
-
-    BitrateLevel bitrate_level = 1;
-    BitrateStrategy strategy = 2;
-    BitrateLevel target_bitrate_level = 3;
-    bool target_bitrate_available = 4;
-    HiFiStatus hifi_status = 5;
+    
+    BitrateLevel highest_available_quality = 6;
+    
+    FileOrigin file_origin = 7;
+    enum FileOrigin {
+        UNKNOWN_FILE_ORIGIN = 0;
+        INTERNAL = 1;
+        EXTERNAL = 2;
+        LOCAL = 3;
+        GENERATED = 4;
+    }
 }
 
 message ContextPlayerState {
@@ -82,4 +96,22 @@ message ContextPlayerState {
     PreparePlayOptions.AudioStream audio_stream = 26;
     repeated string signals = 27;
     string session_command_id = 28;
+    
+    oneof _format {
+        Format format = 29;
+    }
+    
+    oneof _ad_break_context {
+        AdBreakContext ad_break_context = 30;
+    }
+    
+    oneof _sleep_timer {
+        SleepTimer sleep_timer = 31;
+    }
+    
+    enum Format {
+        UNKNOWN = 0;
+        DEFAULT = 1;
+        PARROT = 2;
+    }
 }

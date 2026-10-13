@@ -1,0 +1,157 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.automix.bundle.proto;
+
+option optimize_for = CODE_SIZE;
+
+message Point {
+    double x = 1;
+    double y = 2;
+}
+
+message AutomationCurve {
+    repeated Point points = 1;
+    double start = 2;
+    double end = 3;
+}
+
+message AutomationCurves {
+    repeated AutomationCurve curves = 1;
+    double minimum = 2;
+    double maximum = 3;
+}
+
+message SalesPeriod {
+    int64 start = 1;
+    int64 end = 2;
+}
+
+message Identifier {
+    int32 id = 1;
+    string string_id = 2;
+    
+    oneof _sales_period {
+        SalesPeriod sales_period = 3;
+    }
+}
+
+message PresetDefinition {
+    int32 volume_style_out_id = 1;
+    int32 volume_style_in_id = 2;
+    int32 eq_style_out_id = 3;
+    int32 eq_style_in_id = 4;
+    int32 filter_style_out_id = 5;
+    int32 filter_style_in_id = 6;
+    int32 fx_style_out_id = 7;
+    int32 fx_style_in_id = 8;
+}
+
+message LegacyPresetDefinition {
+    int32 volume_style_id = 1;
+    int32 eq_style_id = 2;
+    int32 filter_fx_style_id = 3;
+}
+
+message LegacyVolumeStyleMapping {
+    int32 volume_style_id = 1;
+    int32 volume_style_out_id = 2;
+    int32 volume_style_in_id = 3;
+}
+
+message LegacyEqStyleMapping {
+    int32 eq_style_id = 1;
+    int32 eq_style_out_id = 2;
+    int32 eq_style_in_id = 3;
+}
+
+message LegacyFilterFxStyleMapping {
+    int32 filter_fx_style_id = 1;
+    int32 filter_style_out_id = 2;
+    int32 filter_style_in_id = 3;
+    int32 fx_style_out_id = 4;
+    int32 fx_style_in_id = 5;
+}
+
+message Preset {
+    Identifier identifier = 1;
+    PresetDefinition definition = 2;
+    
+    oneof _legacy_definition {
+        LegacyPresetDefinition legacy_definition = 3;
+    }
+}
+
+message VolumeAutomation {
+    int32 num_bars = 1;
+    AutomationCurves volume = 2;
+}
+
+message VolumeStyle {
+    Identifier identifier = 1;
+    repeated VolumeAutomation automation = 2;
+}
+
+message EqAutomation {
+    int32 num_bars = 1;
+    AutomationCurves low = 2;
+    AutomationCurves mid = 3;
+    AutomationCurves high = 4;
+}
+
+message EqStyle {
+    Identifier identifier = 1;
+    repeated EqAutomation automation = 2;
+}
+
+message FilterAutomation {
+    int32 num_bars = 1;
+    AutomationCurves cutoff = 2;
+    AutomationCurves resonance = 3;
+}
+
+message FilterStyle {
+    Identifier identifier = 1;
+    repeated FilterAutomation automation = 4;
+}
+
+message FxAutomation {
+    int32 num_bars = 1;
+    AutomationCurves todo = 2;
+}
+
+message FxStyle {
+    Identifier identifier = 1;
+    repeated FxAutomation automation = 2;
+}
+
+message LegacyVolumeStyle {
+    Identifier identifier = 1;
+}
+
+message LegacyEqStyle {
+    Identifier identifier = 1;
+}
+
+message LegacyFilterFxStyle {
+    Identifier identifier = 1;
+}
+
+message MixingBundle {
+    repeated Preset presets = 1;
+    repeated VolumeStyle volume_styles_out = 2;
+    repeated VolumeStyle volume_styles_in = 3;
+    repeated EqStyle eq_styles_out = 4;
+    repeated EqStyle eq_styles_in = 5;
+    repeated FilterStyle filter_styles_out = 6;
+    repeated FilterStyle filter_styles_in = 7;
+    repeated FxStyle fx_styles_out = 8;
+    repeated FxStyle fx_styles_in = 9;
+    repeated LegacyVolumeStyleMapping legacy_volume_style_mappings = 10;
+    repeated LegacyEqStyleMapping legacy_eq_style_mappings = 11;
+    repeated LegacyFilterFxStyleMapping legacy_filter_fx_style_mappings = 12;
+    repeated LegacyVolumeStyle legacy_volume_styles = 13;
+    repeated LegacyEqStyle legacy_eq_styles = 14;
+    repeated LegacyFilterFxStyle legacy_filter_fx_styles = 15;
+}

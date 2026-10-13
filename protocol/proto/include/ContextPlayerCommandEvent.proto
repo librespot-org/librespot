@@ -1,0 +1,74 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message ContextPlayerCommandEvent {
+    optional string command = 1;
+    optional string command_source = 2;
+    optional string command_id = 3;
+    optional string device_identifier = 4;
+    optional bool system_initiated = 5;
+    optional int64 command_initiated_time = 6;
+    optional string feature_identifier = 7;
+    
+    optional CurrentContext current_context = 8;
+    message CurrentContext {
+        optional string context_uri = 1;
+        optional string track_uri = 2;
+        optional string track_uid = 3;
+        optional bool is_playing = 4;
+        optional bool is_paused = 5;
+        optional bool is_buffering = 6;
+        optional int32 next_track_count = 7;
+        optional int32 prev_track_count = 8;
+        optional int64 position_as_of_timestamp = 9;
+        optional int64 timestamp = 10;
+        optional double playback_speed = 11;
+        optional int64 duration = 12;
+        optional bool shuffling_context = 13;
+        optional bool repeating_context = 14;
+        optional bool repeating_track = 15;
+    }
+    
+    optional CommandParams command_params = 9;
+    message CommandParams {
+        optional string context_uri = 1;
+        optional string track_uri = 2;
+        optional string track_uid = 3;
+        optional int64 position = 4;
+        optional int64 creator_timestamp_position = 5;
+        optional string seek_relative = 6;
+        optional bool initially_paused = 7;
+        optional string reason = 8;
+        optional bool repeating_track = 9;
+        optional bool repeating_context = 10;
+        optional bool shuffling_context = 11;
+        optional float playback_speed = 12;
+        optional int32 next_track_count = 13;
+        optional int32 prev_track_count = 14;
+        optional string timer_type = 15;
+        optional int32 timer_duration = 16;
+        optional string signal_id = 17;
+        optional bool allow_seeking = 18;
+        
+        optional Transfer transfer = 19;
+        message Transfer {
+            optional string restore_paused = 1;
+            optional string restore_position = 2;
+            optional string restore_track = 3;
+            optional string retain_session = 4;
+            optional string reason = 5;
+            optional string license = 6;
+        }
+        
+        optional string session_id = 20;
+        optional string queue_revision = 21;
+    }
+    
+    optional string page_instance_id = 10;
+    optional string interaction_id = 11;
+}

@@ -1,0 +1,18 @@
+// Extracted from: Spotify 1.2.96.518 (Windows)
+
+syntax = "proto3";
+
+package spotify.contentagnostic.v2;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.contentagnostic.v2";
+
+message ContentExperienceTrait {
+    ContentExperience content_experience = 1;
+    enum ContentExperience {
+        CONTENT_EXPERIENCE_UNSPECIFIED = 0;
+        CONTENT_EXPERIENCE_MUSIC = 1;
+        CONTENT_EXPERIENCE_TALK = 2;
+    }
+}
