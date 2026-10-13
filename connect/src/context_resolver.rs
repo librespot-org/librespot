@@ -34,16 +34,25 @@ pub(super) struct ResolveContext {
     fallback: Option<String>,
     update: ContextType,
     action: ContextAction,
+    /// Started by the listener rather than restored, so a session like DJ's
+    /// begins with a set it hasn't played yet.
+    fresh: bool,
 }
 
 impl ResolveContext {
-    fn append_context(uri: impl Into<String>) -> Self {
+    pub fn append_context(uri: impl Into<String>) -> Self {
         Self {
             resolve: Resolve::Uri(uri.into()),
             fallback: None,
             update: ContextType::Default,
             action: ContextAction::Append,
+            fresh: false,
         }
+    }
+
+    pub fn starting_fresh(mut self, fresh: bool) -> Self {
+        self.fresh = fresh;
+        self
     }
 
     pub fn from_uri(
@@ -58,6 +67,7 @@ impl ResolveContext {
             fallback: (!fallback_uri.is_empty()).then_some(fallback_uri),
             update,
             action,
+            fresh: false,
         }
     }
 
@@ -67,6 +77,7 @@ impl ResolveContext {
             fallback: None,
             update,
             action,
+            fresh: false,
         }
     }
 
@@ -125,6 +136,9 @@ pub struct ContextResolver {
     queue: VecDeque<ResolveContext>,
     unavailable_contexts: HashMap<ResolveContext, Instant>,
 }
+
+/// Names the session a DJ context draws its tracks from.
+pub(crate) const LEXICON_CONTEXT_URL: &str = "lexicon_context_url";
 
 // time after which an unavailable context is retried
 const RETRY_UNAVAILABLE: Duration = Duration::from_secs(3600);
@@ -214,7 +228,56 @@ impl ContextResolver {
 
         match next.update {
             ContextType::Default => {
-                let mut ctx = self.session.spclient().get_context(resolve_uri).await;
+                let mut ctx = if resolve_uri.starts_with("hm://") {
+                    // the next page of a context that streams in pages
+                    self.session
+                        .spclient()
+                        .get_context_page(resolve_uri)
+                        .await
+                        .map(|page| Context {
+                            pages: vec![page],
+                            ..Default::default()
+                        })
+                } else {
+                    self.session.spclient().get_context(resolve_uri).await
+                };
+                // DJ resolves to an empty shell naming the session that holds its tracks.
+                let session = ctx
+                    .as_ref()
+                    .ok()
+                    .filter(|shell| shell.pages.iter().all(|page| page.tracks.is_empty()))
+                    .and_then(|shell| {
+                        let session = shell.metadata.get(LEXICON_CONTEXT_URL)?;
+                        Some((session.clone(), shell.metadata.clone()))
+                    });
+                if let Some((session, shell_metadata)) = session {
+                    debug!("resolving {resolve_uri} through its session {session}");
+                    ctx = self.session.spclient().get_context_url(&session).await;
+                    // The session holds every set since it began, and nothing tells which
+                    // were heard, so a fresh start asks for a new set, as "Let DJ pick" does.
+                    let new_set = ctx
+                        .as_ref()
+                        .ok()
+                        .filter(|_| next.fresh)
+                        .and_then(|ctx| ctx.pages.last()?.next_page_url.clone());
+                    if let Some(new_set) = new_set {
+                        match self.session.spclient().get_context_page(&new_set).await {
+                            Ok(page) => {
+                                if let Ok(ctx) = ctx.as_mut() {
+                                    ctx.pages = vec![page];
+                                }
+                            }
+                            Err(e) => {
+                                warn!("no new set for {resolve_uri}, resuming its session: {e}")
+                            }
+                        }
+                    }
+                    if let Ok(ctx) = ctx.as_mut() {
+                        for (key, value) in shell_metadata {
+                            ctx.metadata.entry(key).or_insert(value);
+                        }
+                    }
+                }
                 if let Ok(ctx) = ctx.as_mut() {
                     ctx.uri = Some(next.context_uri().to_string());
                     ctx.url = ctx.uri.as_ref().map(|s| format!("context://{s}"));

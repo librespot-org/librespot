@@ -1,6 +1,6 @@
 use crate::{
     LoadContextOptions, LoadRequestOptions, PlayContext,
-    context_resolver::{ContextAction, ContextResolver, ResolveContext},
+    context_resolver::{ContextAction, ContextResolver, LEXICON_CONTEXT_URL, ResolveContext},
     core::{
         Error, Session, SpotifyUri,
         authentication::Credentials,
@@ -1373,9 +1373,14 @@ impl SpircTask {
         self.connect_state.reset_options();
 
         let autoplay = matches!(cmd.context_options, Some(LoadContextOptions::Autoplay));
+        // Playing from the top rather than a chosen track starts a context afresh.
+        let fresh = matches!(
+            cmd.options.playing_track,
+            None | Some(PlayingTrack::Index(0))
+        );
         match cmd.context {
             PlayContext::Uri(uri) => {
-                self.load_context_from_uri(uri, page.as_ref(), autoplay)
+                self.load_context_from_uri(uri, page.as_ref(), autoplay, fresh)
                     .await?
             }
             PlayContext::Tracks(tracks) => self.load_context_from_tracks(tracks)?,
@@ -1466,6 +1471,7 @@ impl SpircTask {
         context_uri: String,
         page: Option<&ContextPage>,
         autoplay: bool,
+        fresh: bool,
     ) -> Result<(), Error> {
         if !self.connect_state.is_active() {
             self.handle_activate();
@@ -1490,18 +1496,27 @@ impl SpircTask {
         };
 
         let current_context_uri = self.connect_state.context_uri();
+        // A session like DJ's moves on to a new set each time it starts afresh.
+        let new_set = fresh
+            && self
+                .connect_state
+                .get_context(update_context)
+                .is_ok_and(|ctx| ctx.metadata.contains_key(LEXICON_CONTEXT_URL));
 
-        if current_context_uri == &context_uri && fallback == context_uri {
+        if current_context_uri == &context_uri && fallback == context_uri && !new_set {
             debug!("context <{current_context_uri}> didn't change, no resolving required")
         } else {
             debug!("resolving context for load command");
             self.context_resolver.clear();
-            self.context_resolver.add(ResolveContext::from_uri(
-                &context_uri,
-                fallback,
-                update_context,
-                ContextAction::Replace,
-            ));
+            self.context_resolver.add(
+                ResolveContext::from_uri(
+                    &context_uri,
+                    fallback,
+                    update_context,
+                    ContextAction::Replace,
+                )
+                .starting_fresh(fresh),
+            );
             let context = self.context_resolver.get_next_context(Vec::new).await;
             self.handle_next_context(context);
         }
@@ -1697,13 +1712,23 @@ impl SpircTask {
     }
 
     fn add_autoplay_resolving_when_required(&mut self) {
-        let require_load_new = !self
+        let running_low = !self
             .connect_state
             .has_next_tracks(Some(CONTEXT_FETCH_THRESHOLD))
-            && self.session.autoplay()
             && !self.connect_state.context_uri().is_empty();
 
-        if !require_load_new {
+        if !running_low {
+            return;
+        }
+
+        // A context that streams in pages, like DJ, continues before autoplay takes over.
+        if let Some(next_page) = self.connect_state.take_next_page_url() {
+            self.context_resolver
+                .add(ResolveContext::append_context(next_page));
+            return;
+        }
+
+        if !self.session.autoplay() {
             return;
         }
 

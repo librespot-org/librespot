@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] Play mono audio on both channels instead of rejecting it
 - [core] Add `SpClient::get_context_url` and `SpClient::get_context_page` to resolve a context, or its next page, from the `hm://` url it carries
 - [core] Add `SpClient::get_narration_url`, which turns a DJ narration script into the url of its synthesized audio
+- [connect] Play Spotify's DJ: resolve the lexicon session its playlist names, continue through each page's `next_page_url` before autoplay takes over, and start a new set when DJ is started afresh. Advertise `supports_dj` in the device capabilities
 
 ### Changed
 
