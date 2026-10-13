@@ -234,7 +234,7 @@ impl AudioFileFetch {
 
         for range in ranges_to_request.iter() {
             let streamer = self.session.spclient().stream_from_cdn(
-                &self.shared.cdn_url,
+                self.shared.cdn_urls.current(),
                 range.start,
                 range.length,
             )?;

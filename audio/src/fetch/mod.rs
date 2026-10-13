@@ -322,8 +322,46 @@ struct AudioFileDownloadStatus {
     downloaded: RangeSet,
 }
 
+/// The CDN URLs of a file, starting with the one in use: a failed download moves on to the next.
+struct CdnUrls {
+    urls: Vec<String>,
+    current: AtomicUsize,
+}
+
+impl CdnUrls {
+    fn new(urls: Vec<String>) -> Self {
+        Self {
+            urls,
+            current: AtomicUsize::new(0),
+        }
+    }
+
+    fn current(&self) -> &str {
+        self.urls
+            .get(self.current.load(Ordering::Acquire))
+            .map_or("", String::as_str)
+    }
+
+    /// Move on to the next URL, if there is another; returns the hosts switched from and to.
+    fn switch(&self) -> Option<(&str, &str)> {
+        if self.urls.len() < 2 {
+            return None;
+        }
+        let from = self.current.load(Ordering::Acquire);
+        let to = (from + 1) % self.urls.len();
+        self.current.store(to, Ordering::Release);
+        Some((host(&self.urls[from]), host(&self.urls[to])))
+    }
+}
+
+/// The host of a URL, for logging without the URL's token.
+fn host(url: &str) -> &str {
+    let rest = url.split_once("://").map_or(url, |(_, rest)| rest);
+    rest.split(['/', '?']).next().unwrap_or(rest)
+}
+
 struct AudioFileShared {
-    cdn_url: String,
+    cdn_urls: CdnUrls,
     file_size: usize,
     bytes_per_second: usize,
     cond: Condvar,
@@ -506,7 +544,12 @@ impl AudioFileStreaming {
         };
 
         let shared = Arc::new(AudioFileShared {
-            cdn_url: url.to_string(),
+            // the URL that answered first, then the others in their order
+            cdn_urls: CdnUrls::new(
+                std::iter::once(url.to_string())
+                    .chain(urls.iter().filter(|u| *u != url).map(ToString::to_string))
+                    .collect(),
+            ),
             file_size,
             bytes_per_second,
             cond: Condvar::new(),
@@ -622,7 +665,15 @@ impl Read for AudioFileStreaming {
                 let missing = missing_ranges(&download_status, wanted);
                 if !missing.is_empty() {
                     retries += 1;
-                    warn!("Re-requesting {missing} after a failed download (retry {retries})");
+                    // the CDN that failed may keep failing for this range: try another one
+                    match self.shared.cdn_urls.switch() {
+                        Some((from, to)) => warn!(
+                            "Re-requesting {missing} from {to} after a failed download from {from} (retry {retries})"
+                        ),
+                        None => warn!(
+                            "Re-requesting {missing} after a failed download (retry {retries})"
+                        ),
+                    }
                     for &range in missing.iter() {
                         self.stream_loader_command_tx
                             .send(StreamLoaderCommand::Fetch(range))
@@ -758,6 +809,95 @@ mod tests {
         })
     }
 
+    /// A loader for which every request to host `a` fails and every other one is served; it
+    /// returns the host of each request.
+    fn loader_with_a_failing_host(
+        shared: Arc<AudioFileShared>,
+        mut commands: mpsc::UnboundedReceiver<StreamLoaderCommand>,
+    ) -> std::thread::JoinHandle<Vec<String>> {
+        std::thread::spawn(move || {
+            let mut hosts = Vec::new();
+            while let Some(StreamLoaderCommand::Fetch(range)) = commands.blocking_recv() {
+                let h = host(shared.cdn_urls.current()).to_string();
+                let mut status = shared.download_status.lock().unwrap();
+                if h == "a" {
+                    // receive_data's error path: the range is handed back
+                    status.requested.add_range(&range);
+                    status.requested.subtract_range(&range);
+                } else {
+                    status.downloaded.add_range(&range);
+                }
+                hosts.push(h);
+                shared.cond.notify_all();
+            }
+            hosts
+        })
+    }
+
+    #[test]
+    fn a_failed_download_moves_on_to_the_next_cdn() {
+        let _ = AudioFetchParams::set(AudioFetchParams {
+            download_timeout: Duration::from_secs(2),
+            ..Default::default()
+        });
+        let data: Vec<u8> = (0..256 * 1024).map(|i| (i % 251) as u8).collect();
+        let mut file = NamedTempFile::new().unwrap();
+        std::io::Write::write_all(&mut file, &data).unwrap();
+        let shared = Arc::new(AudioFileShared {
+            cdn_urls: CdnUrls::new(vec![
+                "https://a/audio/x?token".into(),
+                "https://b/audio/x?token".into(),
+            ]),
+            file_size: data.len(),
+            bytes_per_second: 40 * 1024,
+            cond: Condvar::new(),
+            download_status: Mutex::new(AudioFileDownloadStatus {
+                requested: RangeSet::new(),
+                downloaded: RangeSet::new(),
+            }),
+            download_streaming: AtomicBool::new(true),
+            download_slots: Semaphore::new(1),
+            ping_time_ms: AtomicUsize::new(0),
+            read_position: AtomicUsize::new(0),
+            throughput: AtomicUsize::new(0),
+        });
+        let (tx, rx) = mpsc::unbounded_channel();
+        let loader = loader_with_a_failing_host(shared.clone(), rx);
+        let mut audio = AudioFileStreaming {
+            read_file: file.reopen().unwrap(),
+            position: 0,
+            stream_loader_command_tx: tx,
+            shared,
+        };
+
+        let mut buf = vec![0u8; 4096];
+        let n = audio
+            .read(&mut buf)
+            .expect("read() should get the range from the other CDN");
+        assert_eq!(&buf[..n], &data[..n]);
+
+        drop(audio);
+        assert_eq!(loader.join().unwrap(), ["a", "b"]);
+    }
+
+    #[test]
+    fn switching_cdns_cycles_and_logs_only_hosts() {
+        let urls = CdnUrls::new(vec![
+            "https://audio-fa.scdn.co/audio/x?token".into(),
+            "https://audio-ak.scdn.co/audio/x?token".into(),
+        ]);
+        assert_eq!(
+            urls.switch(),
+            Some(("audio-fa.scdn.co", "audio-ak.scdn.co"))
+        );
+        assert_eq!(urls.current(), "https://audio-ak.scdn.co/audio/x?token");
+        assert_eq!(
+            urls.switch(),
+            Some(("audio-ak.scdn.co", "audio-fa.scdn.co"))
+        );
+        assert_eq!(CdnUrls::new(vec!["https://a/x".into()]).switch(), None);
+    }
+
     #[test]
     fn read_requests_a_failed_range_again() {
         // fail fast instead of after the default 8s
@@ -769,7 +909,7 @@ mod tests {
         let mut file = NamedTempFile::new().unwrap();
         std::io::Write::write_all(&mut file, &data).unwrap();
         let shared = Arc::new(AudioFileShared {
-            cdn_url: String::new(),
+            cdn_urls: CdnUrls::new(Vec::new()),
             file_size: data.len(),
             bytes_per_second: 40 * 1024,
             cond: Condvar::new(),
