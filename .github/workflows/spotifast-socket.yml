@@ -1,0 +1,27 @@
+name: Spotifast playback connections
+
+on:
+  push:
+    branches: [spotifast-dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  socket:
+    name: Socket regressions (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # Run the dependency's own tests on native hosts. Downstream Cargo test
+      # does not run these private socket tests, or their resolver fixtures.
+      - name: Core tests with Spotifast's TLS backend
+        run: cargo test --locked -p librespot-core --no-default-features --features rustls-tls-native-roots --lib
