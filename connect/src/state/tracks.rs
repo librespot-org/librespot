@@ -10,6 +10,7 @@ use crate::{
 };
 use protobuf::MessageField;
 use rand::Rng;
+use std::collections::HashMap;
 
 // identifier used as part of the uid
 pub const IDENTIFIER_DELIMITER: &str = "delimiter";
@@ -363,14 +364,20 @@ impl<'ct> ConnectState {
         Ok(())
     }
 
-    pub fn preview_next_track(&mut self) -> Option<SpotifyUri> {
+    /// The next track, with the lines DJ speaks around it.
+    pub fn preview_next_track(&mut self) -> Option<(SpotifyUri, Option<HashMap<String, String>>)> {
         let next = if self.repeat_track() {
-            self.current_track(|t| &t.uri)
+            self.current_track(|t| t.as_ref())?
         } else {
-            &self.next_tracks().first()?.uri
+            self.next_tracks().first()?
         };
 
-        SpotifyUri::from_uri(next).ok()
+        Some((SpotifyUri::from_uri(&next.uri).ok()?, next.narration()))
+    }
+
+    /// The lines DJ speaks around the current track.
+    pub fn current_narration(&self) -> Option<HashMap<String, String>> {
+        self.current_track(|t| t.as_ref().and_then(Metadata::narration))
     }
 
     pub fn has_next_tracks(&self, min: Option<usize>) -> bool {

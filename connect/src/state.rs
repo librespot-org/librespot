@@ -569,4 +569,23 @@ mod dj_tests {
             Some("hm://lexicon/session/2")
         );
     }
+
+    #[tokio::test]
+    async fn tracks_carry_the_lines_the_dj_speaks_around_them() {
+        let mut state = state();
+        let first = Context {
+            uri: Some(DJ.into()),
+            pages: vec![segment(0, 3, "hm://lexicon/session/1")],
+            ..Default::default()
+        };
+        state.update_context(first, ContextType::Default).unwrap();
+        state.set_current_track(0).unwrap();
+        state.reset_playback_to_position(Some(0)).unwrap();
+
+        let narration = state.current_narration().unwrap();
+        assert_eq!(narration["narration.intro.voice"], "VOICE1");
+        assert!(narration.keys().all(|key| key.starts_with("narration.")));
+        // The next track has nothing to say.
+        assert_eq!(state.preview_next_track().unwrap().1, None);
+    }
 }

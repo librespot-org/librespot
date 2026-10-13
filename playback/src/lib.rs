@@ -12,6 +12,7 @@ pub mod decoder;
 pub mod dither;
 mod local_file;
 pub mod mixer;
+pub mod narration;
 pub mod player;
 mod symphonia_util;
 
