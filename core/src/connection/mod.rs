@@ -64,10 +64,10 @@ impl From<APLoginFailed> for AuthenticationError {
 
 pub async fn connect(host: &str, port: u16, proxy: Option<&Url>) -> io::Result<Transport> {
     const TIMEOUT: Duration = Duration::from_secs(5);
-    tokio::time::timeout(TIMEOUT, {
+    tokio::time::timeout(TIMEOUT, async {
         let socket = crate::socket::connect(host, port, proxy).await?;
         debug!("Connection to AP established.");
-        handshake(socket)
+        handshake(socket).await
     })
     .await?
 }
@@ -191,4 +191,71 @@ pub async fn authenticate(
         }
     };
     Ok(result?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::{io::AsyncReadExt, net::TcpListener};
+
+    #[tokio::test]
+    async fn connection_timeout_includes_proxy_setup_and_allows_retry() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let proxy = Url::parse(&format!("http://{}", listener.local_addr().unwrap())).unwrap();
+        let server = tokio::spawn(async move {
+            // Accept CONNECT but never answer it. Socket setup must be subject
+            // to the same deadline as the access-point handshake.
+            let (mut stalled, _) = listener.accept().await.unwrap();
+            let mut request = [0; 1024];
+            assert!(stalled.read(&mut request).await.unwrap() > 0);
+
+            // The first connection must time out and permit another attempt.
+            // Closing the retry immediately also checks that its IO error is
+            // returned instead of being replaced with a timeout.
+            let (retry, _) = listener.accept().await.unwrap();
+            drop(retry);
+            drop(stalled);
+        });
+        let result = tokio::time::timeout(
+            Duration::from_secs(10),
+            connect_with_retry("127.0.0.1", 4070, Some(&proxy), 1),
+        )
+        .await;
+        // Abort even on failure so the listening task cannot outlive the test.
+        if result.is_err() {
+            server.abort();
+        }
+        let error = result
+            .expect("stalled proxy prevented retry")
+            .err()
+            .expect("connection unexpectedly succeeded");
+        assert_ne!(error.kind(), io::ErrorKind::TimedOut);
+        server.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn connection_timeout_still_covers_handshake() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut request = [0; 1024];
+            assert!(socket.read(&mut request).await.unwrap() > 0);
+            std::future::pending::<()>().await;
+        });
+        let result = tokio::time::timeout(
+            Duration::from_secs(10),
+            connect("127.0.0.1", address.port(), None),
+        )
+        .await;
+        server.abort();
+        assert_eq!(
+            result
+                .expect("handshake did not time out")
+                .err()
+                .expect("connection unexpectedly succeeded")
+                .kind(),
+            io::ErrorKind::TimedOut,
+        );
+    }
 }
