@@ -9,7 +9,7 @@ librespot based client) sends and receives, and it can change without notice.
 
 ## What a Jam is, from a device's point of view
 
-A Jam is a [connect](connection.md) session that several accounts share. One account owns it and
+A Jam is a Spotify Connect session that several accounts share. One account owns it and
 its active device plays. Everyone else in the Jam is a member, who can listen and, depending on
 the Jam, control and add to the queue.
 
