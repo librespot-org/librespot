@@ -1,4 +1,7 @@
-use std::io::{self, Read};
+use std::{
+    fmt,
+    io::{self, Read},
+};
 
 use aes::Aes192;
 use base64::engine::Engine as _;
@@ -27,7 +30,7 @@ impl From<AuthenticationError> for Error {
 }
 
 /// The credentials are used to log into the Spotify API.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct Credentials {
     pub username: Option<String>,
 
@@ -39,6 +42,18 @@ pub struct Credentials {
     #[serde(serialize_with = "serialize_base64")]
     #[serde(deserialize_with = "deserialize_base64")]
     pub auth_data: Vec<u8>,
+}
+
+// The auth data is a password, token or reusable credential, and Debug output
+// ends up in logs.
+impl fmt::Debug for Credentials {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Credentials")
+            .field("username", &self.username)
+            .field("auth_type", &self.auth_type)
+            .field("auth_data", &"[redacted]")
+            .finish()
+    }
 }
 
 impl Credentials {
@@ -186,4 +201,23 @@ where
     BASE64
         .decode(v)
         .map_err(|e| serde::de::Error::custom(e.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn debug_output_leaves_out_the_auth_data() {
+        let credentials = Credentials::with_password("someone", "secret-password");
+
+        for output in [format!("{credentials:?}"), format!("{credentials:#?}")] {
+            assert!(!output.contains("secret-password"), "{output}");
+            assert!(
+                !output.contains(&format!("{:?}", credentials.auth_data)),
+                "{output}"
+            );
+            assert!(output.contains("someone"), "{output}");
+        }
+    }
 }

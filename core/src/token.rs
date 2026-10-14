@@ -8,7 +8,10 @@
 //   user-library-modify, user-library-read, user-follow-modify, user-follow-read, streaming,
 //   app-remote-control
 
-use std::time::{Duration, SystemTime};
+use std::{
+    fmt,
+    time::{Duration, SystemTime},
+};
 
 use serde::Deserialize;
 use thiserror::Error;
@@ -33,13 +36,26 @@ impl From<TokenError> for Error {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Token {
     pub access_token: String,
     pub expires_in: Duration,
     pub token_type: String,
     pub scopes: Vec<String>,
     pub timestamp: SystemTime,
+}
+
+// The access token is a bearer credential, and Debug output ends up in logs.
+impl fmt::Debug for Token {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Token")
+            .field("access_token", &"[redacted]")
+            .field("expires_in", &self.expires_in)
+            .field("token_type", &self.token_type)
+            .field("scopes", &self.scopes)
+            .field("timestamp", &self.timestamp)
+            .finish()
+    }
 }
 
 #[derive(Deserialize)]
@@ -139,5 +155,27 @@ impl Token {
             }
         }
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn debug_output_leaves_out_the_access_token() {
+        let token = Token {
+            access_token: "secret-access-token".to_string(),
+            expires_in: Duration::from_secs(3600),
+            token_type: "Bearer".to_string(),
+            scopes: vec!["streaming".to_string()],
+            timestamp: SystemTime::now(),
+        };
+
+        for output in [format!("{token:?}"), format!("{token:#?}")] {
+            assert!(!output.contains("secret-access-token"), "{output}");
+            assert!(output.contains("Bearer"), "{output}");
+            assert!(output.contains("streaming"), "{output}");
+        }
     }
 }
