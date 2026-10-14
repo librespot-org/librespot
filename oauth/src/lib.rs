@@ -18,6 +18,7 @@
 //! `docs/device-authorization.md`.
 
 use std::{
+    fmt,
     io::{self, BufRead, BufReader, Write},
     net::{SocketAddr, TcpListener},
     sync::mpsc,
@@ -160,7 +161,7 @@ pub enum OAuthError {
 }
 
 /// Represents an OAuth token used for accessing Spotify's Web API and sessions.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct OAuthToken {
     /// Bearer token used for authenticated Spotify API requests
     pub access_token: String,
@@ -172,6 +173,19 @@ pub struct OAuthToken {
     pub token_type: String,
     /// Permission scopes granted by this token
     pub scopes: Vec<String>,
+}
+
+// Both tokens are credentials, and Debug output ends up in logs.
+impl fmt::Debug for OAuthToken {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("OAuthToken")
+            .field("access_token", &"[redacted]")
+            .field("refresh_token", &"[redacted]")
+            .field("expires_at", &self.expires_at)
+            .field("token_type", &self.token_type)
+            .field("scopes", &self.scopes)
+            .finish()
+    }
 }
 
 /// Return code query-string parameter from the redirect URI.
@@ -788,6 +802,23 @@ mod test {
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
     use super::*;
+
+    #[test]
+    fn debug_output_leaves_out_the_tokens() {
+        let token = OAuthToken {
+            access_token: "secret-access-token".to_string(),
+            refresh_token: "secret-refresh-token".to_string(),
+            expires_at: Instant::now(),
+            token_type: "Bearer".to_string(),
+            scopes: vec!["streaming".to_string()],
+        };
+
+        for output in [format!("{token:?}"), format!("{token:#?}")] {
+            assert!(!output.contains("secret-access-token"), "{output}");
+            assert!(!output.contains("secret-refresh-token"), "{output}");
+            assert!(output.contains("streaming"), "{output}");
+        }
+    }
 
     #[test]
     fn get_socket_address_none() {
