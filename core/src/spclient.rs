@@ -370,7 +370,10 @@ impl SpClient {
             inner.client_token = Some(client_token);
         });
 
-        trace!("Got client token: {granted_token:?}");
+        trace!(
+            "Got client token, refresh after {} seconds",
+            granted_token.refresh_after_seconds
+        );
 
         Ok(access_token)
     }
