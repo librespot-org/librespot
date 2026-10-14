@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - [playback] Stop instead of skipping through the queue when Spotify refuses a track's audio key
+- [core] Reject an access-point handshake packet whose size is under four bytes or over 64 KiB, instead of panicking or allocating whatever size it names
 - [core] Pass on dealer messages that carry plain JSON, such as collection updates, instead of dropping them with a base64 warning
 - [connect] Take `SetVolume` while the device is inactive, so the level reported on activation is the one set
 - [core] Fixed AP login on Windows on ARM by using the supported desktop platform identifier
