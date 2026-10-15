@@ -91,9 +91,9 @@ impl Default for RequestStrategy {
 }
 
 pub struct RequestOptions {
-    metrics: bool,
-    salt: bool,
-    base_url: Option<&'static str>,
+    pub metrics: bool,
+    pub salt: bool,
+    pub base_url: Option<&'static str>,
 }
 
 impl Default for RequestOptions {
