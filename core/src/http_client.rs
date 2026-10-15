@@ -322,7 +322,10 @@ mod tests {
             Err(e) => {
                 // Client creation failed gracefully - this is the Android case
                 // Verify it's an actual error, not a panic
-                assert!(!e.error.to_string().is_empty(), "Error should have a message");
+                assert!(
+                    !e.error.to_string().is_empty(),
+                    "Error should have a message"
+                );
             }
         }
     }
@@ -343,7 +346,10 @@ mod tests {
             }
             Err(e) => {
                 // Failed to create client (e.g., no certificates)
-                assert!(!e.error.to_string().is_empty(), "Error should have a message");
+                assert!(
+                    !e.error.to_string().is_empty(),
+                    "Error should have a message"
+                );
             }
         }
     }
