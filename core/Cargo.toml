@@ -20,6 +20,8 @@ native-tls = [
     "hyper-proxy2/tls",
     "librespot-oauth/native-tls",
     "tokio-tungstenite/native-tls",
+    "dep:native-tls",
+    "dep:tokio-native-tls",
 ]
 rustls-tls-native-roots = [
     "__rustls",
@@ -27,6 +29,7 @@ rustls-tls-native-roots = [
     "hyper-rustls/native-tokio",
     "librespot-oauth/rustls-tls-native-roots",
     "tokio-tungstenite/rustls-tls-native-roots",
+    "dep:rustls-native-certs",
 ]
 rustls-tls-webpki-roots = [
     "__rustls",
@@ -34,10 +37,11 @@ rustls-tls-webpki-roots = [
     "hyper-rustls/webpki-tokio",
     "librespot-oauth/rustls-tls-webpki-roots",
     "tokio-tungstenite/rustls-tls-webpki-roots",
+    "dep:webpki-roots",
 ]
 
 # Internal features - these are not meant to be used by end users
-__rustls = []
+__rustls = ["dep:tokio-rustls", "dep:rustls"]
 
 [dependencies]
 librespot-oauth = { version = "0.8.0", path = "../oauth", default-features = false }
@@ -75,6 +79,17 @@ hyper-util = { version = "0.1", default-features = false, features = [
     "http2",
 ] }
 log = "0.4"
+# TLS connectors used by the proxy connector in src/proxy_connector.rs
+native-tls = { version = "0.2", optional = true }
+tokio-native-tls = { version = "0.3", optional = true }
+tokio-rustls = { version = "0.26", optional = true }
+rustls = { version = "0.23", default-features = false, features = [
+    "ring",
+    "std",
+    "tls12",
+], optional = true }
+rustls-native-certs = { version = "0.8", optional = true }
+webpki-roots = { version = "1", optional = true }
 nonzero_ext = "0.3"
 num-bigint = "0.4"
 num-derive = "0.4"
@@ -106,6 +121,7 @@ tokio = { version = "1", features = [
 tokio-stream = { version = "0.1", default-features = false }
 tokio-tungstenite = { version = "0.28", default-features = false }
 tokio-util = { version = "0.7", default-features = false }
+tower-service = "0.3"
 url = "2"
 uuid = { version = "1", default-features = false, features = ["v4"] }
 
@@ -119,7 +135,7 @@ vergen-gitcl = { version = "1.0.8", default-features = false, features = [
 vergen = "=9.0.6"
 
 [dev-dependencies]
-tokio = { version = "1", features = ["macros"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
 [lints]
 workspace = true

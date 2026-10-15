@@ -9,27 +9,22 @@ use governor::{
     Quota, RateLimiter, clock::MonotonicClock, middleware::NoOpMiddleware,
     state::keyed::DefaultKeyedStateStore,
 };
-use http::{Uri, header::HeaderValue};
+use http::header::HeaderValue;
 use http_body_util::{BodyExt, Full};
 use hyper::{HeaderMap, Request, Response, StatusCode, body::Incoming, header::USER_AGENT};
-use hyper_proxy2::{Intercept, Proxy, ProxyConnector};
 use hyper_util::{
-    client::legacy::{Client, ResponseFuture, connect::HttpConnector},
+    client::legacy::{Client, ResponseFuture},
     rt::TokioExecutor,
 };
 use nonzero_ext::nonzero;
 use thiserror::Error;
 use url::Url;
 
-#[cfg(all(feature = "__rustls", not(feature = "native-tls")))]
-use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
-#[cfg(all(feature = "native-tls", not(feature = "__rustls")))]
-use hyper_tls::HttpsConnector;
-
 use crate::{
     Error,
     config::{OS, os_version},
     date::Date,
+    proxy_connector::ProxyConnector,
     version::{FALLBACK_USER_AGENT, VERSION_STRING, spotify_version},
 };
 
@@ -92,7 +87,7 @@ impl From<HttpClientError> for Error {
     }
 }
 
-type HyperClient = Client<ProxyConnector<HttpsConnector<HttpConnector>>, Full<bytes::Bytes>>;
+type HyperClient = Client<ProxyConnector, Full<bytes::Bytes>>;
 
 pub struct HttpClient {
     user_agent: HeaderValue,
@@ -145,27 +140,10 @@ impl HttpClient {
     }
 
     fn try_create_hyper_client(proxy_url: Option<&Url>) -> Result<HyperClient, Error> {
-        // configuring TLS is expensive and should be done once per process
-
-        #[cfg(all(feature = "__rustls", not(feature = "native-tls")))]
-        let https_connector = {
-            #[cfg(feature = "rustls-tls-native-roots")]
-            let tls = HttpsConnectorBuilder::new().with_native_roots()?;
-            #[cfg(feature = "rustls-tls-webpki-roots")]
-            let tls = HttpsConnectorBuilder::new().with_webpki_roots();
-            tls.https_or_http().enable_http1().enable_http2().build()
-        };
-
-        #[cfg(all(feature = "native-tls", not(feature = "__rustls")))]
-        let https_connector = HttpsConnector::new();
-
-        // When not using a proxy a dummy proxy is configured that will not intercept any traffic.
-        // This prevents needing to carry the Client Connector generics through the whole project
-        let proxy = match &proxy_url {
-            Some(proxy_url) => Proxy::new(Intercept::All, proxy_url.to_string().parse()?),
-            None => Proxy::new(Intercept::None, Uri::from_static("0.0.0.0")),
-        };
-        let proxy_connector = ProxyConnector::from_proxy(https_connector, proxy)?;
+        // configuring TLS is expensive and should be done once per process.
+        // The connector supports direct connections, HTTP CONNECT proxies and
+        // SOCKS5 (socks5h) proxies alike.
+        let proxy_connector = ProxyConnector::new(proxy_url).map_err(Error::unknown)?;
 
         let client = Client::builder(TokioExecutor::new())
             .http2_adaptive_window(true)

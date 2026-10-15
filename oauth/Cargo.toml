@@ -37,6 +37,7 @@ oauth2 = { version = "5.0", default-features = false, features = [
 open = "5.3"
 reqwest = { version = "0.12", default-features = false, features = [
     "system-proxy",
+    "socks",
 ] }
 thiserror = "2"
 # The device flow's async poll needs a timer to wait between polls.
