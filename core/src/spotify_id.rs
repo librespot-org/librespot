@@ -164,6 +164,14 @@ impl TryFrom<&[u8]> for SpotifyId {
     }
 }
 
+impl core::str::FromStr for SpotifyId {
+    type Err = crate::Error;
+
+    fn from_str(src: &str) -> Result<Self, Self::Err> {
+        Self::from_base62(src)
+    }
+}
+
 impl TryFrom<&str> for SpotifyId {
     type Error = crate::Error;
     fn try_from(src: &str) -> Result<Self, Self::Error> {
