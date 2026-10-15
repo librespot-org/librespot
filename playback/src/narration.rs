@@ -41,19 +41,24 @@ pub(crate) async fn narrate(
     track: Box<dyn AudioDecoder + Send>,
 ) -> Box<dyn AudioDecoder + Send> {
     // Resuming mid-track skips the introduction; it belongs to the start.
-    let intro = if position_ms == 0 {
-        // The in-sequence intro, or the `jump` line when that is all there is.
-        // Telling a skip to this track apart would need spirc to say how it got here.
-        let kind = if has_script(narration, "intro") {
-            "intro"
-        } else {
-            "jump"
-        };
-        line(session, config, narration, kind, track_factor).await
-    } else {
-        None
+    // Otherwise the in-sequence intro, or the `jump` line when that is all there is.
+    // Telling a skip to this track apart would need spirc to say how it got here.
+    let intro_kind = match position_ms {
+        0 if has_script(narration, "intro") => Some("intro"),
+        0 => Some("jump"),
+        _ => None,
     };
-    let outro = line(session, config, narration, "outro", track_factor).await;
+    let intro = async {
+        match intro_kind {
+            Some(kind) => line(session, config, narration, kind, track_factor).await,
+            None => None,
+        }
+    };
+    // Both at once, so a slow service delays the track by one timeout at most.
+    let (intro, outro) = tokio::join!(
+        intro,
+        line(session, config, narration, "outro", track_factor)
+    );
 
     if intro.is_none() && outro.is_none() {
         return track;
@@ -91,12 +96,7 @@ async fn line(
     };
 
     let spclient = session.spclient();
-    let fetch = async {
-        let url = spclient
-            .get_narration_url(field("ssml"), field("voice"), field("tts_provider"))
-            .await?;
-        spclient.request_url(&url).await
-    };
+    let fetch = spclient.get_narration(field("ssml"), field("voice"), field("tts_provider"));
     let mp3 = match tokio::time::timeout(TIMEOUT, fetch).await {
         Ok(Ok(mp3)) => mp3,
         Ok(Err(e)) => {

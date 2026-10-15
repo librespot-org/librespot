@@ -91,6 +91,8 @@ struct PlayerInternal {
 
     auto_normalise_as_album: bool,
     narrations: HashMap<SpotifyUri, Narration>,
+    /// The lines the current track's decoder was built with.
+    playing_narration: Option<Narration>,
 
     player_id: usize,
     play_request_id_generator: SeqGenerator<u64>,
@@ -544,6 +546,7 @@ impl Player {
 
                 auto_normalise_as_album: false,
                 narrations: HashMap::new(),
+                playing_narration: None,
 
                 player_id,
                 play_request_id_generator: SeqGenerator::new(0),
@@ -1026,7 +1029,8 @@ impl PlayerTrackLoader {
         narration: Option<Narration>,
     ) -> Option<PlayerLoadedTrackData> {
         let mut loaded = self.load_bare_track(track_uri, position_ms).await?;
-        if let Some(narration) = narration {
+        // Passthrough hands on raw Ogg packets, which decoded lines can't sit between.
+        if let Some(narration) = narration.filter(|_| !self.config.passthrough) {
             let config = resolve_auto_normalisation(&self.config, self.normalise_as_album);
             let track_factor = NormalisationData::get_factor(&config, loaded.normalisation_data);
             loaded.decoder = narration::narrate(
@@ -1541,9 +1545,16 @@ impl Future for PlayerInternal {
                                             // Only notify if we're skipped some packets *or* we are behind.
                                             // If we're ahead it's probably due to a buffer of the backend
                                             // and we're actually in time.
+                                            // A DJ line holds the position still while time runs on.
+                                            // That isn't lag: the track's first moving packet
+                                            // corrects it once.
+                                            let held_still = new_stream_position_ms
+                                                == expected_position_ms
+                                                && !packet_position.skipped;
                                             let notify_about_position =
                                                 match *reported_nominal_start_time {
                                                     None => true,
+                                                    Some(_) if held_still => false,
                                                     Some(reported_nominal_start_time) => {
                                                         let mut notify = false;
 
@@ -1955,6 +1966,7 @@ impl PlayerInternal {
         loaded_track: PlayerLoadedTrackData,
         start_playback: bool,
     ) {
+        self.playing_narration = self.narrations.get(&track_id).cloned();
         let audio_item = Box::new(loaded_track.audio_item.clone());
 
         self.send_event(PlayerEvent::TrackChanged { audio_item });
@@ -2015,6 +2027,11 @@ impl PlayerInternal {
         }
     }
 
+    /// Whether the current decoder speaks the lines `track_id` now has, so it can be reused.
+    fn speaks_current_lines(&self, track_id: &SpotifyUri) -> bool {
+        self.narrations.get(track_id) == self.playing_narration.as_ref()
+    }
+
     fn handle_command_load(
         &mut self,
         track_id: SpotifyUri,
@@ -2048,7 +2065,7 @@ impl PlayerInternal {
             ..
         } = &self.state
         {
-            if *previous_track_id == track_id {
+            if *previous_track_id == track_id && self.speaks_current_lines(&track_id) {
                 let mut loaded_track = match mem::replace(&mut self.state, PlayerState::Invalid) {
                     PlayerState::EndOfTrack { loaded_track, .. } => loaded_track,
                     _ => {
@@ -2076,6 +2093,7 @@ impl PlayerInternal {
         }
 
         // Check if we are already playing the track. If so, just do a seek and update our info.
+        let speaks_current_lines = self.speaks_current_lines(&track_id);
         if let PlayerState::Playing {
             track_id: ref current_track_id,
             ref mut stream_position_ms,
@@ -2089,7 +2107,7 @@ impl PlayerInternal {
             ..
         } = self.state
         {
-            if *current_track_id == track_id {
+            if *current_track_id == track_id && speaks_current_lines {
                 // we can use the current decoder. Ensure it's at the correct position.
                 if position_ms != *stream_position_ms {
                     // This may be blocking.
@@ -2261,7 +2279,7 @@ impl PlayerInternal {
             ..
         } = &self.state
         {
-            if *current_track_id == track_id {
+            if *current_track_id == track_id && self.speaks_current_lines(&track_id) {
                 // we already have the requested track loaded.
                 preload_track = false;
             }
@@ -2431,19 +2449,30 @@ impl PlayerInternal {
             PlayerCommand::SetNarration {
                 track_id,
                 narration,
-            } => match narration {
-                Some(narration) => {
-                    // Only the playing and next tracks' lines matter, and those arrive
-                    // right before their loads, so a wholesale clear bounds the map.
-                    if self.narrations.len() >= 16 {
-                        self.narrations.clear();
+            } => {
+                // A track played twice gets new lines; a preload of it has the old ones.
+                let preloaded = match &self.preload {
+                    PlayerPreload::Loading { track_id: id, .. }
+                    | PlayerPreload::Ready { track_id: id, .. } => *id == track_id,
+                    PlayerPreload::None => false,
+                };
+                if preloaded && self.narrations.get(&track_id) != narration.as_ref() {
+                    self.preload = PlayerPreload::None;
+                }
+                match narration {
+                    Some(narration) => {
+                        // Only the playing and next tracks' lines matter, and those arrive
+                        // right before their loads, so a wholesale clear bounds the map.
+                        if self.narrations.len() >= 16 {
+                            self.narrations.clear();
+                        }
+                        self.narrations.insert(track_id, narration);
                     }
-                    self.narrations.insert(track_id, narration);
+                    None => {
+                        self.narrations.remove(&track_id);
+                    }
                 }
-                None => {
-                    self.narrations.remove(&track_id);
-                }
-            },
+            }
 
             PlayerCommand::EmitFilterExplicitContentChangedEvent(filter) => {
                 self.send_event(PlayerEvent::FilterExplicitContentChanged { filter });

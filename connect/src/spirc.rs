@@ -1374,10 +1374,16 @@ impl SpircTask {
 
         let autoplay = matches!(cmd.context_options, Some(LoadContextOptions::Autoplay));
         // Playing from the top rather than a chosen track starts a context afresh.
-        let fresh = matches!(
-            cmd.options.playing_track,
-            None | Some(PlayingTrack::Index(0))
-        );
+        // Clients start one by picking its first track, so that counts too, unless
+        // the context is already playing and the listener picked it from there.
+        let fresh = match cmd.options.playing_track {
+            None => true,
+            Some(PlayingTrack::Index(0)) => !matches!(
+                &cmd.context,
+                PlayContext::Uri(uri) if uri == self.connect_state.context_uri()
+            ),
+            Some(_) => false,
+        };
         match cmd.context {
             PlayContext::Uri(uri) => {
                 self.load_context_from_uri(uri, page.as_ref(), autoplay, fresh)
