@@ -146,6 +146,9 @@ const VOLUME_UPDATE_DELAY: Duration = Duration::from_millis(500);
 // to reduce updates to remote, we group some request by waiting for a set amount of time
 const UPDATE_STATE_DELAY: Duration = Duration::from_millis(200);
 
+// the placeholder context of a list of tracks played without one, which can't be resolved
+const WEB_API_URI: &str = "spotify:web-api";
+
 /// The spotify connect handle
 pub struct Spirc {
     commands: mpsc::UnboundedSender<SpircCommand>,
@@ -1185,6 +1188,8 @@ impl SpircTask {
             None => Err(SpircError::NoUri("transfer context"))?,
             // can apparently happen when a state is transferred and was started with "uris" via the api
             Some(ref uri) if uri == "-" || uri.is_empty() => None,
+            // a list of tracks played on another librespot device; take its tracks
+            Some(ref uri) if uri == WEB_API_URI => None,
             Some(ref uri) => Some(uri.clone()),
         };
 
@@ -1510,7 +1515,6 @@ impl SpircTask {
     }
 
     fn load_context_from_tracks(&mut self, tracks: impl Into<ContextPage>) -> Result<(), Error> {
-        const WEB_API_URI: &str = "spotify:web-api";
         let ctx = Context {
             // by providing values for uri/url the player in the official client's isn't frozen
             uri: Some(WEB_API_URI.into()),
@@ -1701,7 +1705,9 @@ impl SpircTask {
             .connect_state
             .has_next_tracks(Some(CONTEXT_FETCH_THRESHOLD))
             && self.session.autoplay()
-            && !self.connect_state.context_uri().is_empty();
+            && !self.connect_state.context_uri().is_empty()
+            // there is no autoplay for a list of tracks
+            && self.connect_state.context_uri() != WEB_API_URI;
 
         if !require_load_new {
             return;
