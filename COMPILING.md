@@ -56,6 +56,42 @@ On Fedora systems:
 sudo dnf install alsa-lib-devel
 ```
 
+#### Android requirements for Rodio/CPAL backend
+
+When embedding librespot in an Android application using the Rodio audio backend (which uses CPAL), you **must** initialize the Android context before using any audio functionality. Without this initialization, the application will panic with the error `android context was not initialized`.
+
+**Required initialization:**
+
+Call `ndk_context::initialize_android_context` once during your application startup (e.g., in `JNI_OnLoad` or a native initialization function) with a global reference to the application `Context`:
+
+```rust
+use jni::JavaVM;
+use jni::objects::JObject;
+
+#[no_mangle]
+pub extern "C" fn JNI_OnLoad(vm: JavaVM, _: *mut std::os::raw::c_void) -> jni::sys::jint {
+    // Get the application context from the VM
+    let env = vm.get_env().unwrap();
+    let context = /* obtain your application Context, e.g., from activity or application class */;
+    
+    // Create a global reference to ensure it remains valid
+    let context_ref = env.new_global_ref(context).unwrap();
+    
+    // Initialize the Android context for ndk-context (required by CPAL/Rodio)
+    ndk_context::initialize_android_context(vm.get_java_vm_pointer(), context_ref.as_obj().into_raw());
+    
+    jni::sys::JNI_VERSION_1_6
+}
+```
+
+**Important notes:**
+- This initialization is **required only once** per application lifecycle
+- The `Context` reference must be a **global reference** that remains valid for the application lifetime
+- This only affects Android applications embedding librespot as a library
+- Native Android builds and non-Android platforms do not require this initialization
+
+For more information about `ndk-context`, see the [crate documentation](https://docs.rs/ndk-context/).
+
 ### Zeroconf library dependencies
 Depending on the chosen backend, specific development libraries are required.
 
