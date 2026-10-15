@@ -87,7 +87,7 @@ pub struct ClusterDeviceInfo {
     pub device_alias: String,
     /// Device type (e.g., speaker, phone)
     pub device_type: DeviceType,
-    /// Volume level 0-100
+    /// Volume as Spotify reports it, 0 to 65535
     pub volume: u32,
     /// Whether this is the currently active device
     pub is_active: bool,
@@ -1353,16 +1353,10 @@ impl SpircTask {
     /// Remote snapshots carry no event metadata, so reasons are inferred by diffing here.
     /// Local updates get theirs directly from the originating `PlayerEvent` instead.
     fn emit_player_update(&self, state: Option<PlayerState>, last_state: Option<&PlayerState>) {
-        if self.player_update_sender.receiver_count() == 0
-            && self.player_state_sender.receiver_count() == 0
-        {
-            return;
-        }
-
         let state = state.unwrap_or_else(|| self.connect_state.player().clone());
         let reasons = classify_player_update_reasons(&state, last_state);
 
-        let _ = self.player_state_sender.send(Some(state));
+        self.player_state_sender.send_replace(Some(state));
         for reason in reasons {
             self.emit_player_update_event(PlayerUpdateEvent { reason });
         }
@@ -1381,7 +1375,8 @@ impl SpircTask {
 
     /// Shared by connect-time hydration and ongoing dealer updates so neither forgets it
     fn sync_cluster_state(&mut self, cluster: &Cluster) {
-        let _ = self.cluster_state_sender.send(build_cluster_state(cluster));
+        self.cluster_state_sender
+            .send_replace(build_cluster_state(cluster));
 
         let new_active_device_id = if cluster.active_device_id.is_empty() {
             None
@@ -1439,19 +1434,13 @@ impl SpircTask {
     }
 
     fn publish_queue_snapshot(&mut self, player_state: &PlayerState) {
-        if self.queue_list_sender.receiver_count() == 0
-            && self.queue_update_sender.receiver_count() == 0
-        {
-            return;
-        }
-
         let queue_list = Self::queue_list_from_player_state(player_state);
         let prev_queue_list = std::mem::replace(&mut self.last_queue_list, queue_list.clone());
 
         let (prev_changed, next_changed) = queue_lists_changed(&prev_queue_list, &queue_list);
 
         if prev_changed || next_changed {
-            let _ = self.queue_list_sender.send(queue_list);
+            self.queue_list_sender.send_replace(queue_list);
 
             if prev_changed {
                 self.emit_queue_update(QueueUpdateEvent {
@@ -1467,16 +1456,9 @@ impl SpircTask {
     }
 
     fn publish_active_state(&mut self, reason: Option<PlayerUpdateReason>) {
-        let has_subscribers = self.player_update_sender.receiver_count() > 0
-            || self.player_state_sender.receiver_count() > 0
-            || self.queue_list_sender.receiver_count() > 0
-            || self.queue_update_sender.receiver_count() > 0;
-        if !has_subscribers {
-            return;
-        }
-
         let player_state = self.connect_state.player().clone();
-        let _ = self.player_state_sender.send(Some(player_state.clone()));
+        self.player_state_sender
+            .send_replace(Some(player_state.clone()));
         self.publish_queue_snapshot(&player_state);
         self.last_player_state = Some(player_state);
 
@@ -1517,6 +1499,9 @@ impl SpircTask {
                 info!("device became inactive");
                 self.handle_disconnect().await?;
                 self.handle_stop();
+                if let Some(state) = cluster.player_state.take() {
+                    self.publish_remote_player_state(state);
+                }
             } else if self.connect_state.is_active() {
                 // fixme: workaround fix, because of missing information why it behaves like it does
                 //  background: when another device sends a connect-state update, some player's position de-syncs
@@ -2648,7 +2633,7 @@ fn build_cluster_state(cluster: &Cluster) -> ClusterState {
 /// Position drift beyond `SEEK_THRESHOLD_MS` relative to natural playback progress
 fn is_seek(state: &PlayerState, last: &PlayerState) -> bool {
     let time_diff = state.timestamp.saturating_sub(last.timestamp);
-    let expected_position = if state.is_playing {
+    let expected_position = if last.is_playing && !last.is_paused {
         last.position_as_of_timestamp + time_diff
     } else {
         last.position_as_of_timestamp
@@ -2819,6 +2804,48 @@ mod tests {
         assert_eq!(
             classify_player_update_reasons(&next, Some(&last)),
             vec![PlayerUpdateReason::Other]
+        );
+    }
+
+    #[test]
+    fn resume_after_long_pause_is_not_a_seek() {
+        // librespot sets is_playing for paused states too
+        let last = state_with(|s| {
+            s.is_playing = true;
+            s.is_paused = true;
+            s.timestamp = 1_000;
+            s.position_as_of_timestamp = 10_000;
+        });
+        let next = state_with(|s| {
+            s.is_playing = true;
+            s.timestamp = 20_000;
+            s.position_as_of_timestamp = 10_000;
+        });
+        assert_eq!(
+            classify_player_update_reasons(&next, Some(&last)),
+            vec![PlayerUpdateReason::PlayPauseChanged]
+        );
+    }
+
+    #[test]
+    fn seek_while_paused_detected() {
+        let paused = |s: &mut PlayerState| {
+            s.is_playing = true;
+            s.is_paused = true;
+        };
+        let last = state_with(|s| {
+            paused(s);
+            s.timestamp = 1_000;
+            s.position_as_of_timestamp = 10_000;
+        });
+        let next = state_with(|s| {
+            paused(s);
+            s.timestamp = 20_000;
+            s.position_as_of_timestamp = 60_000;
+        });
+        assert_eq!(
+            classify_player_update_reasons(&next, Some(&last)),
+            vec![PlayerUpdateReason::SeekChanged]
         );
     }
 
