@@ -1082,9 +1082,10 @@ impl SpircTask {
                 return Ok(());
             }
             // modification and update of the connect_state
+            // the state is sent after the reply, as for every other request: Spotify
+            // fails a transfer it has no reply to within about three seconds
             Transfer(transfer) => {
-                self.handle_transfer(transfer.data.expect("by condition checked"))?;
-                return self.notify().await;
+                self.handle_transfer(transfer.data.expect("by condition checked"))?
             }
             Play(mut play) => {
                 if !self.connect_state.is_active() {
