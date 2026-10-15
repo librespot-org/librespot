@@ -15,8 +15,8 @@ use crate::{
     },
 };
 use protobuf::MessageField;
+use sha1::{Digest, Sha1};
 use std::collections::HashMap;
-use uuid::Uuid;
 
 const LOCAL_FILES_IDENTIFIER: &str = "spotify:local-files";
 const SEARCH_IDENTIFIER: &str = "spotify:search";
@@ -469,8 +469,10 @@ impl ConnectState {
         //  - if no uid is present, resorting doesn't work or behaves not as intended
         let uid = match ctx_track.uid.as_ref() {
             Some(uid) if !uid.is_empty() => uid.to_string(),
-            // so providing a unique id should allow to resort the queue
-            _ => Uuid::new_v4().as_simple().to_string(),
+            // so providing a unique id should allow to resort the queue; the
+            // official clients derive it from the uri, and look a transferred
+            // track up by it
+            _ => uid_from_uri(&uri),
         };
 
         let mut metadata = page_metadata.cloned().unwrap_or_default();
@@ -516,5 +518,30 @@ impl ConnectState {
         }
 
         Ok(())
+    }
+}
+
+/// The uid the official clients give a track of a context that comes without
+/// uids, such as the user's collection: the first 20 hex digits of the SHA-1 of
+/// its uri.
+fn uid_from_uri(uri: &str) -> String {
+    let digest = Sha1::digest(uri.as_bytes());
+    digest[..10]
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::uid_from_uri;
+
+    #[test]
+    fn uid_matches_the_official_clients() {
+        // as an official client reported it for this track in the user's collection
+        assert_eq!(
+            uid_from_uri("spotify:track:2bwOeSrKTowqwfaL9Nmbo1"),
+            "864461b876c91b512510"
+        );
     }
 }
