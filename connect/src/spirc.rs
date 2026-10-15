@@ -1910,6 +1910,9 @@ impl SpircTask {
     }
 
     async fn notify(&mut self) -> Result<(), Error> {
+        // skipping, shuffling and transfers change the queue too
+        self.emit_set_queue_event();
+
         self.connect_state.set_status(&self.play_status);
 
         if self.connect_state.is_playing() {
