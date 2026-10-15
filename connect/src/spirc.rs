@@ -1182,11 +1182,30 @@ impl SpircTask {
 
     fn handle_transfer(&mut self, mut transfer: TransferState) -> Result<(), Error> {
         let mut ctx_uri = match transfer.current_session.context.uri {
-            None => Err(SpircError::NoUri("transfer context"))?,
+            // no uri at all is taken like an empty one
+            None => None,
             // can apparently happen when a state is transferred and was started with "uris" via the api
             Some(ref uri) if uri == "-" || uri.is_empty() => None,
             Some(ref uri) => Some(uri.clone()),
         };
+
+        // without a context, the tracks or the current track are played; with none of
+        // them there is nothing to play, so refuse before taking over
+        let has_tracks = transfer
+            .current_session
+            .context
+            .pages
+            .iter()
+            .any(|page| !page.tracks.is_empty());
+        if ctx_uri.is_none()
+            && !has_tracks
+            && self
+                .connect_state
+                .current_track_from_transfer(&transfer)
+                .is_err()
+        {
+            Err(SpircError::NoData)?
+        }
 
         self.connect_state.reset_context(
             ctx_uri
