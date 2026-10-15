@@ -96,6 +96,13 @@ pub struct AudioFetchParams {
 
     /// The time we will wait to obtain status updates on downloading.
     pub download_timeout: Duration,
+
+    /// The largest amount of data that is requested from the Spotify servers in one request;
+    /// a larger range is requested in pieces of at most this size, one after another.
+    /// Each response is held in memory until it has been received completely, and while
+    /// streaming a range is as large as one second of measured throughput, so on a fast
+    /// connection this bounds memory use. `None` requests each range in one go.
+    pub maximum_download_size: Option<usize>,
 }
 
 impl Default for AudioFetchParams {
@@ -113,6 +120,7 @@ impl Default for AudioFetchParams {
             download_timeout: Duration::from_secs(
                 (minimum_download_size / minimum_throughput) as u64,
             ),
+            maximum_download_size: None,
         }
     }
 }

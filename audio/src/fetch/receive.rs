@@ -208,27 +208,39 @@ impl AudioFileFetch {
 
         // TODO : refresh cdn_url when the token expired
 
+        let maximum_download_size = AudioFetchParams::get()
+            .maximum_download_size
+            .unwrap_or(usize::MAX);
+
         for range in ranges_to_request.iter() {
-            let streamer = self.session.spclient().stream_from_cdn(
-                &self.shared.cdn_url,
-                range.start,
-                range.length,
-            )?;
+            let end = range.start + range.length;
+            let mut start = range.start;
+            while start < end {
+                let length = min(end - start, maximum_download_size);
+                let streamer =
+                    self.session
+                        .spclient()
+                        .stream_from_cdn(&self.shared.cdn_url, start, length)?;
 
-            download_status.requested.add_range(range);
+                download_status
+                    .requested
+                    .add_range(&Range::new(start, length));
 
-            let streaming_request = StreamingRequest {
-                streamer,
-                initial_response: None,
-                offset: range.start,
-                length: range.length,
-            };
+                let streaming_request = StreamingRequest {
+                    streamer,
+                    initial_response: None,
+                    offset: start,
+                    length,
+                };
 
-            self.session.spawn(receive_data(
-                self.shared.clone(),
-                self.file_data_tx.clone(),
-                streaming_request,
-            ));
+                self.session.spawn(receive_data(
+                    self.shared.clone(),
+                    self.file_data_tx.clone(),
+                    streaming_request,
+                ));
+
+                start += length;
+            }
         }
 
         Ok(())
