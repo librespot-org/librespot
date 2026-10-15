@@ -1428,6 +1428,10 @@ impl SpircTask {
             self.connect_state.set_shuffle(options.shuffle);
             self.connect_state.set_repeat_context(options.repeat);
             self.connect_state.set_repeat_track(options.repeat_track);
+
+            self.player.emit_shuffle_changed_event(options.shuffle);
+            self.player
+                .emit_repeat_changed_event(options.repeat, options.repeat_track);
         }
 
         if matches!(cmd_options.context_options, Some(LoadContextOptions::Options(ref o)) if o.shuffle)
