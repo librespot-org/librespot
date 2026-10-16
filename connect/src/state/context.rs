@@ -281,7 +281,8 @@ impl ConnectState {
             .into_iter()
             .flat_map(|page| {
                 if !page.tracks.is_empty() {
-                    self.fill_context_from_page(page).ok()?;
+                    self.fill_context_from_page(ty, page, context.uri.as_deref())
+                        .ok()?;
                     None
                 } else if matches!(page.page_url, Some(ref url) if !url.is_empty()) {
                     Some(page_url_to_uri(
@@ -502,14 +503,26 @@ impl ConnectState {
         Ok(track)
     }
 
-    pub fn fill_context_from_page(&mut self, page: ContextPage) -> Result<(), Error> {
-        let ctx_len = self.context.as_ref().map(|c| c.tracks.len());
-        let context = self.state_context_from_page(page, HashMap::new(), None, None, ctx_len, None);
+    pub fn fill_context_from_page(
+        &mut self,
+        ty: ContextType,
+        page: ContextPage,
+        context_uri: Option<&str>,
+    ) -> Result<(), Error> {
+        let (ctx_len, provider) = match ty {
+            ContextType::Default => (self.context.as_ref().map(|c| c.tracks.len()), None),
+            ContextType::Autoplay => (None, Some(Provider::Autoplay)),
+        };
+        let context = self.state_context_from_page(
+            page,
+            HashMap::new(),
+            None,
+            context_uri,
+            ctx_len,
+            provider,
+        );
 
-        let ctx = self
-            .context
-            .as_mut()
-            .ok_or(StateError::NoContext(ContextType::Default))?;
+        let ctx = self.get_context_mut(ty)?;
 
         for t in context.tracks {
             ctx.tracks.push(t)
