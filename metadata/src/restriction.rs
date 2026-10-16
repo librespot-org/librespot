@@ -63,7 +63,7 @@ impl From<&RestrictionMessage> for Restriction {
                 .type_
                 .unwrap_or_default()
                 .enum_value_or_default(),
-            catalogue_strs: restriction.catalogue_str.to_vec(),
+            catalogue_strs: restriction.catalogue_str.clone(),
             countries_allowed,
             countries_forbidden,
         }
