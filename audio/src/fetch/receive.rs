@@ -35,6 +35,34 @@ enum ReceivedData {
 const ONE_SECOND: Duration = Duration::from_secs(1);
 const DOWNLOAD_STATUS_POISON_MSG: &str = "audio download status mutex should not be poisoned";
 
+/// How long a download may go without progress before it counts as failed: a connection
+/// can hang without an error (the request is sent, nothing comes back).  Half of
+/// `download_timeout`, so a reader waiting for the data can still get it requested again.
+fn stall_timeout() -> Duration {
+    AudioFetchParams::get().download_timeout / 2
+}
+
+/// The body of a response, failing if it makes no progress for `stall`.
+async fn collect_body<B>(mut body: B, stall: Duration) -> Result<Bytes, Error>
+where
+    B: hyper::body::Body<Data = Bytes> + Unpin,
+    B::Error: Into<Error>,
+{
+    let mut data = Vec::new();
+    loop {
+        match tokio::time::timeout(stall, body.frame()).await {
+            Err(_) => break Err(AudioFileError::WaitTimeout.into()),
+            Ok(None) => break Ok(Bytes::from(data)),
+            Ok(Some(Err(e))) => break Err(e.into()),
+            Ok(Some(Ok(frame))) => {
+                if let Ok(chunk) = frame.into_data() {
+                    data.extend_from_slice(&chunk);
+                }
+            }
+        }
+    }
+}
+
 async fn receive_data(
     shared: Arc<AudioFileShared>,
     file_data_tx: mpsc::UnboundedSender<ReceivedData>,
@@ -58,10 +86,11 @@ async fn receive_data(
 
                 data
             }
-            None => match request.streamer.next().await {
-                Some(Ok(response)) => response,
-                Some(Err(e)) => break Err(e.into()),
-                None => {
+            None => match tokio::time::timeout(stall_timeout(), request.streamer.next()).await {
+                Err(_) => break Err(AudioFileError::WaitTimeout.into()),
+                Ok(Some(Ok(response))) => response,
+                Ok(Some(Err(e))) => break Err(e.into()),
+                Ok(None) => {
                     if actual_length != request.length {
                         let msg = format!("did not expect body to contain {actual_length} bytes");
                         break Err(Error::data_loss(msg));
@@ -98,14 +127,9 @@ async fn receive_data(
             break Err(AudioFileError::StatusCode(code).into());
         }
 
-        let body = response.into_body();
-        let data = match body
-            .collect()
-            .await
-            .map(http_body_util::Collected::to_bytes)
-        {
+        let data = match collect_body(response.into_body(), stall_timeout()).await {
             Ok(bytes) => bytes,
-            Err(e) => break Err(e.into()),
+            Err(e) => break Err(e),
         };
 
         let data_size = data.len();
@@ -210,7 +234,7 @@ impl AudioFileFetch {
 
         for range in ranges_to_request.iter() {
             let streamer = self.session.spclient().stream_from_cdn(
-                &self.shared.cdn_url,
+                self.shared.cdn_urls.current(),
                 range.start,
                 range.length,
             )?;
@@ -518,4 +542,43 @@ pub(super) async fn audio_file_fetch(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use futures_util::stream;
+    use http_body_util::StreamBody;
+    use hyper::body::Frame;
+
+    type Chunk = Result<Frame<Bytes>, std::io::Error>;
+
+    #[tokio::test]
+    async fn a_stalled_body_fails_instead_of_hanging() {
+        // some data, then nothing: the connection hangs without an error
+        let chunks = stream::iter(vec![Ok::<_, std::io::Error>(Frame::data(
+            Bytes::from_static(b"abc"),
+        ))])
+        .chain(stream::pending::<Chunk>());
+        let t = Instant::now();
+        let r = collect_body(StreamBody::new(chunks), Duration::from_millis(200)).await;
+        assert!(r.is_err(), "a stalled body must fail");
+        assert!(t.elapsed() < Duration::from_secs(2));
+    }
+
+    #[tokio::test]
+    async fn a_slow_body_that_keeps_going_completes() {
+        // each chunk arrives within the stall timeout, the whole body takes longer than it
+        let chunks = stream::iter(0..5u8).then(|i| async move {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            Ok::<_, std::io::Error>(Frame::data(Bytes::from(vec![i; 3])))
+        });
+        let r = collect_body(
+            StreamBody::new(Box::pin(chunks)),
+            Duration::from_millis(250),
+        )
+        .await
+        .expect("progressing body");
+        assert_eq!(r.len(), 15);
+    }
 }
