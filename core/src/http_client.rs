@@ -93,11 +93,12 @@ impl From<HttpClientError> for Error {
 }
 
 type HyperClient = Client<ProxyConnector<HttpsConnector<HttpConnector>>, Full<bytes::Bytes>>;
+type HyperClientResult = Result<HyperClient, Error>;
 
 pub struct HttpClient {
     user_agent: HeaderValue,
     proxy_url: Option<Url>,
-    hyper_client: OnceLock<HyperClient>,
+    hyper_client: OnceLock<HyperClientResult>,
 
     rate_limiter:
         RateLimiter<String, DefaultKeyedStateStore<String>, MonotonicClock, NoOpMiddleware>,
@@ -173,9 +174,11 @@ impl HttpClient {
         Ok(client)
     }
 
-    fn hyper_client(&self) -> &HyperClient {
+    fn hyper_client(&self) -> Result<&HyperClient, Error> {
         self.hyper_client
-            .get_or_init(|| Self::try_create_hyper_client(self.proxy_url.as_ref()).unwrap())
+            .get_or_init(|| Self::try_create_hyper_client(self.proxy_url.as_ref()))
+            .as_ref()
+            .map_err(|e| Error::new(e.kind, e.error.to_string()))
     }
 
     pub async fn request(&self, req: Request<Bytes>) -> Result<Response<Incoming>, Error> {
@@ -253,7 +256,7 @@ impl HttpClient {
             ))
         })?;
 
-        Ok(self.hyper_client().request(req.map(Full::new)))
+        Ok(self.hyper_client()?.request(req.map(Full::new)))
     }
 
     pub fn get_retry_after(headers: &HeaderMap<HeaderValue>) -> Option<Duration> {
@@ -297,5 +300,87 @@ impl HttpClient {
         }
 
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_try_create_hyper_client_with_no_proxy() {
+        // Test that client creation with no proxy returns Ok or an error (not panic)
+        let result = HttpClient::try_create_hyper_client(None);
+
+        // On systems with proper certificates, this should succeed
+        // On systems without native certificates (like Android), this should return an error
+        // Either way, it should not panic
+        match result {
+            Ok(_) => {
+                // Client creation succeeded - certificates are available
+            }
+            Err(e) => {
+                // Client creation failed gracefully - this is the Android case
+                // Verify it's an actual error, not a panic
+                assert!(
+                    !e.error.to_string().is_empty(),
+                    "Error should have a message"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_hyper_client_returns_result() {
+        // Test that hyper_client() returns a Result, not panics
+        let client = HttpClient::new(None);
+
+        // This should return a Result<&HyperClient, Error>, not panic
+        let result = client.hyper_client();
+
+        // On most systems this will succeed, on Android it will fail
+        // Either way, no panic
+        match result {
+            Ok(_) => {
+                // Successfully created client
+            }
+            Err(e) => {
+                // Failed to create client (e.g., no certificates)
+                assert!(
+                    !e.error.to_string().is_empty(),
+                    "Error should have a message"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_request_fut_handles_client_creation_result() {
+        // Test that request_fut propagates Result from hyper_client()
+        let client = HttpClient::new(None);
+
+        let req = Request::builder()
+            .uri("http://example.com")
+            .body(Bytes::new())
+            .unwrap();
+
+        // This should return a Result, not panic
+        let _result = client.request_fut(req);
+
+        // The request might succeed or fail depending on the environment,
+        // but it should not panic during client initialization
+    }
+
+    #[cfg(feature = "rustls-tls-native-roots")]
+    #[test]
+    fn test_client_creation_error_is_propagated() {
+        // This test verifies that if native root certificate loading fails,
+        // we get an error instead of a panic. This would happen on Android
+        // or other systems without native certificate stores.
+
+        // We can't easily force the native roots loading to fail in a test,
+        // but we can verify the error handling pathway exists by checking
+        // that try_create_hyper_client returns a Result type
+        let _: Result<HyperClient, Error> = HttpClient::try_create_hyper_client(None);
     }
 }
