@@ -15,6 +15,8 @@ pub enum SinkError {
     InvalidParams(String),
     #[error("Audio Sink Error Changing State: {0}")]
     StateChange(String),
+    #[error("Audio Sink Error Updating Sample Rate: Not Supported")]
+    SampleRateChangeNotSupported,
 }
 
 pub type SinkResult<T> = Result<T, SinkError>;
@@ -30,6 +32,9 @@ pub trait Sink {
     fn stop(&mut self) -> SinkResult<()> {
         Ok(())
     }
+
+    fn update_sample_rate(&mut self, new_sample_rate: u32) -> SinkResult<()>;
+
     fn write(&mut self, packet: AudioPacket, converter: &mut Converter) -> SinkResult<()>;
 }
 

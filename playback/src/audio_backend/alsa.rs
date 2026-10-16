@@ -9,8 +9,6 @@ use alsa::{Direction, ValueOr};
 use std::process::exit;
 use thiserror::Error;
 
-const MAX_BUFFER: Frames = (SAMPLE_RATE / 2) as Frames;
-const MIN_BUFFER: Frames = (SAMPLE_RATE / 10) as Frames;
 const ZERO_FRAMES: Frames = 0;
 
 const MAX_PERIOD_DIVISOR: Frames = 4;
@@ -162,7 +160,7 @@ fn list_compatible_devices() -> SinkResult<()> {
     Ok(())
 }
 
-fn open_device(dev_name: &str, format: AudioFormat) -> SinkResult<(PCM, usize)> {
+fn open_device(dev_name: &str, format: AudioFormat, sample_rate: u32) -> SinkResult<(PCM, usize)> {
     let pcm = PCM::new(dev_name, Direction::Playback, false).map_err(|e| AlsaError::PcmSetUp {
         device: dev_name.to_string(),
         e,
@@ -187,10 +185,10 @@ fn open_device(dev_name: &str, format: AudioFormat) -> SinkResult<(PCM, usize)> 
                 e,
             })?;
 
-        hwp.set_rate(SAMPLE_RATE, ValueOr::Nearest).map_err(|e| {
+        hwp.set_rate(sample_rate, ValueOr::Nearest).map_err(|e| {
             AlsaError::UnsupportedSampleRate {
                 device: dev_name.to_string(),
-                samplerate: SAMPLE_RATE,
+                samplerate: sample_rate,
                 e,
             }
         })?;
@@ -240,8 +238,11 @@ fn open_device(dev_name: &str, format: AudioFormat) -> SinkResult<(PCM, usize)> 
                 Ok(s) => s,
             };
 
+            let max_buffer: Frames = (sample_rate / 2) as Frames;
+            let min_buffer: Frames = (sample_rate / 10) as Frames;
+
             let buffer_size = if min < max {
-                match (MIN_BUFFER..=MAX_BUFFER)
+                match (min_buffer..=max_buffer)
                     .rev()
                     .find(|f| (min..=max).contains(f))
                 {
@@ -269,7 +270,7 @@ fn open_device(dev_name: &str, format: AudioFormat) -> SinkResult<(PCM, usize)> 
             };
 
             if buffer_size == ZERO_FRAMES {
-                trace!("Desired Buffer Frame range: {MIN_BUFFER:?} - {MAX_BUFFER:?}",);
+                trace!("Desired Buffer Frame range: {min_buffer:?} - {max_buffer:?}",);
 
                 trace!("Actual Buffer Frame range as reported by the device: {min:?} - {max:?}",);
             }
@@ -416,18 +417,7 @@ impl Open for AlsaSink {
 impl Sink for AlsaSink {
     fn start(&mut self) -> SinkResult<()> {
         if self.pcm.is_none() {
-            let (pcm, bytes_per_period) = open_device(&self.device, self.format)?;
-            self.pcm = Some(pcm);
-
-            if self.period_buffer.capacity() != bytes_per_period {
-                self.period_buffer = Vec::with_capacity(bytes_per_period);
-            }
-
-            // Should always match the "Period Buffer size in bytes: " trace! message.
-            trace!(
-                "Period Buffer capacity: {:?}",
-                self.period_buffer.capacity()
-            );
+            self.start_internal(SAMPLE_RATE)?;
         }
 
         Ok(())
@@ -444,6 +434,13 @@ impl Sink for AlsaSink {
 
             pcm.drain().map_err(AlsaError::DrainFailure)?;
         }
+
+        Ok(())
+    }
+
+    fn update_sample_rate(&mut self, new_sample_rate: u32) -> SinkResult<()> {
+        self.stop()?;
+        self.start_internal(new_sample_rate)?;
 
         Ok(())
     }
@@ -482,6 +479,23 @@ impl SinkAsBytes for AlsaSink {
 
 impl AlsaSink {
     pub const NAME: &'static str = "alsa";
+
+    fn start_internal(&mut self, sample_rate: u32) -> SinkResult<()> {
+        let (pcm, bytes_per_period) = open_device(&self.device, self.format, sample_rate)?;
+        self.pcm = Some(pcm);
+
+        if self.period_buffer.capacity() != bytes_per_period {
+            self.period_buffer = Vec::with_capacity(bytes_per_period);
+        }
+
+        // Should always match the "Period Buffer size in bytes: " trace! message.
+        trace!(
+            "Period Buffer capacity: {:?}",
+            self.period_buffer.capacity()
+        );
+
+        Ok(())
+    }
 
     fn write_buf(&mut self) -> SinkResult<()> {
         if self.pcm.is_some() {
