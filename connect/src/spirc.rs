@@ -137,6 +137,7 @@ enum SpircCommand {
     Load(LoadRequest),
     AddToQueue(SpotifyUri),
     ClearQueue,
+    RemoveNextTrack { index: usize, uri: SpotifyUri },
 }
 
 const CONTEXT_FETCH_THRESHOLD: usize = 2;
@@ -423,6 +424,20 @@ impl Spirc {
     /// context are kept; the next tracks are filled up from the context again.
     pub fn clear_queue(&self) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::ClearQueue)?)
+    }
+
+    /// Removes one upcoming track from the next tracks.
+    ///
+    /// Does nothing if we are not the active device.
+    ///
+    /// `index` counts only the visible next tracks; the current track is never
+    /// touched. If the track at `index` doesn't have the given `uri`, the removal
+    /// is ignored. Afterwards the next tracks are refilled from the context,
+    /// continuing after the last next track already listed.
+    pub fn remove_next_track(&self, index: usize, uri: SpotifyUri) -> Result<(), Error> {
+        Ok(self
+            .commands
+            .send(SpircCommand::RemoveNextTrack { index, uri })?)
     }
 
     /// Disconnects the current device and pauses the playback according the value.
@@ -762,6 +777,9 @@ impl SpircTask {
             SpircCommand::ClearQueue => {
                 self.connect_state.clear_queue()?;
                 self.emit_set_queue_event();
+            }
+            SpircCommand::RemoveNextTrack { index, uri } => {
+                self.handle_remove_next_track(index, uri)?
             }
         };
 
@@ -1665,6 +1683,36 @@ impl SpircTask {
             self.connect_state.add_to_queue(track, true);
         }
         self.emit_set_queue_event();
+    }
+
+    fn handle_remove_next_track(&mut self, index: usize, uri: SpotifyUri) -> Result<(), Error> {
+        let uri = uri.to_uri();
+
+        if !self.connect_state.remove_next_track(index, &uri)? {
+            warn!("no next track at index {index} with uri {uri} to remove");
+            return Ok(());
+        }
+
+        self.emit_set_queue_event();
+
+        let already_preloading = matches!(
+            self.play_status,
+            SpircPlayStatus::Paused {
+                preloading_of_next_track_triggered: true,
+                ..
+            } | SpircPlayStatus::Playing {
+                preloading_of_next_track_triggered: true,
+                ..
+            }
+        );
+
+        // the removed track was the one we already started preloading, so we
+        // need to preload the track that took its place for gapless playback
+        if index == 0 && already_preloading {
+            self.handle_preload_next_track();
+        }
+
+        Ok(())
     }
 
     fn handle_preload_next_track(&mut self) {

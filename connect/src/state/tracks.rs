@@ -277,6 +277,39 @@ impl<'ct> ConnectState {
         Ok(())
     }
 
+    /// Remove a single upcoming track
+    ///
+    /// `index` counts only the visible next tracks: hidden entries (the context
+    /// delimiters) are skipped, matching what the Web API and Spotify clients show.
+    /// Works for a queued track as well as a track from the context or autoplay.
+    ///
+    /// Returns `Ok(false)` and leaves the state untouched when there is no visible
+    /// track at `index`, or when its uri doesn't match `uri`. Otherwise removes it,
+    /// fills the next tracks back up from the context and returns `Ok(true)`.
+    pub fn remove_next_track(&mut self, index: usize, uri: &str) -> Result<bool, Error> {
+        let position = self
+            .next_tracks()
+            .iter()
+            .enumerate()
+            .filter(|(_, t)| !t.is_hidden())
+            .nth(index)
+            .map(|(position, _)| position);
+
+        let Some(position) = position else {
+            return Ok(false);
+        };
+
+        if self.next_tracks()[position].uri != uri {
+            return Ok(false);
+        }
+
+        self.next_tracks_mut().remove(position);
+        self.fill_up_next_tracks()?;
+        self.update_restrictions();
+
+        Ok(true)
+    }
+
     pub fn clear_next_tracks(&mut self) {
         // respect queued track and don't throw them out of our next played tracks
         let first_non_queued_track = self
@@ -446,5 +479,197 @@ impl<'ct> ConnectState {
             self.update_queue_revision();
         }
         self.update_restrictions();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        core::{Session, SessionConfig},
+        protocol::{context::Context, context_page::ContextPage, context_track::ContextTrack},
+        state::ConnectConfig,
+    };
+
+    fn new_state() -> ConnectState {
+        let session = Session::new(SessionConfig::default(), None);
+        ConnectState::new(ConnectConfig::default(), &session)
+    }
+
+    fn context_with_tracks(len: usize) -> Context {
+        Context {
+            uri: Some("spotify:playlist:remove-next-track-test".into()),
+            pages: vec![ContextPage {
+                tracks: (0..len)
+                    .map(|i| ContextTrack {
+                        uri: Some(format!("spotify:track:{i:022}")),
+                        uid: Some(format!("uid-{i}")),
+                        ..Default::default()
+                    })
+                    .collect(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        }
+    }
+
+    /// A state with a context of `len` tracks, currently playing `current_index`
+    /// and the next tracks already filled up.
+    fn state_at(current_index: usize, repeat: bool, len: usize) -> ConnectState {
+        let mut state = new_state();
+        state
+            .update_context(context_with_tracks(len), ContextType::Default)
+            .unwrap();
+        if repeat {
+            state.set_repeat_context(true);
+        }
+        state.set_current_track(current_index).unwrap();
+        state
+            .reset_playback_to_position(Some(current_index))
+            .unwrap();
+        state
+    }
+
+    #[tokio::test]
+    async fn removing_a_context_track_refills_from_where_it_left_off_and_never_replays_it() {
+        let mut state = state_at(0, false, 120);
+        let before = state.player().next_tracks.clone();
+        assert_eq!(before.len(), SPOTIFY_MAX_NEXT_TRACKS_SIZE);
+
+        let removed = before[5].clone();
+        let last_before = before.last().unwrap().get_context_index().unwrap();
+
+        let ok = state.remove_next_track(5, &removed.uri).unwrap();
+        assert!(ok);
+
+        let after = state.player().next_tracks.clone();
+        assert_eq!(after.len(), SPOTIFY_MAX_NEXT_TRACKS_SIZE);
+        assert!(after.iter().all(|t| t.uri != removed.uri));
+
+        // the appended track continues right after the previous last one
+        let appended = after.last().unwrap();
+        assert_eq!(appended.get_context_index(), Some(last_before + 1));
+
+        // stepping through the rest of the context never yields the removed track again
+        let mut seen_removed = false;
+        for _ in 0..150 {
+            match state.next_track().unwrap() {
+                None => break,
+                Some(_) => {
+                    if state.current_track(|t| t.uri.clone()) == removed.uri {
+                        seen_removed = true;
+                    }
+                }
+            }
+        }
+        assert!(!seen_removed);
+    }
+
+    #[tokio::test]
+    async fn removing_one_queued_duplicate_keeps_the_others() {
+        let mut state = state_at(0, false, 120);
+
+        let queued_uri = "spotify:track:queued-duplicate".to_string();
+        for _ in 0..3 {
+            state.add_to_queue(
+                ProvidedTrack {
+                    uri: queued_uri.clone(),
+                    ..Default::default()
+                },
+                true,
+            );
+        }
+
+        let before = state.player().next_tracks.clone();
+        let queued_before: Vec<_> = before.iter().filter(|t| t.uri == queued_uri).collect();
+        assert_eq!(queued_before.len(), 3);
+        let uids_before: Vec<_> = queued_before.iter().map(|t| t.uid.clone()).collect();
+
+        let revision_before_removal = state.player().queue_revision.clone();
+
+        // the three queued copies are the first three next tracks
+        let ok = state.remove_next_track(1, &queued_uri).unwrap();
+        assert!(ok);
+
+        let after = state.player().next_tracks.clone();
+        let queued_after: Vec<_> = after.iter().filter(|t| t.uri == queued_uri).collect();
+        let uids_after: Vec<_> = queued_after.iter().map(|t| t.uid.clone()).collect();
+        assert_eq!(
+            uids_after,
+            vec![uids_before[0].clone(), uids_before[2].clone()]
+        );
+
+        assert_ne!(state.player().queue_revision, revision_before_removal);
+    }
+
+    #[tokio::test]
+    async fn wrong_uri_or_out_of_range_index_leaves_state_untouched() {
+        let mut state = state_at(0, false, 120);
+        let before = state.player().next_tracks.clone();
+        let revision_before = state.player().queue_revision.clone();
+
+        // wrong uri at a valid index
+        let ok = state
+            .remove_next_track(0, "spotify:track:not-actually-next")
+            .unwrap();
+        assert!(!ok);
+        assert_eq!(state.player().next_tracks, before);
+        assert_eq!(state.player().queue_revision, revision_before);
+
+        // out-of-range index
+        let ok = state
+            .remove_next_track(before.len(), &before[0].uri)
+            .unwrap();
+        assert!(!ok);
+        assert_eq!(state.player().next_tracks, before);
+        assert_eq!(state.player().queue_revision, revision_before);
+    }
+
+    #[tokio::test]
+    async fn repeat_context_delimiter_is_skipped_and_can_never_be_removed() {
+        let mut state = state_at(115, true, 120);
+        let before = state.player().next_tracks.clone();
+        assert_eq!(before.len(), SPOTIFY_MAX_NEXT_TRACKS_SIZE);
+
+        let delimiter_pos = before
+            .iter()
+            .position(Metadata::is_hidden)
+            .expect("a delimiter should be present within the refilled next tracks");
+        assert_eq!(before[delimiter_pos].uri, "spotify:delimiter");
+
+        // no visible index maps to the delimiter's raw position: nth() over the
+        // non-hidden entries can never land on it
+        let visible_positions: Vec<usize> = before
+            .iter()
+            .enumerate()
+            .filter(|(_, t)| !t.is_hidden())
+            .map(|(i, _)| i)
+            .collect();
+        assert!(!visible_positions.contains(&delimiter_pos));
+
+        let visible_index_after_delimiter = before[..delimiter_pos]
+            .iter()
+            .filter(|t| !t.is_hidden())
+            .count();
+        let track_after_delimiter = before[delimiter_pos + 1].clone();
+
+        // addressing that visible index with the delimiter's own uri does nothing:
+        // the index actually names the visible track after it, not the delimiter
+        let ok = state
+            .remove_next_track(visible_index_after_delimiter, "spotify:delimiter")
+            .unwrap();
+        assert!(!ok);
+        assert_eq!(state.player().next_tracks, before);
+
+        // removing the track right after the delimiter leaves the delimiter in place
+        let ok = state
+            .remove_next_track(visible_index_after_delimiter, &track_after_delimiter.uri)
+            .unwrap();
+        assert!(ok);
+
+        let after = state.player().next_tracks.clone();
+        assert_eq!(after.len(), SPOTIFY_MAX_NEXT_TRACKS_SIZE);
+        assert!(after[delimiter_pos].is_hidden());
+        assert_eq!(after[delimiter_pos].uri, "spotify:delimiter");
     }
 }
