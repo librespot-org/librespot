@@ -2,7 +2,7 @@ use futures_core::Stream;
 use futures_util::StreamExt;
 use std::{pin::Pin, str::FromStr, sync::OnceLock};
 use thiserror::Error;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use url::Url;
 
@@ -16,6 +16,7 @@ component! {
     DealerManager: DealerManagerInner {
         builder: OnceLock<Builder> = OnceLock::from(Builder::new()),
         dealer: OnceLock<Dealer> = OnceLock::new(),
+        reconnect_tx: watch::Sender<u64> = watch::Sender::new(0),
     }
 }
 
@@ -153,10 +154,12 @@ impl DealerManager {
         // and the token is expired we will just get 401 error
         let get_url = move || Self::get_url(session.clone());
 
+        let reconnect_tx = self.lock(|inner| inner.reconnect_tx.clone());
+
         let dealer = self
             .lock(move |inner| inner.builder.take())
             .ok_or(DealerError::BuilderNotAvailable)?
-            .launch(get_url, None)
+            .launch(get_url, None, reconnect_tx)
             .await
             .map_err(DealerError::LaunchFailure)?;
 
@@ -170,5 +173,9 @@ impl DealerManager {
         if let Some(dealer) = self.lock(|inner| inner.dealer.take()) {
             dealer.close().await
         }
+    }
+
+    pub fn reconnect_receiver(&self) -> watch::Receiver<u64> {
+        self.lock(|inner| inner.reconnect_tx.subscribe())
     }
 }

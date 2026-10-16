@@ -21,6 +21,7 @@ use tokio::{
     sync::{
         Semaphore,
         mpsc::{self, UnboundedReceiver},
+        watch,
     },
     task::JoinHandle,
 };
@@ -55,6 +56,10 @@ const PING_INTERVAL: Duration = Duration::from_secs(30);
 const PING_TIMEOUT: Duration = Duration::from_secs(3);
 
 const RECONNECT_INTERVAL: Duration = Duration::from_secs(10);
+// Bounds each step of a reconnect attempt (URL resolution and the TCP/TLS/
+// websocket handshake), so a blackholed connection can't stall reconnection
+// forever.
+const RECONNECT_STEP_TIMEOUT: Duration = Duration::from_secs(30);
 
 const DEALER_REQUEST_HANDLERS_POISON_MSG: &str =
     "dealer request handlers mutex should not be poisoned";
@@ -301,15 +306,25 @@ impl Builder {
         handles(&self.request_handlers, &self.message_handlers, uri)
     }
 
-    pub fn launch_in_background<Fut, F>(self, get_url: F, proxy: Option<Url>) -> Dealer
+    pub fn launch_in_background<Fut, F>(
+        self,
+        get_url: F,
+        proxy: Option<Url>,
+        reconnect_tx: watch::Sender<u64>,
+    ) -> Dealer
     where
         Fut: Future<Output = GetUrlResult> + Send + 'static,
         F: (Fn() -> Fut) + Send + 'static,
     {
-        create_dealer!(self, shared -> run(shared, None, get_url, proxy))
+        create_dealer!(self, shared -> run(shared, None, get_url, proxy, reconnect_tx))
     }
 
-    pub async fn launch<Fut, F>(self, get_url: F, proxy: Option<Url>) -> WsResult<Dealer>
+    pub async fn launch<Fut, F>(
+        self,
+        get_url: F,
+        proxy: Option<Url>,
+        reconnect_tx: watch::Sender<u64>,
+    ) -> WsResult<Dealer>
     where
         Fut: Future<Output = GetUrlResult> + Send + 'static,
         F: (Fn() -> Fut) + Send + 'static,
@@ -317,10 +332,10 @@ impl Builder {
         let dealer = create_dealer!(self, shared -> {
             // Try to connect.
             let url = get_url().await?;
-            let tasks = connect(&url, proxy.as_ref(), &shared).await?;
+            let tasks = connect(&url, proxy.as_ref(), &shared, None).await?;
 
             // If a connection is established, continue in a background task.
-            run(shared, Some(tasks), get_url, proxy)
+            run(shared, Some(tasks), get_url, proxy, reconnect_tx)
         });
 
         Ok(dealer)
@@ -496,10 +511,15 @@ impl Dealer {
 }
 
 /// Initializes a connection and returns futures that will finish when the connection is closed/lost.
+///
+/// When `notify_reconnect` is set, it is bumped on the receive task before any
+/// message of the new connection is dispatched, so consumers can order their
+/// own state against the reconnect (e.g. "did I register before or after it?").
 async fn connect(
     address: &Url,
     proxy: Option<&Url>,
     shared: &Arc<DealerShared>,
+    notify_reconnect: Option<watch::Sender<u64>>,
 ) -> WsResult<(JoinHandle<()>, JoinHandle<()>)> {
     let host = address
         .host_str()
@@ -578,6 +598,11 @@ async fn connect(
 
     // A task that receives messages from the web socket.
     let receive_task = tokio::spawn(async {
+        if let Some(tx) = notify_reconnect {
+            warn!("Dealer reconnected; notifying consumers.");
+            tx.send_modify(|n| *n += 1);
+        }
+
         let pong_received = AtomicBool::new(true);
         let send_tx = send_tx;
         let shared = shared;
@@ -665,6 +690,7 @@ async fn run<F, Fut>(
     initial_tasks: Option<(JoinHandle<()>, JoinHandle<()>)>,
     mut get_url: F,
     proxy: Option<Url>,
+    reconnect_tx: watch::Sender<u64>,
 ) -> Result<(), Error>
 where
     Fut: Future<Output = GetUrlResult> + Send + 'static,
@@ -672,11 +698,15 @@ where
 {
     let init_task = |t| Some(TimeoutOnDrop::new(t, WEBSOCKET_CLOSE_TIMEOUT));
 
+    let has_had_initial_connection = initial_tasks.is_some();
+
     let mut tasks = if let Some((s, r)) = initial_tasks {
         (init_task(s), init_task(r))
     } else {
         (None, None)
     };
+
+    let mut has_connected = has_had_initial_connection;
 
     while !shared.is_closed() {
         match &mut tasks {
@@ -702,13 +732,49 @@ where
                     () = shared.closed() => {
                         break
                     },
-                    e = get_url() => e
-                }?;
+                    result = tokio::time::timeout(RECONNECT_STEP_TIMEOUT, get_url()) => {
+                        match result {
+                            Ok(Ok(url)) => url,
+                            Ok(Err(e)) => {
+                                error!("Failed to resolve dealer URL: {e}");
+                                tokio::time::sleep(RECONNECT_INTERVAL).await;
+                                continue;
+                            }
+                            Err(_) => {
+                                error!("Timed out resolving dealer URL.");
+                                tokio::time::sleep(RECONNECT_INTERVAL).await;
+                                continue;
+                            }
+                        }
+                    }
+                };
 
-                match connect(&url, proxy.as_ref(), &shared).await {
-                    Ok((s, r)) => tasks = (init_task(s), init_task(r)),
-                    Err(e) => {
+                let connect_result = select! {
+                    () = shared.closed() => break,
+                    r = tokio::time::timeout(
+                        RECONNECT_STEP_TIMEOUT,
+                        // Notify consumers of reconnects, but not of the very
+                        // first connection.
+                        connect(
+                            &url,
+                            proxy.as_ref(),
+                            &shared,
+                            has_connected.then(|| reconnect_tx.clone()),
+                        ),
+                    ) => r,
+                };
+
+                match connect_result {
+                    Ok(Ok((s, r))) => {
+                        tasks = (init_task(s), init_task(r));
+                        has_connected = true;
+                    }
+                    Ok(Err(e)) => {
                         error!("Error while connecting: {e}");
+                        tokio::time::sleep(RECONNECT_INTERVAL).await;
+                    }
+                    Err(_) => {
+                        error!("Timed out connecting to dealer.");
                         tokio::time::sleep(RECONNECT_INTERVAL).await;
                     }
                 }
