@@ -42,7 +42,10 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use thiserror::Error;
-use tokio::{sync::mpsc, time::sleep};
+use tokio::{
+    sync::mpsc,
+    time::{Instant, sleep, sleep_until},
+};
 
 #[derive(Debug, Error)]
 enum SpircError {
@@ -95,6 +98,8 @@ struct SpircTask {
 
     context_resolver: ContextResolver,
 
+    next_track_deadline: Option<Instant>,
+
     emit_set_queue_events: bool,
 
     shutdown: bool,
@@ -140,6 +145,9 @@ enum SpircCommand {
 }
 
 const CONTEXT_FETCH_THRESHOLD: usize = 2;
+
+// how long the next track may wait for the context resolver
+const NEXT_TRACK_WAIT: Duration = Duration::from_secs(30);
 
 // delay to update volume after a certain amount of time, instead on each update request
 const VOLUME_UPDATE_DELAY: Duration = Duration::from_millis(500);
@@ -252,6 +260,7 @@ impl Spirc {
             player_events: Some(player_events),
 
             context_resolver: ContextResolver::new(session.clone()),
+            next_track_deadline: None,
 
             emit_set_queue_events,
 
@@ -482,6 +491,7 @@ impl SpircTask {
             // when state and volume update have a higher priority than context resolving
             // because of that the context resolving has to wait, so that the other tasks can finish
             let allow_context_resolving = !self.update_state && !self.update_volume;
+            let next_track_deadline = self.next_track_deadline;
 
             tokio::select! {
                 // startup of the dealer requires a connection_id, which is retrieved at the very beginning
@@ -590,11 +600,24 @@ impl SpircTask {
                             .collect::<Vec<_>>()
                     }).await
                 }, if allow_context_resolving && self.context_resolver.has_next() => {
-                    let update_state = self.handle_next_context(next_context);
+                    let mut update_state = self.handle_next_context(next_context);
+                    if self.next_track_deadline.is_some() {
+                        if let Err(why) = self.handle_next(None) {
+                            error!("failed to play the next track after context resolving: {why}")
+                        }
+                        update_state |= self.next_track_deadline.is_none();
+                    }
                     if update_state {
                         if let Err(why) = self.notify().await {
                             error!("update after context resolving failed: {why}")
                         }
+                    }
+                },
+                _ = async { if let Some(deadline) = next_track_deadline { sleep_until(deadline).await } }, if next_track_deadline.is_some() => {
+                    info!("No tracks arrived within {NEXT_TRACK_WAIT:?}, stopping playback.");
+                    self.handle_stop();
+                    if let Err(why) = self.notify().await {
+                        error!("update after waiting for the next track failed: {why}")
                     }
                 },
                 else => break
@@ -1181,6 +1204,8 @@ impl SpircTask {
     }
 
     fn handle_transfer(&mut self, mut transfer: TransferState) -> Result<(), Error> {
+        self.next_track_deadline = None;
+
         let mut ctx_uri = match transfer.current_session.context.uri {
             None => Err(SpircError::NoUri("transfer context"))?,
             // can apparently happen when a state is transferred and was started with "uris" via the api
@@ -1304,6 +1329,7 @@ impl SpircTask {
 
     async fn handle_disconnect(&mut self) -> Result<(), Error> {
         self.context_resolver.clear();
+        self.next_track_deadline = None;
 
         self.play_status = SpircPlayStatus::Stopped {};
         self.connect_state
@@ -1319,6 +1345,11 @@ impl SpircTask {
     }
 
     fn handle_stop(&mut self) {
+        if self.next_track_deadline.take().is_some() {
+            // the player is already stopped and sends no event
+            self.play_status = SpircPlayStatus::Stopped;
+            self.connect_state.set_status(&self.play_status);
+        }
         self.player.stop();
         self.connect_state.update_position(0, self.now_ms());
         self.connect_state.clear_next_tracks();
@@ -1363,6 +1394,8 @@ impl SpircTask {
         page: Option<ContextPage>,
         fallback_index: Option<usize>,
     ) -> Result<(), Error> {
+        self.next_track_deadline = None;
+
         self.connect_state
             .reset_context(if let PlayContext::Uri(ref uri) = cmd.context {
                 ResetContext::WhenDifferent(uri)
@@ -1543,7 +1576,9 @@ impl SpircTask {
                 };
             }
             SpircPlayStatus::LoadingPause { position_ms } => {
-                self.player.play();
+                if self.next_track_deadline.is_none() {
+                    self.player.play();
+                }
                 self.play_status = SpircPlayStatus::LoadingPlay { position_ms };
             }
             _ => return,
@@ -1583,7 +1618,9 @@ impl SpircTask {
                 };
             }
             SpircPlayStatus::LoadingPlay { position_ms } => {
-                self.player.pause();
+                if self.next_track_deadline.is_none() {
+                    self.player.pause();
+                }
                 self.play_status = SpircPlayStatus::LoadingPause { position_ms };
             }
             _ => (),
@@ -1599,7 +1636,9 @@ impl SpircTask {
 
         self.connect_state
             .update_position(position_ms, self.now_ms());
-        self.player.seek(position_ms);
+        if self.next_track_deadline.is_none() {
+            self.player.seek(position_ms);
+        }
         let now = self.now_ms();
         match self.play_status {
             SpircPlayStatus::Stopped => (),
@@ -1737,6 +1776,15 @@ impl SpircTask {
         let mut has_next_track =
             matches!(track_uri, Some(ref track_uri) if current_uri == track_uri);
 
+        // next_track() drops the current track, which the resolver still needs
+        if !has_next_track
+            && track_uri.is_none()
+            && self.context_resolver.awaits_next_track(&self.connect_state)
+        {
+            self.await_next_track(continue_playing);
+            return Ok(());
+        }
+
         if !has_next_track {
             has_next_track = loop {
                 let index = self.connect_state.next_track()?;
@@ -1760,7 +1808,34 @@ impl SpircTask {
         }
     }
 
+    fn await_next_track(&mut self, start_playing: bool) {
+        if self.next_track_deadline.is_some() {
+            return;
+        }
+
+        info!("No next track in queue yet, waiting for the context resolver to add tracks.");
+        self.next_track_deadline = Some(Instant::now() + NEXT_TRACK_WAIT);
+
+        self.player.stop();
+        // the stopped track's events must not change the status while waiting
+        self.play_request_id = None;
+
+        let position_ms = self.position();
+        self.play_status = if start_playing {
+            SpircPlayStatus::LoadingPlay { position_ms }
+        } else {
+            SpircPlayStatus::LoadingPause { position_ms }
+        };
+        self.connect_state
+            .update_position(position_ms, self.now_ms());
+        self.connect_state.set_status(&self.play_status);
+    }
+
     fn handle_prev(&mut self) -> Result<(), Error> {
+        if self.next_track_deadline.is_some() {
+            return self.load_track(self.connect_state.is_playing(), 0);
+        }
+
         // Previous behaves differently based on the position
         // Under 3s it goes to the previous song (starts playing)
         // Over 3s it seeks to zero (retains previous play status)
@@ -1887,6 +1962,8 @@ impl SpircTask {
     }
 
     fn load_track(&mut self, start_playing: bool, position_ms: u32) -> Result<(), Error> {
+        self.next_track_deadline = None;
+
         if self.connect_state.current_track(MessageField::is_none) {
             debug!("current track is none, stopping playback");
             self.handle_stop();
