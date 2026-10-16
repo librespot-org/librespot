@@ -1560,6 +1560,7 @@ async fn get_setup() -> Setup {
             disable_volume,
             volume_steps,
             emit_set_queue_events: false,
+            cluster_listener: None,
         }
     };
 
