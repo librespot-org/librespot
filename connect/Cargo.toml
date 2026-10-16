@@ -31,3 +31,6 @@ thiserror = "2"
 tokio = { version = "1", features = ["macros", "sync"] }
 tokio-stream = { version = "0.1", default-features = false }
 uuid = { version = "1.18", default-features = false, features = ["v4"] }
+
+[lints]
+workspace = true

@@ -99,7 +99,11 @@ async fn receive_data(
         }
 
         let body = response.into_body();
-        let data = match body.collect().await.map(|b| b.to_bytes()) {
+        let data = match body
+            .collect()
+            .await
+            .map(http_body_util::Collected::to_bytes)
+        {
             Ok(bytes) => bytes,
             Err(e) => break Err(e.into()),
         };
@@ -116,8 +120,8 @@ async fn receive_data(
     if measure_throughput {
         let duration = Instant::now().duration_since(request_time).as_millis();
         if actual_length > 0 && duration > 0 {
-            let throughput = ONE_SECOND.as_millis() as usize * actual_length / duration as usize;
-            file_data_tx.send(ReceivedData::Throughput(throughput))?;
+            let throughput = ONE_SECOND.as_millis() * actual_length as u128 / duration;
+            file_data_tx.send(ReceivedData::Throughput(throughput as usize))?;
         }
     }
 

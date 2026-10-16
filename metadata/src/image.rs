@@ -27,7 +27,7 @@ pub struct Images(pub Vec<Image>);
 
 impl From<&ImageGroup> for Images {
     fn from(image_group: &ImageGroup) -> Self {
-        Self(image_group.image.iter().map(|i| i.into()).collect())
+        Self(image_group.image.iter().map(Into::into).collect())
     }
 }
 

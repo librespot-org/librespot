@@ -31,3 +31,6 @@ log = "0.4"
 tempfile = "3"
 thiserror = "2"
 tokio = { version = "1", features = ["macros", "sync"] }
+
+[lints]
+workspace = true

@@ -24,7 +24,7 @@ impl TryFrom<&Bytes> for Lyrics {
     type Error = Error;
 
     fn try_from(lyrics: &Bytes) -> Result<Self, Self::Error> {
-        serde_json::from_slice(lyrics).map_err(|err| err.into())
+        serde_json::from_slice(lyrics).map_err(Into::into)
     }
 }
 

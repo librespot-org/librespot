@@ -14,3 +14,6 @@ protobuf = "3"
 
 [build-dependencies]
 protobuf-codegen = "3"
+
+[lints]
+workspace = true

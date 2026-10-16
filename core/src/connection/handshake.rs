@@ -103,19 +103,13 @@ pub async fn handshake<T: AsyncRead + AsyncWrite + Unpin>(
     Ok(codec.framed(connection))
 }
 
-async fn client_hello<T>(connection: &mut T, gc: Vec<u8>) -> io::Result<Vec<u8>>
-where
-    T: AsyncWrite + Unpin,
-{
-    let mut client_nonce = vec![0; 0x10];
-    rand::rng().fill_bytes(&mut client_nonce);
-
-    let platform = match crate::config::OS {
-        "freebsd" | "netbsd" | "openbsd" => match ARCH {
+fn platform_for(os: &str, arch: &str) -> Platform {
+    match os {
+        "freebsd" | "netbsd" | "openbsd" => match arch {
             "x86_64" => Platform::PLATFORM_FREEBSD_X86_64,
             _ => Platform::PLATFORM_FREEBSD_X86,
         },
-        "ios" => match ARCH {
+        "ios" => match arch {
             "aarch64" => Platform::PLATFORM_IPHONE_ARM64,
             _ => Platform::PLATFORM_IPHONE_ARM,
         },
@@ -124,7 +118,7 @@ where
         // all APs will reject the client with TryAnotherAP, no matter the credentials
         // used was obtained via OAuth using KEYMASTER or ANDROID's client ID or
         // Login5Manager::login
-        "linux" | "android" => match ARCH {
+        "linux" | "android" => match arch {
             "arm" | "aarch64" => Platform::PLATFORM_LINUX_ARM,
             "blackfin" => Platform::PLATFORM_LINUX_BLACKFIN,
             "mips" => Platform::PLATFORM_LINUX_MIPS,
@@ -132,18 +126,29 @@ where
             "x86_64" => Platform::PLATFORM_LINUX_X86_64,
             _ => Platform::PLATFORM_LINUX_X86,
         },
-        "macos" => match ARCH {
+        "macos" => match arch {
             "ppc" | "ppc64" => Platform::PLATFORM_OSX_PPC,
             "x86_64" => Platform::PLATFORM_OSX_X86_64,
             _ => Platform::PLATFORM_OSX_X86,
         },
-        "windows" => match ARCH {
-            "arm" | "aarch64" => Platform::PLATFORM_WINDOWS_CE_ARM,
-            "x86_64" => Platform::PLATFORM_WIN32_X86_64,
+        // Spotify APs reject the legacy Windows CE ARM platform even for Premium
+        // accounts. Windows on ARM is a desktop client, so identify it as Win32.
+        "windows" => match arch {
+            "arm" | "aarch64" | "x86_64" => Platform::PLATFORM_WIN32_X86_64,
             _ => Platform::PLATFORM_WIN32_X86,
         },
         _ => Platform::PLATFORM_LINUX_X86,
-    };
+    }
+}
+
+async fn client_hello<T>(connection: &mut T, gc: Vec<u8>) -> io::Result<Vec<u8>>
+where
+    T: AsyncWrite + Unpin,
+{
+    let mut client_nonce = vec![0; 0x10];
+    rand::rng().fill_bytes(&mut client_nonce);
+
+    let platform = platform_for(crate::config::OS, ARCH);
 
     #[cfg(debug_assertions)]
     const PRODUCT_FLAGS: ProductFlags = ProductFlags::PRODUCT_FLAG_DEV_BUILD;
@@ -267,4 +272,31 @@ fn compute_keys(shared_secret: &[u8], packets: &[u8]) -> io::Result<(Vec<u8>, Ve
         data[0x14..0x34].to_vec(),
         data[0x34..0x54].to_vec(),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::platform_for;
+    use crate::protocol::keyexchange::Platform;
+
+    #[test]
+    fn windows_on_arm_uses_supported_desktop_platform() {
+        assert_eq!(
+            platform_for("windows", "aarch64"),
+            Platform::PLATFORM_WIN32_X86_64
+        );
+        assert_eq!(
+            platform_for("windows", "arm"),
+            Platform::PLATFORM_WIN32_X86_64
+        );
+    }
+
+    #[test]
+    fn windows_x86_platforms_are_unchanged() {
+        assert_eq!(
+            platform_for("windows", "x86_64"),
+            Platform::PLATFORM_WIN32_X86_64
+        );
+        assert_eq!(platform_for("windows", "x86"), Platform::PLATFORM_WIN32_X86);
+    }
 }

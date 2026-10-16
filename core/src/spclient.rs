@@ -306,7 +306,7 @@ impl SpClient {
                                 challenge_answer.ChallengeType =
                                     ChallengeType::CHALLENGE_HASH_CASH.into();
 
-                                challenge_answers.state = state.to_string();
+                                challenge_answers.state = state.clone();
                                 challenge_answers.answers.push(challenge_answer);
 
                                 trace!("Answering hash cash challenge");
@@ -347,7 +347,7 @@ impl SpClient {
         };
 
         let granted_token = token_response.granted_token();
-        let access_token = granted_token.token.to_owned();
+        let access_token = granted_token.token.clone();
 
         self.lock(|inner| {
             let client_token = Token {
@@ -422,7 +422,7 @@ impl SpClient {
         let mut headers = headers.unwrap_or_default();
         headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
 
-        self.request(method, endpoint, Some(headers), body.map(|s| s.as_bytes()))
+        self.request(method, endpoint, Some(headers), body.map(str::as_bytes))
             .await
     }
 
@@ -749,7 +749,7 @@ impl SpClient {
 
         let previous_track_str = previous_tracks
             .iter()
-            .map(|track| track.to_base62())
+            .map(SpotifyId::to_base62)
             .collect::<Vec<_>>()
             .join(",");
         // better than checking `previous_tracks.len() > 0` because the `filter_map` could still return 0 items
@@ -952,7 +952,7 @@ impl SpClient {
             &Method::POST,
             &endpoint,
             None,
-            body.as_deref().map(|s| s.as_bytes()),
+            body.as_deref().map(str::as_bytes),
             &NO_METRICS_AND_SALT,
         )
         .await

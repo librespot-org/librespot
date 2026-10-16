@@ -33,10 +33,7 @@ impl_deref_wrapped!(RestrictionCatalogues, Vec<RestrictionCatalogue>);
 
 impl Restriction {
     fn parse_country_codes(country_codes: &str) -> Vec<String> {
-        country_codes
-            .chunks(2)
-            .map(|country_code| country_code.to_owned())
-            .collect()
+        country_codes.chunks(2).map(Into::into).collect()
     }
 }
 
@@ -58,7 +55,7 @@ impl From<&RestrictionMessage> for Restriction {
             catalogues: restriction
                 .catalogue
                 .iter()
-                .map(|c| c.enum_value_or_default())
+                .map(protobuf::EnumOrUnknown::enum_value_or_default)
                 .collect::<Vec<RestrictionCatalogue>>()
                 .as_slice()
                 .into(),
@@ -66,7 +63,7 @@ impl From<&RestrictionMessage> for Restriction {
                 .type_
                 .unwrap_or_default()
                 .enum_value_or_default(),
-            catalogue_strs: restriction.catalogue_str.to_vec(),
+            catalogue_strs: restriction.catalogue_str.clone(),
             countries_allowed,
             countries_forbidden,
         }

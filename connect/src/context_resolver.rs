@@ -142,7 +142,7 @@ impl ContextResolver {
         let last_try = self
             .unavailable_contexts
             .get(&resolve)
-            .map(|i| i.duration_since(Instant::now()));
+            .map(Instant::elapsed);
 
         let last_try = if matches!(last_try, Some(last_try) if last_try > RETRY_UNAVAILABLE) {
             let _ = self.unavailable_contexts.remove(&resolve);

@@ -60,3 +60,6 @@ zbus = { version = "5", default-features = false, features = [
 futures = "0.3"
 hex = "0.4"
 tokio = { version = "1", features = ["macros", "rt"] }
+
+[lints]
+workspace = true
