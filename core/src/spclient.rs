@@ -12,15 +12,18 @@ use crate::{
     error::ErrorKind,
     protocol::{
         autoplay_context_request::AutoplayContextRequest,
+        client_tts::TtsRequest,
         clienttoken_http::{
             ChallengeAnswer, ChallengeType, ClientTokenRequest, ClientTokenRequestType,
             ClientTokenResponse, ClientTokenResponseType,
         },
         connect::PutStateRequest,
         context::Context,
+        context_page::ContextPage,
         extended_metadata::BatchedEntityRequest,
         extended_metadata::{BatchedExtensionResponse, EntityRequest, ExtensionQuery},
         extension_kind::ExtensionKind,
+        tts_resolve::resolve_request::{AudioFormat, TtsProvider, TtsVoice},
     },
     token::Token,
     util,
@@ -30,9 +33,10 @@ use bytes::Bytes;
 use data_encoding::HEXUPPER_PERMISSIVE;
 use futures_util::future::IntoStream;
 use http::{Uri, header::HeaderValue};
+use http_body_util::{BodyExt, Limited};
 use hyper::{
     HeaderMap, Method, Request,
-    header::{ACCEPT, AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, HeaderName, RANGE},
+    header::{ACCEPT, AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, HeaderName, LOCATION, RANGE},
 };
 use hyper_util::client::legacy::ResponseFuture;
 use protobuf::{Enum, EnumOrUnknown, Message, MessageFull};
@@ -811,6 +815,66 @@ impl SpClient {
         self.session().http_client().request_body(request).await
     }
 
+    /// Synthesizes a DJ narration script: 44.1 kHz MP3 in the named voice. The
+    /// service answers with a redirect to the audio, which is fetched up to
+    /// `MAX_NARRATION_BYTES`.
+    pub async fn get_narration(
+        &self,
+        ssml: &str,
+        voice: &str,
+        provider: &str,
+    ) -> Result<Bytes, Error> {
+        let mut tts = TtsRequest::new();
+        tts.set_ssml(ssml.to_string());
+        tts.audio_format = AudioFormat::MP3.into();
+        tts.tts_voice = TtsVoice::from_str(voice).unwrap_or(TtsVoice::VOICE1).into();
+        tts.tts_provider = TtsProvider::from_str(provider)
+            .unwrap_or(TtsProvider::SONANTIC_FAST)
+            .into();
+        tts.sample_rate_hz = 44_100;
+
+        let token = self.session().login5().auth_token().await?;
+        let mut request = Request::builder()
+            .method(&Method::POST)
+            .uri(format!("{}/client-tts/v1/fulfill", self.base_url().await?))
+            .header(
+                CONTENT_TYPE,
+                HeaderValue::from_static("application/x-protobuf"),
+            )
+            .header(
+                AUTHORIZATION,
+                HeaderValue::from_str(&format!("{} {}", token.token_type, token.access_token))?,
+            )
+            .body(Bytes::from(tts.write_to_bytes()?))?;
+        if let Ok(client_token) = self.client_token().await {
+            request
+                .headers_mut()
+                .insert(CLIENT_TOKEN, HeaderValue::from_str(&client_token)?);
+        }
+
+        // Not `request_body`: it treats the redirect that carries the answer as a failure.
+        let response = self.session().http_client().request_fut(request)?.await?;
+        let status = response.status();
+        let url = response
+            .headers()
+            .get(LOCATION)
+            .and_then(|location| location.to_str().ok())
+            .ok_or_else(|| {
+                Error::failed_precondition(format!("narration answered {status} without a url"))
+            })?;
+
+        let request = Request::builder()
+            .method(&Method::GET)
+            .uri(url)
+            .body(Bytes::new())?;
+        let response = self.session().http_client().request(request).await?;
+        let audio = Limited::new(response.into_body(), MAX_NARRATION_BYTES)
+            .collect()
+            .await
+            .map_err(|e| Error::failed_precondition(format!("narration audio: {e}")))?;
+        Ok(audio.to_bytes())
+    }
+
     // Audio preview in 96 kbps MP3, unencrypted
     pub async fn get_audio_preview(&self, preview_id: &FileId) -> SpClientResult {
         const ATTRIBUTE: &str = "audio-preview-url-template";
@@ -877,10 +941,30 @@ impl SpClient {
     ///   - the query result shown by the search expects no query at all
     ///   - uri looks like `spotify:search:never+gonna`
     pub async fn get_context(&self, uri: &str) -> Result<Context, Error> {
-        let uri = format!("/context-resolve/v1/{uri}");
+        self.get_context_at(&format!("/context-resolve/v1/{uri}"))
+            .await
+    }
 
+    /// Resolves a context from an `hm://` url one carries, like the session behind
+    /// DJ's `lexicon_context_url`.
+    pub async fn get_context_url(&self, hm_url: &str) -> Result<Context, Error> {
+        self.get_context_at(lexicon_endpoint(hm_url)?).await
+    }
+
+    /// The next page of a context that streams in pages, like DJ, from the
+    /// `next_page_url` of the last. It answers with the page alone.
+    pub async fn get_context_page(&self, next_page_url: &str) -> Result<ContextPage, Error> {
+        lexicon_endpoint(next_page_url)?;
+        let res = self.get_next_page(next_page_url).await?;
+        let page_json = String::from_utf8(res.to_vec())?;
+        Ok(protobuf_json_mapping::parse_from_str::<ContextPage>(
+            &page_json,
+        )?)
+    }
+
+    async fn get_context_at(&self, endpoint: &str) -> Result<Context, Error> {
         let res = self
-            .request_with_options(&Method::GET, &uri, None, None, &NO_METRICS_AND_SALT)
+            .request_with_options(&Method::GET, endpoint, None, None, &NO_METRICS_AND_SALT)
             .await?;
         let ctx_json = String::from_utf8(res.to_vec())?;
         if ctx_json.is_empty() {
@@ -956,5 +1040,35 @@ impl SpClient {
             &NO_METRICS_AND_SALT,
         )
         .await
+    }
+}
+
+/// Bounds a narration line's audio; real ones are a few hundred kilobytes.
+const MAX_NARRATION_BYTES: usize = 4 * 1024 * 1024;
+
+/// The endpoint of a DJ session url, the only `hm://` urls a context leads to.
+fn lexicon_endpoint(hm_url: &str) -> Result<&str, Error> {
+    hm_url
+        .strip_prefix("hm:/")
+        .filter(|endpoint| {
+            endpoint.starts_with("/lexicon-session-provider/") && !endpoint.contains("..")
+        })
+        .ok_or_else(|| Error::invalid_argument(format!("not a DJ session url: {hm_url}")))
+}
+
+#[cfg(test)]
+mod lexicon_tests {
+    use super::lexicon_endpoint;
+
+    #[test]
+    fn only_dj_session_urls_resolve() {
+        assert_eq!(
+            lexicon_endpoint("hm://lexicon-session-provider/context-resolve/v2/session?x=1")
+                .unwrap(),
+            "/lexicon-session-provider/context-resolve/v2/session?x=1"
+        );
+        assert!(lexicon_endpoint("hm://keymaster/token/authenticated").is_err());
+        assert!(lexicon_endpoint("hm://lexicon-session-provider/../keymaster").is_err());
+        assert!(lexicon_endpoint("https://lexicon-session-provider/").is_err());
     }
 }

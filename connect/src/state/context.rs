@@ -28,6 +28,8 @@ pub struct StateContext {
     pub restrictions: Option<Restrictions>,
     /// is used to keep track which tracks are already loaded into the next_tracks
     pub index: ContextIndex,
+    /// Where the tracks continue, for contexts that stream in pages like DJ.
+    pub next_page_url: Option<String>,
 }
 
 #[derive(Default, Debug, Copy, Clone, PartialEq, Hash, Eq)]
@@ -380,6 +382,7 @@ impl ConnectState {
             restrictions,
             metadata,
             index: ContextIndex::new(),
+            next_page_url: page.next_page_url.filter(|url| !url.is_empty()),
         }
     }
 
@@ -514,7 +517,17 @@ impl ConnectState {
         for t in context.tracks {
             ctx.tracks.push(t)
         }
+        ctx.next_page_url = context.next_page_url.or(ctx.next_page_url.take());
 
         Ok(())
+    }
+
+    /// Hands over where the context continues, once: a page that fails to load
+    /// leaves autoplay to carry on rather than asking for it again.
+    pub fn take_next_page_url(&mut self) -> Option<String> {
+        self.get_context_mut(ContextType::Default)
+            .ok()?
+            .next_page_url
+            .take()
     }
 }

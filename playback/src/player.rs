@@ -29,6 +29,7 @@ use crate::{
     local_file::{LocalFileLookup, create_local_file_lookup},
     metadata::audio::{AudioFileFormat, AudioFiles, AudioItem},
     mixer::VolumeGetter,
+    narration::{self, Narration},
 };
 use futures_util::{
     StreamExt, TryFutureExt, future, future::FusedFuture,
@@ -89,6 +90,9 @@ struct PlayerInternal {
     normalisation_knee_factor: f64,
 
     auto_normalise_as_album: bool,
+    narrations: HashMap<SpotifyUri, Narration>,
+    /// The lines the current track's decoder was built with.
+    playing_narration: Option<Narration>,
 
     player_id: usize,
     play_request_id_generator: SeqGenerator<u64>,
@@ -107,6 +111,10 @@ enum PlayerCommand {
     },
     Preload {
         track_id: SpotifyUri,
+    },
+    SetNarration {
+        track_id: SpotifyUri,
+        narration: Option<Narration>,
     },
     Play,
     Pause,
@@ -311,6 +319,19 @@ pub type PlayerEventChannel = mpsc::UnboundedReceiver<PlayerEvent>;
 #[inline]
 pub fn db_to_ratio(db: f64) -> f64 {
     f64::powf(10.0, db / DB_VOLTAGE_RATIO)
+}
+
+/// The config with `Auto` normalisation settled to what the context asks for.
+fn resolve_auto_normalisation(config: &PlayerConfig, as_album: bool) -> PlayerConfig {
+    let mut config = config.clone();
+    if config.normalisation_type == NormalisationType::Auto {
+        config.normalisation_type = if as_album {
+            NormalisationType::Album
+        } else {
+            NormalisationType::Track
+        };
+    }
+    config
 }
 
 #[inline]
@@ -524,6 +545,8 @@ impl Player {
                 normalisation_knee_factor,
 
                 auto_normalise_as_album: false,
+                narrations: HashMap::new(),
+                playing_narration: None,
 
                 player_id,
                 play_request_id_generator: SeqGenerator::new(0),
@@ -571,6 +594,15 @@ impl Player {
 
     pub fn preload(&self, track_id: SpotifyUri) {
         self.command(PlayerCommand::Preload { track_id });
+    }
+
+    /// Gives a track the DJ lines to speak around it the next time it loads,
+    /// or takes them away. Send it before the `load` or `preload` it is for.
+    pub fn set_narration(&self, track_id: SpotifyUri, narration: Option<Narration>) {
+        self.command(PlayerCommand::SetNarration {
+            track_id,
+            narration,
+        });
     }
 
     pub fn play(&self) {
@@ -935,6 +967,7 @@ struct PlayerTrackLoader {
     session: Session,
     config: PlayerConfig,
     local_file_lookup: Arc<LocalFileLookup>,
+    normalise_as_album: bool,
 }
 
 impl PlayerTrackLoader {
@@ -990,6 +1023,30 @@ impl PlayerTrackLoader {
     }
 
     async fn load_track(
+        &self,
+        track_uri: SpotifyUri,
+        position_ms: u32,
+        narration: Option<Narration>,
+    ) -> Option<PlayerLoadedTrackData> {
+        let mut loaded = self.load_bare_track(track_uri, position_ms).await?;
+        // Passthrough hands on raw Ogg packets, which decoded lines can't sit between.
+        if let Some(narration) = narration.filter(|_| !self.config.passthrough) {
+            let config = resolve_auto_normalisation(&self.config, self.normalise_as_album);
+            let track_factor = NormalisationData::get_factor(&config, loaded.normalisation_data);
+            loaded.decoder = narration::narrate(
+                &self.session,
+                &self.config,
+                &narration,
+                position_ms,
+                track_factor,
+                loaded.decoder,
+            )
+            .await;
+        }
+        Some(loaded)
+    }
+
+    async fn load_bare_track(
         &self,
         track_uri: SpotifyUri,
         position_ms: u32,
@@ -1488,9 +1545,16 @@ impl Future for PlayerInternal {
                                             // Only notify if we're skipped some packets *or* we are behind.
                                             // If we're ahead it's probably due to a buffer of the backend
                                             // and we're actually in time.
+                                            // A DJ line holds the position still while time runs on.
+                                            // That isn't lag: the track's first moving packet
+                                            // corrects it once.
+                                            let held_still = new_stream_position_ms
+                                                == expected_position_ms
+                                                && !packet_position.skipped;
                                             let notify_about_position =
                                                 match *reported_nominal_start_time {
                                                     None => true,
+                                                    Some(_) if held_still => false,
                                                     Some(reported_nominal_start_time) => {
                                                         let mut notify = false;
 
@@ -1902,20 +1966,14 @@ impl PlayerInternal {
         loaded_track: PlayerLoadedTrackData,
         start_playback: bool,
     ) {
+        self.playing_narration = self.narrations.get(&track_id).cloned();
         let audio_item = Box::new(loaded_track.audio_item.clone());
 
         self.send_event(PlayerEvent::TrackChanged { audio_item });
 
         let position_ms = loaded_track.stream_position_ms;
 
-        let mut config = self.config.clone();
-        if config.normalisation_type == NormalisationType::Auto {
-            if self.auto_normalise_as_album {
-                config.normalisation_type = NormalisationType::Album;
-            } else {
-                config.normalisation_type = NormalisationType::Track;
-            }
-        };
+        let config = resolve_auto_normalisation(&self.config, self.auto_normalise_as_album);
         let normalisation_factor =
             NormalisationData::get_factor(&config, loaded_track.normalisation_data);
 
@@ -1969,6 +2027,11 @@ impl PlayerInternal {
         }
     }
 
+    /// Whether the current decoder speaks the lines `track_id` now has, so it can be reused.
+    fn speaks_current_lines(&self, track_id: &SpotifyUri) -> bool {
+        self.narrations.get(track_id) == self.playing_narration.as_ref()
+    }
+
     fn handle_command_load(
         &mut self,
         track_id: SpotifyUri,
@@ -2002,7 +2065,7 @@ impl PlayerInternal {
             ..
         } = &self.state
         {
-            if *previous_track_id == track_id {
+            if *previous_track_id == track_id && self.speaks_current_lines(&track_id) {
                 let mut loaded_track = match mem::replace(&mut self.state, PlayerState::Invalid) {
                     PlayerState::EndOfTrack { loaded_track, .. } => loaded_track,
                     _ => {
@@ -2030,6 +2093,7 @@ impl PlayerInternal {
         }
 
         // Check if we are already playing the track. If so, just do a seek and update our info.
+        let speaks_current_lines = self.speaks_current_lines(&track_id);
         if let PlayerState::Playing {
             track_id: ref current_track_id,
             ref mut stream_position_ms,
@@ -2043,7 +2107,7 @@ impl PlayerInternal {
             ..
         } = self.state
         {
-            if *current_track_id == track_id {
+            if *current_track_id == track_id && speaks_current_lines {
                 // we can use the current decoder. Ensure it's at the correct position.
                 if position_ms != *stream_position_ms {
                     // This may be blocking.
@@ -2215,7 +2279,7 @@ impl PlayerInternal {
             ..
         } = &self.state
         {
-            if *current_track_id == track_id {
+            if *current_track_id == track_id && self.speaks_current_lines(&track_id) {
                 // we already have the requested track loaded.
                 preload_track = false;
             }
@@ -2382,6 +2446,34 @@ impl PlayerInternal {
                 prev_tracks,
             }),
 
+            PlayerCommand::SetNarration {
+                track_id,
+                narration,
+            } => {
+                // A track played twice gets new lines; a preload of it has the old ones.
+                let preloaded = match &self.preload {
+                    PlayerPreload::Loading { track_id: id, .. }
+                    | PlayerPreload::Ready { track_id: id, .. } => *id == track_id,
+                    PlayerPreload::None => false,
+                };
+                if preloaded && self.narrations.get(&track_id) != narration.as_ref() {
+                    self.preload = PlayerPreload::None;
+                }
+                match narration {
+                    Some(narration) => {
+                        // Only the playing and next tracks' lines matter, and those arrive
+                        // right before their loads, so a wholesale clear bounds the map.
+                        if self.narrations.len() >= 16 {
+                            self.narrations.clear();
+                        }
+                        self.narrations.insert(track_id, narration);
+                    }
+                    None => {
+                        self.narrations.remove(&track_id);
+                    }
+                }
+            }
+
             PlayerCommand::EmitFilterExplicitContentChangedEvent(filter) => {
                 self.send_event(PlayerEvent::FilterExplicitContentChanged { filter });
 
@@ -2438,7 +2530,9 @@ impl PlayerInternal {
             session: self.session.clone(),
             config: self.config.clone(),
             local_file_lookup: self.local_file_lookup.clone(),
+            normalise_as_album: self.auto_normalise_as_album,
         };
+        let narration = self.narrations.get(&spotify_uri).cloned();
 
         let (result_tx, result_rx) = oneshot::channel();
 
@@ -2446,7 +2540,7 @@ impl PlayerInternal {
         let handle = tokio::runtime::Handle::current();
 
         let load_handle = thread::spawn(move || {
-            let data = handle.block_on(loader.load_track(spotify_uri, position_ms));
+            let data = handle.block_on(loader.load_track(spotify_uri, position_ms, narration));
             if let Some(data) = data {
                 let _ = result_tx.send(data);
             }
@@ -2537,6 +2631,14 @@ impl fmt::Debug for PlayerCommand {
             PlayerCommand::SetAutoNormaliseAsAlbum(setting) => f
                 .debug_tuple("SetAutoNormaliseAsAlbum")
                 .field(&setting)
+                .finish(),
+            PlayerCommand::SetNarration {
+                track_id,
+                narration,
+            } => f
+                .debug_struct("SetNarration")
+                .field("track_id", &track_id)
+                .field("narration", &narration.is_some())
                 .finish(),
             PlayerCommand::EmitFilterExplicitContentChangedEvent(filter) => f
                 .debug_tuple("EmitFilterExplicitContentChangedEvent")

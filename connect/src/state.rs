@@ -182,7 +182,7 @@ impl ConnectState {
                 supports_set_backend_metadata: false,
                 supports_hifi: MessageField::none(),
                 // that "AI" dj thingy only available to specific regions/users
-                supports_dj: false,
+                supports_dj: true,
                 supports_rooms: false,
                 // AudioQuality::HIFI is available, further investigation necessary
                 supported_audio_quality: EnumOrUnknown::new(AudioQuality::VERY_HIGH),
@@ -498,5 +498,94 @@ impl ConnectState {
             .spclient()
             .put_connect_state_request(&self.request)
             .await
+    }
+}
+
+#[cfg(test)]
+mod dj_tests {
+    use super::*;
+    use crate::protocol::{
+        context::Context, context_page::ContextPage, context_track::ContextTrack,
+    };
+    use std::collections::HashMap;
+
+    const DJ: &str = "spotify:playlist:37i9dQZF1EYkqdzj48dyYq";
+
+    fn state() -> ConnectState {
+        let session = Session::new(Default::default(), None);
+        ConnectState::new(Default::default(), &session)
+    }
+
+    /// One DJ segment: `n` tracks from `start`, the first introduced by the DJ.
+    fn segment(start: usize, n: usize, next: &str) -> ContextPage {
+        ContextPage {
+            tracks: (start..start + n)
+                .map(|i| ContextTrack {
+                    uri: Some(format!("spotify:track:{i:022}")),
+                    uid: Some(format!("dj-{i}")),
+                    metadata: if i == start {
+                        HashMap::from([
+                            (
+                                "narration.intro.ssml".into(),
+                                "<speak>Up next</speak>".into(),
+                            ),
+                            ("narration.intro.voice".into(), "VOICE1".into()),
+                        ])
+                    } else {
+                        HashMap::new()
+                    },
+                    ..Default::default()
+                })
+                .collect(),
+            next_page_url: Some(next.into()),
+            ..Default::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn a_dj_session_continues_page_by_page() {
+        let mut state = state();
+        let first = Context {
+            uri: Some(DJ.into()),
+            pages: vec![segment(0, 15, "hm://lexicon/session/1")],
+            ..Default::default()
+        };
+        state.update_context(first, ContextType::Default).unwrap();
+
+        // Handed over once, so a page that fails to load lets autoplay carry on.
+        assert_eq!(
+            state.take_next_page_url().as_deref(),
+            Some("hm://lexicon/session/1")
+        );
+        assert_eq!(state.take_next_page_url(), None);
+
+        state
+            .fill_context_from_page(segment(15, 15, "hm://lexicon/session/2"))
+            .unwrap();
+        let ctx = state.get_context(ContextType::Default).unwrap();
+        assert_eq!(ctx.tracks.len(), 30);
+        assert_eq!(
+            state.take_next_page_url().as_deref(),
+            Some("hm://lexicon/session/2")
+        );
+    }
+
+    #[tokio::test]
+    async fn tracks_carry_the_lines_the_dj_speaks_around_them() {
+        let mut state = state();
+        let first = Context {
+            uri: Some(DJ.into()),
+            pages: vec![segment(0, 3, "hm://lexicon/session/1")],
+            ..Default::default()
+        };
+        state.update_context(first, ContextType::Default).unwrap();
+        state.set_current_track(0).unwrap();
+        state.reset_playback_to_position(Some(0)).unwrap();
+
+        let narration = state.current_narration().unwrap();
+        assert_eq!(narration["narration.intro.voice"], "VOICE1");
+        assert!(narration.keys().all(|key| key.starts_with("narration.")));
+        // The next track has nothing to say.
+        assert_eq!(state.preview_next_track().unwrap().1, None);
     }
 }
