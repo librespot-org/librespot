@@ -741,7 +741,7 @@ async fn get_setup() -> Setup {
             env_vars
                 .iter()
                 .find(|(k, _)| stripped_env_key(k) == opt)
-                .map(|(_, v)| v.to_string())
+                .map(|(_, v)| v.clone())
         }
     };
 
