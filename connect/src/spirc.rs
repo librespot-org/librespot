@@ -96,6 +96,7 @@ struct SpircTask {
     context_resolver: ContextResolver,
 
     emit_set_queue_events: bool,
+    cluster_listener: Option<mpsc::UnboundedSender<Cluster>>,
 
     shutdown: bool,
     session: Session,
@@ -177,6 +178,7 @@ impl Spirc {
         debug!("new Spirc[{spirc_id}]");
 
         let emit_set_queue_events = config.emit_set_queue_events;
+        let cluster_listener = config.cluster_listener.clone();
         let connect_state = ConnectState::new(config, &session);
 
         let connection_id_update = session
@@ -254,6 +256,7 @@ impl Spirc {
             context_resolver: ContextResolver::new(session.clone()),
 
             emit_set_queue_events,
+            cluster_listener,
 
             shutdown: false,
             session,
@@ -924,6 +927,7 @@ impl SpircTask {
         );
 
         self.connect_established = true;
+        self.forward_cluster(&cluster);
 
         let same_session = cluster.player_state.session_id == self.session.session_id()
             || cluster.player_state.session_id.is_empty();
@@ -1012,6 +1016,8 @@ impl SpircTask {
         );
 
         if let Some(cluster) = cluster_update.cluster.take() {
+            self.forward_cluster(&cluster);
+
             let became_inactive = self.connect_state.is_active()
                 && cluster.active_device_id != self.session.device_id();
             if became_inactive {
@@ -1921,10 +1927,22 @@ impl SpircTask {
 
         self.connect_state.set_now(self.now_ms() as u64);
 
-        self.connect_state
-            .send_state(&self.session)
-            .await
-            .map(|_| ())
+        let response = self.connect_state.send_state(&self.session).await?;
+        // the dealer only pushes changes made by other devices, so the answer is the only way
+        // to learn of this device's own; once inactive the answer can predate the takeover
+        if self.cluster_listener.is_some() && self.connect_state.is_active() {
+            match <Cluster as protobuf::Message>::parse_from_bytes(&response) {
+                Ok(cluster) => self.forward_cluster(&cluster),
+                Err(why) => debug!("couldn't parse the cluster in the state's answer: {why}"),
+            }
+        }
+        Ok(())
+    }
+
+    fn forward_cluster(&self, cluster: &Cluster) {
+        if let Some(listener) = &self.cluster_listener {
+            let _ = listener.send(cluster.clone());
+        }
     }
 
     fn set_volume(&mut self, volume: u16) {

@@ -92,6 +92,11 @@ pub struct ConnectConfig {
     pub volume_steps: u16,
     /// Emit `SetQueue` player events when the queue changes (default: false)
     pub emit_set_queue_events: bool,
+    /// Receives the account's cluster, its devices and what plays on them, whenever the
+    /// device learns of a change: on connecting, when another device changes it, and in the
+    /// answer to the device's own state updates while it is the active device (default: None)
+    pub cluster_listener:
+        Option<tokio::sync::mpsc::UnboundedSender<crate::protocol::connect::Cluster>>,
 }
 
 impl Default for ConnectConfig {
@@ -104,6 +109,7 @@ impl Default for ConnectConfig {
             disable_volume: false,
             volume_steps: 64,
             emit_set_queue_events: false,
+            cluster_listener: None,
         }
     }
 }
