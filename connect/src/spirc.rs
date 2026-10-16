@@ -6,7 +6,7 @@ use crate::{
         authentication::Credentials,
         dealer::{
             manager::{BoxedStream, BoxedStreamResult, Reply, RequestReply},
-            protocol::{Command, FallbackWrapper, Message, Request},
+            protocol::{Command, FallbackWrapper, Message, Request, TransferOptions},
         },
         session::UserAttributes,
         spclient::TransferRequest,
@@ -42,7 +42,10 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use thiserror::Error;
-use tokio::{sync::mpsc, time::sleep};
+use tokio::{
+    sync::{mpsc, oneshot},
+    time::{Instant as TokioInstant, sleep, sleep_until},
+};
 
 #[derive(Debug, Error)]
 enum SpircError {
@@ -102,6 +105,13 @@ struct SpircTask {
 
     /// is set when transferring, and used after resolving the contexts to finish the transfer
     pub transfer_state: Option<TransferState>,
+    /// The active device in the latest cluster.
+    active_device_id: String,
+    /// A transfer this device requested, answered once its target is active.
+    pending_transfer_to: Option<PendingTransfer>,
+    transfer_requests: u64,
+    background_tx: mpsc::UnboundedSender<Background>,
+    background_rx: mpsc::UnboundedReceiver<Background>,
 
     /// when set to true, it will update the volume after [VOLUME_UPDATE_DELAY],
     /// when no other future resolves, otherwise resets the delay
@@ -129,11 +139,17 @@ enum SpircCommand {
     Shuffle(bool),
     Repeat(bool),
     RepeatTrack(bool),
-    Disconnect { pause: bool },
+    Disconnect {
+        pause: bool,
+    },
     SetPosition(u32),
     SetVolume(u16),
     Activate,
     Transfer(Option<TransferRequest>),
+    TransferTo {
+        target: String,
+        reply: oneshot::Sender<Result<(), Error>>,
+    },
     Load(LoadRequest),
     AddToQueue(SpotifyUri),
     ClearQueue,
@@ -145,6 +161,22 @@ const CONTEXT_FETCH_THRESHOLD: usize = 2;
 const VOLUME_UPDATE_DELAY: Duration = Duration::from_millis(500);
 // to reduce updates to remote, we group some request by waiting for a set amount of time
 const UPDATE_STATE_DELAY: Duration = Duration::from_millis(200);
+// how long a transfer target may take to become the active device, as the official clients wait
+const BECOME_ACTIVE_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// A transfer this device requested, answered once its target is active.
+struct PendingTransfer {
+    /// Tells this request's outcome apart from an earlier one to the same target.
+    id: u64,
+    target: String,
+    reply: oneshot::Sender<Result<(), Error>>,
+    deadline: TokioInstant,
+}
+
+/// Results of requests the task runs off its loop, so HTTP never stalls it.
+enum Background {
+    TransferFailed { id: u64, error: Error },
+}
 
 /// The spotify connect handle
 pub struct Spirc {
@@ -229,6 +261,7 @@ impl Spirc {
 
         let player_events = player.get_player_event_channel();
 
+        let (background_tx, background_rx) = mpsc::unbounded_channel();
         let mut task = SpircTask {
             player,
             mixer,
@@ -259,6 +292,11 @@ impl Spirc {
             session,
 
             transfer_state: None,
+            active_device_id: String::new(),
+            pending_transfer_to: None,
+            transfer_requests: 0,
+            background_tx,
+            background_rx,
             update_volume: false,
             update_state: false,
 
@@ -447,6 +485,26 @@ impl Spirc {
             .commands
             .send(SpircCommand::Transfer(transfer_request))?)
     }
+
+    /// Hands playback to another device through the Connect transfer flow, the
+    /// way the official clients do: a state change not yet published is sent
+    /// first, so the target resumes exactly where playback is, then the transfer
+    /// is requested. Works from this device, or between two other devices.
+    ///
+    /// The receiver resolves when the target is the active device, or with an
+    /// error when the request fails, a newer transfer replaces it, or the target
+    /// doesn't become active within 30 seconds.
+    pub fn transfer_to(
+        &self,
+        device_id: impl Into<String>,
+    ) -> Result<oneshot::Receiver<Result<(), Error>>, Error> {
+        let (reply, receiver) = oneshot::channel();
+        self.commands.send(SpircCommand::TransferTo {
+            target: device_id.into(),
+            reply,
+        })?;
+        Ok(receiver)
+    }
 }
 
 impl SpircTask {
@@ -482,6 +540,10 @@ impl SpircTask {
             // when state and volume update have a higher priority than context resolving
             // because of that the context resolving has to wait, so that the other tasks can finish
             let allow_context_resolving = !self.update_state && !self.update_volume;
+            let transfer_deadline = self
+                .pending_transfer_to
+                .as_ref()
+                .map(|pending| pending.deadline);
 
             tokio::select! {
                 // startup of the dealer requires a connection_id, which is retrieved at the very beginning
@@ -549,6 +611,17 @@ impl SpircTask {
                         error!("could not dispatch player event: {e}");
                     }
                 },
+                background = self.background_rx.recv() => if let Some(background) = background {
+                    self.handle_background(background);
+                },
+                _ = async { sleep_until(transfer_deadline.unwrap_or_else(TokioInstant::now)).await }, if transfer_deadline.is_some() => {
+                    if let Some(PendingTransfer { target, reply, .. }) = self.pending_transfer_to.take() {
+                        warn!("transfer target <{target}> did not become active");
+                        let _ = reply.send(Err(Error::deadline_exceeded(format!(
+                            "{target} did not become the active device"
+                        ))));
+                    }
+                },
                 _ = async { sleep(UPDATE_STATE_DELAY).await }, if self.update_state => {
                     self.update_state = false;
 
@@ -614,6 +687,93 @@ impl SpircTask {
         };
 
         self.session.dealer().close().await;
+    }
+
+    /// Answers the pending transfer once the cluster shows its target active.
+    fn resolve_pending_transfer(&mut self) {
+        let arrived = matches!(
+            &self.pending_transfer_to,
+            Some(pending) if pending.target == self.active_device_id
+        );
+        if arrived {
+            if let Some(PendingTransfer { target, reply, .. }) = self.pending_transfer_to.take() {
+                debug!("transfer to <{target}> completed");
+                let _ = reply.send(Ok(()));
+            }
+        }
+    }
+
+    async fn handle_transfer_to(
+        &mut self,
+        target: String,
+        reply: oneshot::Sender<Result<(), Error>>,
+    ) {
+        // A newer transfer replaces an older one, whatever becomes of it.
+        if let Some(PendingTransfer {
+            target: replaced,
+            reply: previous,
+            ..
+        }) = self.pending_transfer_to.take()
+        {
+            // Cancelled, not Aborted: Aborted also reports dropped connections.
+            let _ = previous.send(Err(Error::cancelled(format!(
+                "the transfer to {replaced} was replaced by one to {target}"
+            ))));
+        }
+        let from = if self.connect_state.is_active() {
+            self.session.device_id().to_string()
+        } else {
+            self.active_device_id.clone()
+        };
+        if from == target {
+            let _ = reply.send(Ok(()));
+            return;
+        }
+        if from.is_empty() {
+            let _ = reply.send(Err(Error::failed_precondition(
+                "no active device to transfer from",
+            )));
+            return;
+        }
+        // The target resumes from the published state. Changes are published as
+        // they happen, and Spotify moves the position on from the published
+        // timestamp; only a change still waiting to be published needs sending
+        // before the transfer is requested.
+        if self.connect_state.is_active() && self.update_state {
+            self.update_state = false;
+            if let Err(why) = self.notify().await {
+                warn!("couldn't publish the state before transferring: {why}");
+            }
+        }
+        // Answered by the cluster update that shows the target active, which may
+        // arrive before the request's own response.
+        self.transfer_requests += 1;
+        let id = self.transfer_requests;
+        self.pending_transfer_to = Some(PendingTransfer {
+            id,
+            target: target.clone(),
+            reply,
+            deadline: TokioInstant::now() + BECOME_ACTIVE_TIMEOUT,
+        });
+        let request = TransferRequest {
+            transfer_options: TransferOptions {
+                restore_paused: Some("restore".into()),
+                restore_position: Some("extrapolate".into()),
+                restore_track: Some("only_current".into()),
+                retain_session: None,
+            },
+        };
+        let session = self.session.clone();
+        let background = self.background_tx.clone();
+        self.session.spawn(async move {
+            if let Err(error) = session
+                .spclient()
+                .transfer(&from, &target, Some(&request))
+                .await
+            {
+                let _ = background.send(Background::TransferFailed { id, error });
+            }
+        });
     }
 
     fn handle_next_context(&mut self, next_context: Result<Context, Error>) -> bool {
@@ -720,12 +880,38 @@ impl SpircTask {
                     rx.close()
                 }
             }
+            SpircCommand::TransferTo { target, reply } => {
+                self.handle_transfer_to(target, reply).await;
+                return Ok(());
+            }
             SpircCommand::Transfer(request) if !self.connect_state.is_active() => {
-                let device_id = self.session.device_id();
-                self.session
-                    .spclient()
-                    .transfer(device_id, device_id, request.as_ref())
-                    .await?;
+                // Spotify answers the request only after this task has handled the
+                // transfer it sends back over the dealer, so the request can't be
+                // awaited here. Pull from the active device, as the official
+                // clients do.
+                let to = self.session.device_id().to_string();
+                let from = if self.active_device_id.is_empty() {
+                    to.clone()
+                } else {
+                    self.active_device_id.clone()
+                };
+                let session = self.session.clone();
+                self.session.spawn(async move {
+                    let mut result = session
+                        .spclient()
+                        .transfer(&from, &to, request.as_ref())
+                        .await;
+                    // The cluster's active device may be gone: ask as this device.
+                    if result.is_err() && from != to {
+                        result = session
+                            .spclient()
+                            .transfer(&to, &to, request.as_ref())
+                            .await;
+                    }
+                    if let Err(why) = result {
+                        warn!("transfer to this device failed: {why}");
+                    }
+                });
                 return Ok(());
             }
             SpircCommand::Activate if !self.connect_state.is_active() => {
@@ -917,6 +1103,8 @@ impl SpircTask {
             }
         }
         .ok_or(SpircError::FailedDealerSetup)?;
+        self.active_device_id = cluster.active_device_id.clone();
+        self.resolve_pending_transfer();
 
         debug!(
             "successfully put connect state for {} with connection-id {connection_id}",
@@ -999,6 +1187,19 @@ impl SpircTask {
         }
     }
 
+    fn handle_background(&mut self, background: Background) {
+        match background {
+            Background::TransferFailed { id, error } => {
+                let failed = matches!(&self.pending_transfer_to, Some(pending) if pending.id == id);
+                if failed {
+                    if let Some(PendingTransfer { reply, .. }) = self.pending_transfer_to.take() {
+                        let _ = reply.send(Err(error));
+                    }
+                }
+            }
+        }
+    }
+
     async fn handle_cluster_update(
         &mut self,
         mut cluster_update: ClusterUpdate,
@@ -1012,6 +1213,8 @@ impl SpircTask {
         );
 
         if let Some(cluster) = cluster_update.cluster.take() {
+            self.active_device_id = cluster.active_device_id.clone();
+            self.resolve_pending_transfer();
             let became_inactive = self.connect_state.is_active()
                 && cluster.active_device_id != self.session.device_id();
             if became_inactive {

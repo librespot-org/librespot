@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [connect] Add method `clear_queue` to `Spirc` to remove all manually queued tracks
 - [playback] Add `SetQueue` player event, emitting when the queue changes (context loaded, track added to queue, or queue set via Spotify Connect). Gated behind `ConnectConfig::emit_set_queue_events`
 - [examples] Obtain an access token via OAuth to establish a new session and retrieve the stored credentials
+- [connect] Add method `transfer_to` to `Spirc` to hand playback to another device and wait until it is active
 
 ### Changed
 
@@ -36,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [core] Try all resolved addresses for the dealer connection instead of failing after the first one.
 - [core] Corrected discovery retry uptime limit to be 1 minute instead of 1 second
 - [audio] Try the next CDN URL when a fetch returns a non-206 status instead of only retrying on transport errors, fixing playback failures when the first CDN URL is reachable but does not stream audio.
+- [connect] Take playback from another device in a fraction of a second, because `Spirc::transfer` no longer waits on its own request, which Spotify answers only after librespot handled the transfer
 
 ## [0.8.0] - 2025-11-10
 
