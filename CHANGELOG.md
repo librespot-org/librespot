@@ -7,16 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- [connect] Picking a track in a list plays that track: an empty `track_uri` (or `track_uid`) sent next to the one that identifies the track is ignored, instead of failing to resolve and playing the first track of the context
+
+### Added
+
+- [connect] Add method `add_to_queue` to `Spirc` to add tracks, episodes, albums and playlists to the queue
+- [connect] Add method `clear_queue` to `Spirc` to remove all manually queued tracks
+- [playback] Add `SetQueue` player event, emitting when the queue changes (context loaded, track added to queue, or queue set via Spotify Connect). Gated behind `ConnectConfig::emit_set_queue_events`
+- [examples] Obtain an access token via OAuth to establish a new session and retrieve the stored credentials
+
 ### Changed
 
 - [core] Made `SpotifyId::to_base62`, `SpotifyId::to_base16`, `FileId::to_base16`, `SpotifyUri::to_id`, `SpotifyUri::to_uri` infallible (breaking)
 
 ### Fixed
 
+- [core] Pass on dealer messages that carry plain JSON, such as collection updates, instead of dropping them with a base64 warning
+- [core] Fixed AP login on Windows on ARM by using the supported desktop platform identifier
+- [audio] Fixed integer overflow in throughput calculation
 - [main] Fixed `--volume-ctrl fixed` not disabling volume control
 - [core] Fix default permissions on credentials file and warn user if file is world readable
 - [core] Try all resolved addresses for the dealer connection instead of failing after the first one.
 - [core] Corrected discovery retry uptime limit to be 1 minute instead of 1 second
+- [audio] Try the next CDN URL when a fetch returns a non-206 status instead of only retrying on transport errors, fixing playback failures when the first CDN URL is reachable but does not stream audio.
 
 ## [0.8.0] - 2025-11-10
 

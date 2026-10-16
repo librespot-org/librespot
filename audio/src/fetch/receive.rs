@@ -120,8 +120,8 @@ async fn receive_data(
     if measure_throughput {
         let duration = Instant::now().duration_since(request_time).as_millis();
         if actual_length > 0 && duration > 0 {
-            let throughput = ONE_SECOND.as_millis() as usize * actual_length / duration as usize;
-            file_data_tx.send(ReceivedData::Throughput(throughput))?;
+            let throughput = ONE_SECOND.as_millis() * actual_length as u128 / duration;
+            file_data_tx.send(ReceivedData::Throughput(throughput as usize))?;
         }
     }
 

@@ -90,6 +90,8 @@ pub struct ConnectConfig {
     pub disable_volume: bool,
     /// Number of incremental steps (default: 64)
     pub volume_steps: u16,
+    /// Emit `SetQueue` player events when the queue changes (default: false)
+    pub emit_set_queue_events: bool,
 }
 
 impl Default for ConnectConfig {
@@ -101,6 +103,7 @@ impl Default for ConnectConfig {
             initial_volume: u16::MAX / 2,
             disable_volume: false,
             volume_steps: 64,
+            emit_set_queue_events: false,
         }
     }
 }
