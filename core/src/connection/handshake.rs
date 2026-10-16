@@ -148,7 +148,7 @@ where
     let mut client_nonce = vec![0; 0x10];
     rand::rng().fill_bytes(&mut client_nonce);
 
-    let platform = platform_for(crate::config::OS, ARCH);
+    let platform = platform_for(crate::config::os(), ARCH);
 
     #[cfg(debug_assertions)]
     const PRODUCT_FLAGS: ProductFlags = ProductFlags::PRODUCT_FLAG_DEV_BUILD;
