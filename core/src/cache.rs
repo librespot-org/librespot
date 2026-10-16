@@ -6,7 +6,7 @@ use std::{
     fs::{self, File},
     io::{self, Read, Write},
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, PoisonError},
     time::SystemTime,
 };
 
@@ -263,6 +263,7 @@ impl FsSizeLimiter {
 #[derive(Clone)]
 pub struct Cache {
     credentials_location: Option<PathBuf>,
+    memory_credentials: Option<Arc<Mutex<Option<Credentials>>>>,
     volume_location: Option<PathBuf>,
     audio_location: Option<PathBuf>,
     size_limiter: Option<Arc<FsSizeLimiter>>,
@@ -304,6 +305,7 @@ impl Cache {
 
         let cache = Cache {
             credentials_location,
+            memory_credentials: None,
             volume_location,
             audio_location,
             size_limiter,
@@ -312,7 +314,26 @@ impl Cache {
         Ok(cache)
     }
 
+    /// Keep credentials only in memory, shared by clones of this cache.
+    ///
+    /// This disables credential file reads and writes, even when `new` was
+    /// given a credential directory. Volume and audio caching are unchanged.
+    /// Applications can read the reusable credential after connecting and
+    /// persist it in their own protected store. Existing files are not removed;
+    /// migrating or deleting them remains the application's responsibility.
+    pub fn with_memory_credentials(mut self) -> Self {
+        self.credentials_location = None;
+        self.memory_credentials = Some(Arc::new(Mutex::new(None)));
+        self
+    }
+
     pub fn credentials(&self) -> Option<Credentials> {
+        if let Some(credentials) = &self.memory_credentials {
+            return credentials
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .clone();
+        }
         let location = self.credentials_location.as_ref()?;
 
         // This closure is just convencience to enable the question mark operator
@@ -341,6 +362,10 @@ impl Cache {
     }
 
     pub fn save_credentials(&self, cred: &Credentials) {
+        if let Some(credentials) = &self.memory_credentials {
+            *credentials.lock().unwrap_or_else(PoisonError::into_inner) = Some(cred.clone());
+            return;
+        }
         if let Some(location) = &self.credentials_location {
             let mut file = File::options();
             #[cfg(unix)]
@@ -454,6 +479,39 @@ mod test {
 
     fn ordered_time(v: u64) -> SystemTime {
         SystemTime::UNIX_EPOCH + Duration::from_secs(v)
+    }
+
+    #[test]
+    fn memory_credentials_share_updates_without_reading_or_writing_files() {
+        let root = std::env::temp_dir().join(format!(
+            "librespot-memory-credentials-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let disk = Cache::new(Some(&root), Some(&root), None, None).unwrap();
+        let original = Credentials::with_password("dummy-old-user", "dummy-old-grant");
+        disk.save_credentials(&original);
+        let original_file = fs::read(root.join("credentials.json")).unwrap();
+        let memory = disk.clone().with_memory_credentials();
+        assert!(memory.credentials().is_none());
+        let clone = memory.clone();
+        let updated = Credentials::with_password("dummy-new-user", "dummy-new-grant");
+        clone.save_credentials(&updated);
+        assert_eq!(memory.credentials(), Some(updated));
+        assert_eq!(
+            fs::read(root.join("credentials.json")).unwrap(),
+            original_file
+        );
+        assert_eq!(disk.credentials(), Some(original));
+        memory.save_volume(1234);
+        assert_eq!(disk.volume(), Some(1234));
+        fs::remove_file(root.join("credentials.json")).unwrap();
+        memory.save_credentials(&Credentials::with_access_token("dummy-token"));
+        assert!(!root.join("credentials.json").exists());
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

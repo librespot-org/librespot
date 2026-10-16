@@ -306,7 +306,7 @@ impl SpClient {
                                 challenge_answer.ChallengeType =
                                     ChallengeType::CHALLENGE_HASH_CASH.into();
 
-                                challenge_answers.state = state.to_string();
+                                challenge_answers.state = state.clone();
                                 challenge_answers.answers.push(challenge_answer);
 
                                 trace!("Answering hash cash challenge");
@@ -347,7 +347,7 @@ impl SpClient {
         };
 
         let granted_token = token_response.granted_token();
-        let access_token = granted_token.token.to_owned();
+        let access_token = granted_token.token.clone();
 
         self.lock(|inner| {
             let client_token = Token {

@@ -44,7 +44,14 @@ pub enum HandshakeError {
     InvalidLength,
     #[error("server key verification failed")]
     VerificationFailed,
+    #[error("invalid handshake packet size {0}")]
+    InvalidPacketSize(usize),
 }
+
+// The size that prefixes a handshake packet counts its own four bytes. The
+// server's response holds a few keys and signatures, so anything near this
+// size is not a handshake packet, and it arrives before the server is verified.
+const MAX_HANDSHAKE_PACKET_SIZE: usize = 64 * 1024;
 
 pub async fn handshake<T: AsyncRead + AsyncWrite + Unpin>(
     mut connection: T,
@@ -103,19 +110,13 @@ pub async fn handshake<T: AsyncRead + AsyncWrite + Unpin>(
     Ok(codec.framed(connection))
 }
 
-async fn client_hello<T>(connection: &mut T, gc: Vec<u8>) -> io::Result<Vec<u8>>
-where
-    T: AsyncWrite + Unpin,
-{
-    let mut client_nonce = vec![0; 0x10];
-    rand::rng().fill_bytes(&mut client_nonce);
-
-    let platform = match crate::config::OS {
-        "freebsd" | "netbsd" | "openbsd" => match ARCH {
+fn platform_for(os: &str, arch: &str) -> Platform {
+    match os {
+        "freebsd" | "netbsd" | "openbsd" => match arch {
             "x86_64" => Platform::PLATFORM_FREEBSD_X86_64,
             _ => Platform::PLATFORM_FREEBSD_X86,
         },
-        "ios" => match ARCH {
+        "ios" => match arch {
             "aarch64" => Platform::PLATFORM_IPHONE_ARM64,
             _ => Platform::PLATFORM_IPHONE_ARM,
         },
@@ -124,7 +125,7 @@ where
         // all APs will reject the client with TryAnotherAP, no matter the credentials
         // used was obtained via OAuth using KEYMASTER or ANDROID's client ID or
         // Login5Manager::login
-        "linux" | "android" => match ARCH {
+        "linux" | "android" => match arch {
             "arm" | "aarch64" => Platform::PLATFORM_LINUX_ARM,
             "blackfin" => Platform::PLATFORM_LINUX_BLACKFIN,
             "mips" => Platform::PLATFORM_LINUX_MIPS,
@@ -132,18 +133,29 @@ where
             "x86_64" => Platform::PLATFORM_LINUX_X86_64,
             _ => Platform::PLATFORM_LINUX_X86,
         },
-        "macos" => match ARCH {
+        "macos" => match arch {
             "ppc" | "ppc64" => Platform::PLATFORM_OSX_PPC,
             "x86_64" => Platform::PLATFORM_OSX_X86_64,
             _ => Platform::PLATFORM_OSX_X86,
         },
-        "windows" => match ARCH {
-            "arm" | "aarch64" => Platform::PLATFORM_WINDOWS_CE_ARM,
-            "x86_64" => Platform::PLATFORM_WIN32_X86_64,
+        // Spotify APs reject the legacy Windows CE ARM platform even for Premium
+        // accounts. Windows on ARM is a desktop client, so identify it as Win32.
+        "windows" => match arch {
+            "arm" | "aarch64" | "x86_64" => Platform::PLATFORM_WIN32_X86_64,
             _ => Platform::PLATFORM_WIN32_X86,
         },
         _ => Platform::PLATFORM_LINUX_X86,
-    };
+    }
+}
+
+async fn client_hello<T>(connection: &mut T, gc: Vec<u8>) -> io::Result<Vec<u8>>
+where
+    T: AsyncWrite + Unpin,
+{
+    let mut client_nonce = vec![0; 0x10];
+    rand::rng().fill_bytes(&mut client_nonce);
+
+    let platform = platform_for(crate::config::OS, ARCH);
 
     #[cfg(debug_assertions)]
     const PRODUCT_FLAGS: ProductFlags = ProductFlags::PRODUCT_FLAG_DEV_BUILD;
@@ -228,9 +240,20 @@ where
 {
     let header = read_into_accumulator(connection, 4, acc).await?;
     let size = BigEndian::read_u32(header) as usize;
-    let data = read_into_accumulator(connection, size - 4, acc).await?;
+    let data = read_into_accumulator(connection, packet_body_size(size)?, acc).await?;
     let message = M::parse_from_bytes(data)?;
     Ok(message)
+}
+
+fn packet_body_size(size: usize) -> io::Result<usize> {
+    size.checked_sub(4)
+        .filter(|_| size <= MAX_HANDSHAKE_PACKET_SIZE)
+        .ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                HandshakeError::InvalidPacketSize(size),
+            )
+        })
 }
 
 async fn read_into_accumulator<'b, T: AsyncRead + Unpin>(
@@ -267,4 +290,66 @@ fn compute_keys(shared_secret: &[u8], packets: &[u8]) -> io::Result<(Vec<u8>, Ve
         data[0x14..0x34].to_vec(),
         data[0x34..0x54].to_vec(),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io;
+
+    use super::{APResponseMessage, MAX_HANDSHAKE_PACKET_SIZE, platform_for, recv_packet};
+    use crate::protocol::keyexchange::Platform;
+
+    async fn recv_with_size(size: u32) -> (io::Result<APResponseMessage>, usize) {
+        let mut stream = size.to_be_bytes().to_vec();
+        stream.extend_from_slice(&[0; 16]);
+        let mut acc = Vec::new();
+        let result = recv_packet(&mut stream.as_slice(), &mut acc).await;
+        (result, acc.len())
+    }
+
+    #[tokio::test]
+    async fn packet_sizes_below_the_header_are_rejected() {
+        for size in [0, 3] {
+            let (result, _) = recv_with_size(size).await;
+            let err = result.expect_err("a size below four bytes must fail");
+            assert_eq!(err.kind(), io::ErrorKind::InvalidData, "size {size}");
+        }
+    }
+
+    #[tokio::test]
+    async fn packet_sizes_over_the_limit_are_rejected_before_allocating() {
+        let size = (MAX_HANDSHAKE_PACKET_SIZE + 1) as u32;
+        let (result, accumulated) = recv_with_size(size).await;
+        let err = result.expect_err("an oversized packet must fail");
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+        assert_eq!(accumulated, 4, "only the size header is buffered");
+    }
+
+    #[tokio::test]
+    async fn an_empty_packet_is_read() {
+        let (result, accumulated) = recv_with_size(4).await;
+        result.expect("a packet holding only its size is valid");
+        assert_eq!(accumulated, 4);
+    }
+
+    #[test]
+    fn windows_on_arm_uses_supported_desktop_platform() {
+        assert_eq!(
+            platform_for("windows", "aarch64"),
+            Platform::PLATFORM_WIN32_X86_64
+        );
+        assert_eq!(
+            platform_for("windows", "arm"),
+            Platform::PLATFORM_WIN32_X86_64
+        );
+    }
+
+    #[test]
+    fn windows_x86_platforms_are_unchanged() {
+        assert_eq!(
+            platform_for("windows", "x86_64"),
+            Platform::PLATFORM_WIN32_X86_64
+        );
+        assert_eq!(platform_for("windows", "x86"), Platform::PLATFORM_WIN32_X86);
+    }
 }
