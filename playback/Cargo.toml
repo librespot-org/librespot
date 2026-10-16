@@ -75,8 +75,8 @@ libpulse-binding = { version = "2", optional = true, default-features = false }
 libpulse-simple-binding = { version = "2", optional = true, default-features = false }
 
 # Rodio dependencies
-cpal = { version = "0.16", optional = true }
-rodio = { version = "0.21", optional = true, default-features = false, features = [
+cpal = { version = "0.17", optional = true }
+rodio = { version = "0.22", optional = true, default-features = false, features = [
     "playback",
 ] }
 

@@ -29,7 +29,7 @@ include = [
 ]
 
 [workspace.package]
-rust-version = "1.85"
+rust-version = "1.87"
 authors = ["Librespot Org"]
 license = "MIT"
 repository = "https://github.com/librespot-org/librespot"
