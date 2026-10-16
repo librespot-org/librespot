@@ -8,6 +8,8 @@
 //! and spawns an http server to answer requests of Spotify clients.
 
 mod avahi;
+#[cfg(feature = "with-avahi")]
+mod ifaddrs;
 mod server;
 
 use std::{
@@ -180,6 +182,7 @@ const TXT_RECORD: [&str; 2] = ["VERSION=1.0", "CPath=/"];
 #[cfg(feature = "with-avahi")]
 async fn avahi_task(
     name: Cow<'static, str>,
+    zeroconf_ip: Vec<std::net::IpAddr>,
     port: u16,
     entry_group: &mut Option<avahi::EntryGroupProxy<'_>>,
 ) -> Result<(), DiscoveryError> {
@@ -240,21 +243,46 @@ async fn avahi_task(
             .receive_state_changed()
             .await?;
 
-        entry_group
-            .as_mut()
-            .unwrap()
-            .add_service(
-                -1, // AVAHI_IF_UNSPEC
-                -1, // IPv4 and IPv6
-                0,  // flags
-                &name,
-                DNS_SD_SERVICE_NAME, // type
-                "",                  // domain: let the server choose
-                "",                  // host: let the server choose
-                port,
-                &TXT_RECORD.map(|s| s.as_bytes()),
-            )
-            .await?;
+        let interface_indices = if zeroconf_ip.is_empty() {
+            vec![-1] // AVAHI_IF_UNSPEC
+        } else {
+            match ifaddrs::if_indices_for_ips(&zeroconf_ip) {
+                Ok(indices) if !indices.is_empty() => indices,
+                Ok(_) => {
+                    log::warn!(
+                        "No Avahi interfaces matched configured zeroconf IP(s) {:?}; advertising on all interfaces instead",
+                        zeroconf_ip
+                    );
+                    vec![-1]
+                }
+                Err(error) => {
+                    log::warn!(
+                        "Failed to resolve Avahi interfaces for configured zeroconf IP(s) {:?}: {}; advertising on all interfaces instead",
+                        zeroconf_ip,
+                        error
+                    );
+                    vec![-1]
+                }
+            }
+        };
+
+        for interface_index in interface_indices {
+            entry_group
+                .as_mut()
+                .unwrap()
+                .add_service(
+                    interface_index,
+                    -1, // IPv4 and IPv6
+                    0,  // flags
+                    &name,
+                    DNS_SD_SERVICE_NAME, // type
+                    "",                  // domain: let the server choose
+                    "",                  // host: let the server choose
+                    port,
+                    &TXT_RECORD.map(str::as_bytes),
+                )
+                .await?;
+        }
 
         entry_group.as_mut().unwrap().commit().await?;
         log::debug!("Commited zeroconf service with name {}", &name);
@@ -312,7 +340,7 @@ async fn avahi_task(
 #[cfg(feature = "with-avahi")]
 fn launch_avahi(
     name: Cow<'static, str>,
-    _zeroconf_ip: Vec<std::net::IpAddr>,
+    zeroconf_ip: Vec<std::net::IpAddr>,
     port: u16,
     status_tx: mpsc::UnboundedSender<DiscoveryEvent>,
 ) -> Result<DnsSdHandle, Error> {
@@ -321,7 +349,7 @@ fn launch_avahi(
     let task_handle = tokio::spawn(async move {
         let mut entry_group = None;
         tokio::select! {
-            res = avahi_task(name, port, &mut entry_group) => {
+            res = avahi_task(name, zeroconf_ip, port, &mut entry_group) => {
                 if let Err(e) = res {
                     log::error!("Avahi error: {}", e);
                     let _ = status_tx.send(DiscoveryEvent::ZeroconfError(e));
