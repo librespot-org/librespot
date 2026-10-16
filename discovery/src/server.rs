@@ -9,7 +9,6 @@ use aes::cipher::{KeyIvInit, StreamCipher};
 use base64::engine::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use bytes::Bytes;
-use futures_util::{FutureExt, TryFutureExt};
 use hmac::{Hmac, Mac};
 use http_body_util::{BodyExt, Full};
 use hyper::{Method, Request, Response, StatusCode, body::Incoming};
@@ -24,7 +23,7 @@ use super::{DiscoveryError, DiscoveryEvent};
 
 use crate::{
     core::config::DeviceType,
-    core::{Error, authentication::Credentials, diffie_hellman::DhLocalKeys},
+    core::{Error, authentication::Credentials, diffie_hellman::DhLocalKeys, error::ErrorKind},
 };
 
 type Aes128Ctr = ctr::Ctr128BE<aes::Aes128>;
@@ -234,10 +233,28 @@ impl RequestHandler {
         res
     }
 
+    fn error_response(&self, err: &Error) -> Response<Full<Bytes>> {
+        let status = match err.kind {
+            ErrorKind::InvalidArgument | ErrorKind::FailedPrecondition => StatusCode::BAD_REQUEST,
+            _ => StatusCode::SERVICE_UNAVAILABLE,
+        };
+
+        let body = json!({
+            "status": 102,
+            "spotifyError": 0,
+            "statusString": status.canonical_reason().unwrap_or("ERROR"),
+        })
+        .to_string();
+
+        let mut res = Response::new(Full::new(Bytes::from(body)));
+        *res.status_mut() = status;
+        res
+    }
+
     async fn handle(
         self: Arc<Self>,
         request: Request<Incoming>,
-    ) -> Result<hyper::Result<Response<Full<Bytes>>>, Error> {
+    ) -> hyper::Result<Response<Full<Bytes>>> {
         let mut params = Params::new();
 
         let (parts, body) = request.into_parts();
@@ -257,11 +274,17 @@ impl RequestHandler {
 
         let action = params.get("action").map(Cow::as_ref);
 
-        Ok(Ok(match (parts.method, action) {
+        Ok(match (parts.method, action) {
             (Method::GET, Some("getInfo")) => self.handle_get_info(),
-            (Method::POST, Some("addUser")) => self.handle_add_user(&params)?,
+            (Method::POST, Some("addUser")) => match self.handle_add_user(&params) {
+                Ok(response) => response,
+                Err(err) => {
+                    error!("could not handle discovery request: {err}");
+                    self.error_response(&err)
+                }
+            },
             _ => self.not_found(),
-        }))
+        })
     }
 }
 
@@ -325,12 +348,7 @@ impl DiscoveryServer {
                         let discovery = discovery.clone();
 
                         let svc = hyper::service::service_fn(move |request| {
-                            discovery
-                                .clone()
-                                .handle(request)
-                                .inspect_err(|e| error!("could not handle discovery request: {e}"))
-                                .and_then(|x| async move { Ok(x) })
-                                .map(Result::unwrap) // guaranteed by `and_then` above
+                            discovery.clone().handle(request)
                         });
 
                         let conn = server.serve_connection(io, svc);
