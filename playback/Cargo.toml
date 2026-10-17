@@ -82,6 +82,8 @@ rodio = { version = "0.21", optional = true, default-features = false, features 
 
 # Container and audio decoder
 symphonia = { version = "0.5", default-features = false, features = [
+    "aac",
+    "isomp4",
     "mp3",
     "ogg",
     "vorbis",
