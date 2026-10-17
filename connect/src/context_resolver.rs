@@ -130,6 +130,15 @@ pub struct ContextResolver {
 const RETRY_UNAVAILABLE: Duration = Duration::from_secs(3600);
 
 impl ContextResolver {
+    pub fn pending(&self) -> VecDeque<ResolveContext> {
+        self.queue.clone()
+    }
+
+    pub fn restore_pending(&mut self, pending: VecDeque<ResolveContext>) {
+        self.queue = pending;
+        self.unavailable_contexts.clear();
+    }
+
     pub fn new(session: Session) -> Self {
         Self {
             session,

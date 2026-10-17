@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [docs] Document Android NDK context initialization requirement for Rodio/CPAL audio backend
 - [core] Add `Cache::with_memory_credentials` to keep credentials in memory instead of a file, for applications that store them in their own protected store
+- [connect] Retain playback snapshots after an unexpected disconnect so clients can restore context, shuffle order, and queued tracks on a new session
+- [connect] Add `PlaybackSnapshot::at_position`, `position_ms` and `is_playing`, to restore a snapshot where a player kept across the reconnect has got to
 - [connect] Add method `add_to_queue` to `Spirc` to add tracks, episodes, albums and playlists to the queue
 - [connect] `Spirc::add_to_queue` also queues local files (`spotify:local:` URIs), which play from `PlayerConfig::local_file_directories` as they do in a context
 - [connect] Add method `clear_queue` to `Spirc` to remove all manually queued tracks
