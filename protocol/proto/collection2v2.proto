@@ -16,9 +16,35 @@ message PageRequest {
 
 message CollectionItem {
     string uri = 1;
-    int32 added_at = 2;
+    // Seconds since the Unix epoch. Spotify 1.3.4 declares it int64; the
+    // varint encoding is the same as the int32 of earlier versions.
+    int64 added_at = 2;
     bool is_removed = 3;
     optional string context_uri = 4;
+    // Fields 5 and below are from Spotify 1.3.4 (linux).
+    optional ItemData item_data = 5;
+}
+
+// What a set records about an item beyond its URI. Only the variant for the
+// `playcontextbans` set is declared here.
+message ItemData {
+    oneof data {
+        PlayContextBansItemData play_context_bans_item_data = 1001;
+    }
+}
+
+// A track hidden in one playlist or other context: the `playcontextbans` set
+// holds one item per hidden track, with the context in `context_uri`.
+message PlayContextBansItemData {
+    ItemProvider item_provider = 1;
+}
+
+// Which part of a context offered the hidden track.
+enum ItemProvider {
+    PROVIDER_UNSPECIFIED = 0;
+    PROVIDER_CONTEXT = 1;
+    PROVIDER_AUTOPLAY = 2;
+    PROVIDER_ENHANCE = 3;
 }
 
 message PageResponse {
