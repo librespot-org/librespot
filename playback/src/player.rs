@@ -1308,7 +1308,8 @@ impl PlayerTrackLoader {
 
         let stream_loader_controller = StreamLoaderController::from_local_file(file_size);
 
-        let name = local_file_metadata.name.unwrap_or_default();
+        let name =
+            crate::local_file::matched_title(local_file_metadata.name, path).unwrap_or_default();
 
         info!("Loaded <{name}> from path <{}>", path.display());
 
