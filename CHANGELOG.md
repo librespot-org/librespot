@@ -23,10 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [examples] Obtain an access token via OAuth to establish a new session and retrieve the stored credentials
 - [playback] Add `AudioKeyUnavailable` player event, emitted when Spotify refuses the audio key of the track being loaded (breaking)
 - [playback] Make the `local_file` module public, and add `LocalFileLookup::iter`, `len` and `is_empty`, so applications can list the local files the player can play
+- [core] Add method `post_playlist_changes` to `SpClient` to add, remove or move playlist rows by index, as Spotify's own clients do; it sends the change once
 
 ### Changed
 
 - [core] Leave access tokens, refresh tokens and credentials' auth data out of `Debug` output, and so out of trace logs
+- [core] An HTTP 409 Conflict answer is an `Aborted` error instead of `Unknown`
 - [core] Made `SpotifyId::to_base62`, `SpotifyId::to_base16`, `FileId::to_base16`, `SpotifyUri::to_id`, `SpotifyUri::to_uri` infallible (breaking)
 
 ### Fixed
