@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [core] Add `SpClient::get_buddylist` and `SpClient::get_listening_activity` to read what the people the user follows are listening to
 - [core] Add `Cache::with_memory_credentials` to keep credentials in memory instead of a file, for applications that store them in their own protected store
 - [connect] Retain playback snapshots after an unexpected disconnect so clients can restore context, shuffle order, and queued tracks on a new session
+- [connect] Add `PlaybackSnapshot::at_position`, `position_ms` and `is_playing`, to restore a snapshot where a player kept across the reconnect has got to
 - [connect] Add method `add_to_queue` to `Spirc` to add tracks, episodes, albums and playlists to the queue
 - [connect] Add method `clear_queue` to `Spirc` to remove all manually queued tracks
 - [core] Add method `get_playlist_range` to `SpClient` to fetch a window of a playlist's items with its header decorated on

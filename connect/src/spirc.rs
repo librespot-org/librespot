@@ -309,6 +309,36 @@ pub struct PlaybackSnapshot {
 }
 
 impl PlaybackSnapshot {
+    /// Where the current track was when the session ended.
+    pub fn position_ms(&self) -> u32 {
+        self.position_ms
+    }
+
+    /// Whether the current track was playing, rather than paused, when the
+    /// session ended.
+    pub fn is_playing(&self) -> bool {
+        self.playing
+    }
+
+    /// The same playback, picked up at `position_ms` and playing or paused as
+    /// given instead of where it stood when the session ended.
+    ///
+    /// The [`Player`] outlives its session: given to the next `Spirc` with
+    /// [`Player::set_session`], it keeps playing the track it had from what it
+    /// already fetched while the new session connects. Restoring the snapshot
+    /// as it was would take that track back to where the session ended;
+    /// restoring it at the position the player has reached carries on from
+    /// there.
+    pub fn at_position(&self, position_ms: u32, playing: bool) -> Self {
+        Self {
+            state: self.state.clone(),
+            pending: self.pending.clone(),
+            username: self.username.clone(),
+            position_ms,
+            playing,
+        }
+    }
+
     fn restore_into(
         &self,
         username: &str,
@@ -2548,7 +2578,7 @@ mod recovery_tests {
             playing: false,
         };
         let mut state = ConnectState::new(Default::default(), &session);
-        let mut resolver = ContextResolver::new(session);
+        let mut resolver = ContextResolver::new(session.clone());
         assert!(
             snapshot
                 .restore_into("different", &mut state, &mut resolver)
@@ -2557,6 +2587,25 @@ mod recovery_tests {
         assert!(!state.repeat_context());
         assert!(resolver.pending().is_empty());
         snapshot
+            .restore_into("original", &mut state, &mut resolver)
+            .unwrap();
+        assert!(state.repeat_context());
+        assert_eq!(resolver.pending(), std::slice::from_ref(&pending));
+
+        let later = snapshot.at_position(150_000, true);
+        assert_eq!((later.position_ms(), later.is_playing()), (150_000, true));
+        assert_eq!(
+            (snapshot.position_ms(), snapshot.is_playing()),
+            (144_075, false)
+        );
+        let mut state = ConnectState::new(Default::default(), &session);
+        let mut resolver = ContextResolver::new(session);
+        assert!(
+            later
+                .restore_into("different", &mut state, &mut resolver)
+                .is_err()
+        );
+        later
             .restore_into("original", &mut state, &mut resolver)
             .unwrap();
         assert!(state.repeat_context());
