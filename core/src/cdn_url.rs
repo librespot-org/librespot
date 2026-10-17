@@ -54,24 +54,33 @@ impl From<CdnUrlError> for Error {
 #[derive(Debug, Clone)]
 pub struct CdnUrl {
     pub file_id: FileId,
+    audio_format: i32,
     urls: MaybeExpiringUrls,
 }
 
 impl CdnUrl {
-    pub fn new(file_id: FileId) -> Self {
+    pub fn new(file_id: FileId, audio_format: i32) -> Self {
         Self {
             file_id,
+            audio_format,
             urls: MaybeExpiringUrls(Vec::new()),
         }
     }
 
     pub async fn resolve_audio(&self, session: &Session) -> Result<Self, Error> {
         let file_id = self.file_id;
-        let response = session.spclient().get_audio_storage(&file_id).await?;
+        let response = session
+            .spclient()
+            .get_audio_storage(&file_id, self.audio_format)
+            .await?;
         let msg = CdnUrlMessage::parse_from_bytes(&response)?;
         let urls = MaybeExpiringUrls::try_from(msg)?;
 
-        let cdn_url = Self { file_id, urls };
+        let cdn_url = Self {
+            file_id,
+            audio_format: self.audio_format,
+            urls,
+        };
 
         trace!("Resolved CDN storage: {cdn_url:#?}");
 
