@@ -785,8 +785,36 @@ impl SpClient {
             .await
     }
 
-    // TODO: Seen-in-the-wild but unimplemented endpoints
-    // - /presence-view/v1/buddylist
+    /// The people the user follows, each with the last track they finished
+    /// and where it played from, as JSON. This is the older friend activity
+    /// list of Spotify's desktop client.
+    pub async fn get_buddylist(&self) -> SpClientResult {
+        self.request_as_json(&Method::GET, "/presence-view/v1/buddylist", None, None)
+            .await
+    }
+
+    /// What the people the user follows are listening to, as JSON: up to
+    /// `limit` entries, each with the track, its context, a timestamp, and
+    /// whether it is playing right now. This is the feed behind the
+    /// listening activity panel of Spotify's current clients.
+    pub async fn get_listening_activity(&self, limit: u32) -> SpClientResult {
+        let body = serde_json::json!({ "unused": true, "resultLimit": limit }).to_string();
+
+        let mut headers = HeaderMap::new();
+        headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+
+        // The feed answers 404 to a request carrying the default metrics
+        // and salt query parameters.
+        self.request_with_options(
+            &Method::POST,
+            "/listening-activity/v1/feed",
+            Some(headers),
+            Some(body.as_bytes()),
+            &NO_METRICS_AND_SALT,
+        )
+        .await
+    }
 
     pub async fn get_audio_storage(&self, file_id: &FileId) -> SpClientResult {
         let endpoint = format!(
