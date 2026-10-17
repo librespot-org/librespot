@@ -266,6 +266,9 @@ enum SpircCommand {
 }
 
 const CONTEXT_FETCH_THRESHOLD: usize = 2;
+// how many of the tracks after the current one the player prepares, so that skipping to
+// them starts without a round trip
+const PREFETCH_UPCOMING_TRACKS: usize = 2;
 
 // delay to update volume after a certain amount of time, instead on each update request
 const VOLUME_UPDATE_DELAY: Duration = Duration::from_millis(500);
@@ -2184,6 +2187,19 @@ impl SpircTask {
         Ok(())
     }
 
+    // Lets the player prepare the next tracks, so that a skip starts playing at once. Each
+    // call replaces the previous list, and the player keeps what it already has.
+    fn prefetch_upcoming_tracks(&self) {
+        let upcoming = if self.connect_state.is_active()
+            && !matches!(self.play_status, SpircPlayStatus::Stopped)
+        {
+            self.connect_state.upcoming_tracks(PREFETCH_UPCOMING_TRACKS)
+        } else {
+            Vec::new()
+        };
+        self.player.prefetch(upcoming);
+    }
+
     fn handle_preload_next_track(&mut self) {
         // Requests the player thread to preload the next track
         match self.play_status {
@@ -2427,6 +2443,7 @@ impl SpircTask {
     }
 
     async fn notify(&mut self) -> Result<(), Error> {
+        self.prefetch_upcoming_tracks();
         self.connect_state.set_status(&self.play_status);
 
         if self.connect_state.is_playing() {

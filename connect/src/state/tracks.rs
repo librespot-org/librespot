@@ -406,6 +406,23 @@ impl<'ct> ConnectState {
         SpotifyUri::from_uri(next).ok()
     }
 
+    /// The first `count` tracks and episodes that would play after the current
+    /// one, skipping delimiters and tracks known to be unavailable. Empty while
+    /// the current track repeats.
+    pub fn upcoming_tracks(&self, count: usize) -> Vec<SpotifyUri> {
+        if self.repeat_track() {
+            return Vec::new();
+        }
+
+        self.next_tracks()
+            .iter()
+            .filter(|track| !track.is_unavailable())
+            .filter_map(|track| SpotifyUri::from_uri(&track.uri).ok())
+            .filter(|uri| matches!(uri, SpotifyUri::Track { .. } | SpotifyUri::Episode { .. }))
+            .take(count)
+            .collect()
+    }
+
     pub fn has_next_tracks(&self, min: Option<usize>) -> bool {
         if let Some(min) = min {
             self.next_tracks().len() >= min
@@ -671,5 +688,22 @@ mod tests {
         assert_eq!(after.len(), SPOTIFY_MAX_NEXT_TRACKS_SIZE);
         assert!(after[delimiter_pos].is_hidden());
         assert_eq!(after[delimiter_pos].uri, "spotify:delimiter");
+    }
+
+    #[tokio::test]
+    async fn upcoming_tracks_skip_unavailable_ones_and_stop_while_a_track_repeats() {
+        let mut state = state_at(0, false, 4);
+        let track = |i: usize| SpotifyUri::from_uri(&format!("spotify:track:{i:022}")).unwrap();
+
+        assert_eq!(state.upcoming_tracks(2), vec![track(1), track(2)]);
+
+        state.mark_unavailable(&track(1)).unwrap();
+        assert_eq!(state.upcoming_tracks(2), vec![track(2), track(3)]);
+
+        // the context ends after the last track: the delimiter is not a track
+        assert_eq!(state.upcoming_tracks(5), vec![track(2), track(3)]);
+
+        state.set_repeat_track(true);
+        assert!(state.upcoming_tracks(2).is_empty());
     }
 }

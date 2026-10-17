@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] Add `AudioKeyUnavailable` player event, emitted when Spotify refuses the audio key of the track being loaded (breaking)
 - [playback] Make the `local_file` module public, and add `LocalFileLookup::iter`, `len` and `is_empty`, so applications can list the local files the player can play
 - [core] Add method `post_playlist_changes` to `SpClient` to add, remove or move playlist rows by index, as Spotify's own clients do; it sends the change once
+- [playback] Add `Player::prefetch` to fetch the metadata, audio key and first 128 KiB of upcoming tracks, so loading one of them starts playing without waiting for those in turn; `Spirc` prefetches the next two tracks
+- [audio] Add `AudioFileHead` and `AudioFile::open_with_head` to open a file from its first bytes fetched ahead of time
 
 ### Changed
 
@@ -33,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- [audio] Mark a download's first request as requested by its length rather than its end offset
 - [playback] Stop instead of skipping through the queue when Spotify refuses a track's audio key
 - [core] Reject an access-point handshake packet whose size is under four bytes or over 64 KiB, instead of panicking or allocating whatever size it names
 - [core] Pass on dealer messages that carry plain JSON, such as collection updates, instead of dropping them with a base64 warning
