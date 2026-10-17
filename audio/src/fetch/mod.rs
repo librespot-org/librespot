@@ -3,7 +3,7 @@ mod receive;
 use std::{
     cmp::min,
     fs,
-    io::{self, Read, Seek, SeekFrom},
+    io::{self, Read, Seek, SeekFrom, Write},
     sync::{
         Arc, OnceLock,
         atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -12,7 +12,9 @@ use std::{
     time::Duration,
 };
 
+use bytes::Bytes;
 use futures_util::{StreamExt, TryFutureExt, future::IntoStream};
+use http_body_util::BodyExt;
 use hyper::{Response, StatusCode, body::Incoming, header::CONTENT_RANGE};
 use hyper_util::client::legacy::ResponseFuture;
 
@@ -20,7 +22,10 @@ use tempfile::NamedTempFile;
 use thiserror::Error;
 use tokio::sync::{Semaphore, mpsc, oneshot};
 
-use librespot_core::{Error, FileId, Session, cdn_url::CdnUrl};
+use librespot_core::{
+    Error, FileId, Session,
+    cdn_url::{CdnUrl, CdnUrlError},
+};
 
 use self::receive::audio_file_fetch;
 
@@ -132,6 +137,118 @@ impl AudioFetchParams {
 pub enum AudioFile {
     Cached(fs::File),
     Streaming(AudioFileStreaming),
+}
+
+/// The first bytes of an audio file, fetched ahead of time so that opening
+/// the file later needs no round trip to the CDN before decoding can start.
+///
+/// The bytes are the file as the CDN serves it, still encrypted. A head only
+/// helps while the CDN URL it came from is valid; see [`AudioFileHead::is_fresh`].
+#[derive(Clone)]
+pub struct AudioFileHead {
+    file_id: FileId,
+    cdn_url: CdnUrl,
+    url: String,
+    file_size: usize,
+    data: Bytes,
+}
+
+impl std::fmt::Debug for AudioFileHead {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AudioFileHead")
+            .field("file_id", &self.file_id)
+            .field("file_size", &self.file_size)
+            .field("length", &self.data.len())
+            .finish_non_exhaustive()
+    }
+}
+
+impl AudioFileHead {
+    /// Resolves the file's CDN URL and fetches its first `length` bytes.
+    pub async fn fetch(session: &Session, file_id: FileId, length: usize) -> Result<Self, Error> {
+        let cdn_url = CdnUrl::new(file_id).resolve_audio(session).await?;
+        let urls = cdn_url.try_get_urls()?;
+        let mut last_error = None;
+        for url in &urls {
+            match Self::fetch_from(session, url, length).await {
+                Ok((file_size, data)) => {
+                    return Ok(Self {
+                        file_id,
+                        url: url.to_string(),
+                        cdn_url: cdn_url.clone(),
+                        file_size,
+                        data,
+                    });
+                }
+                Err(e) => {
+                    warn!("Fetching the head of {file_id} from {url} failed with error {e:?}");
+                    last_error = Some(e);
+                }
+            }
+        }
+        Err(last_error.unwrap_or_else(|| CdnUrlError::Unresolved.into()))
+    }
+
+    async fn fetch_from(
+        session: &Session,
+        url: &str,
+        length: usize,
+    ) -> Result<(usize, Bytes), Error> {
+        let mut streamer = session.spclient().stream_from_cdn(url, 0, length)?;
+        let response = tokio::time::timeout(Duration::from_secs(10), streamer.next())
+            .await
+            .map_err(|_| Error::from(AudioFileError::WaitTimeout))?
+            .ok_or(AudioFileError::NoData)??;
+        if response.status() != StatusCode::PARTIAL_CONTENT {
+            return Err(AudioFileError::StatusCode(response.status()).into());
+        }
+        let (_, file_size) = content_range(&response)?;
+        let data = response
+            .into_body()
+            .collect()
+            .await
+            .map(http_body_util::Collected::to_bytes)?;
+        if data.is_empty() || data.len() > file_size {
+            return Err(AudioFileError::NoData.into());
+        }
+        Ok((file_size, data))
+    }
+
+    pub fn file_id(&self) -> FileId {
+        self.file_id
+    }
+
+    /// The number of bytes held.
+    pub fn len(&self) -> usize {
+        self.data.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+
+    /// Whether the CDN URL the rest of the file would come from is still
+    /// valid, so that the head can be used to open the file.
+    pub fn is_fresh(&self) -> bool {
+        self.cdn_url
+            .try_get_urls()
+            .is_ok_and(|urls| urls.contains(&self.url.as_str()))
+    }
+}
+
+/// The last byte a `206 Partial Content` response holds and the size of the
+/// whole file, from its `Content-Range` header.
+fn content_range(response: &Response<Incoming>) -> Result<(usize, usize), Error> {
+    let header_value = response
+        .headers()
+        .get(CONTENT_RANGE)
+        .ok_or(AudioFileError::Header)?;
+    let str_value = header_value.to_str()?;
+    let hyphen_index = str_value.find('-').unwrap_or_default();
+    let slash_index = str_value.find('/').unwrap_or_default();
+    let upper_bound: usize = str_value[hyphen_index + 1..slash_index].parse()?;
+    let file_size = str_value[slash_index + 1..].parse()?;
+    Ok((upper_bound, file_size))
 }
 
 #[derive(Debug)]
@@ -336,6 +453,24 @@ struct AudioFileShared {
 }
 
 impl AudioFileShared {
+    fn new(cdn_url: String, file_size: usize, bytes_per_second: usize) -> Self {
+        Self {
+            cdn_url,
+            file_size,
+            bytes_per_second,
+            cond: Condvar::new(),
+            download_status: Mutex::new(AudioFileDownloadStatus {
+                requested: RangeSet::new(),
+                downloaded: RangeSet::new(),
+            }),
+            download_streaming: AtomicBool::new(false),
+            download_slots: Semaphore::new(1),
+            ping_time_ms: AtomicUsize::new(0),
+            read_position: AtomicUsize::new(0),
+            throughput: AtomicUsize::new(0),
+        }
+    }
+
     fn is_download_streaming(&self) -> bool {
         self.download_streaming.load(Ordering::Acquire)
     }
@@ -382,6 +517,19 @@ impl AudioFile {
         file_id: FileId,
         bytes_per_second: usize,
     ) -> Result<AudioFile, Error> {
+        Self::open_with_head(session, file_id, bytes_per_second, None).await
+    }
+
+    /// Opens the file like [`AudioFile::open`], starting from a head fetched
+    /// earlier when it belongs to this file and its CDN URL is still valid.
+    /// The download then continues after the head, so the file can be read
+    /// from the start without waiting for the CDN.
+    pub async fn open_with_head(
+        session: &Session,
+        file_id: FileId,
+        bytes_per_second: usize,
+        head: Option<AudioFileHead>,
+    ) -> Result<AudioFile, Error> {
         if let Some(file) = session.cache().and_then(|cache| cache.file(file_id)) {
             debug!("File {file_id} already in cache");
             return Ok(AudioFile::Cached(file));
@@ -391,8 +539,18 @@ impl AudioFile {
 
         let (complete_tx, complete_rx) = oneshot::channel();
 
-        let streaming =
-            AudioFileStreaming::open(session.clone(), file_id, complete_tx, bytes_per_second);
+        let head = head.filter(|head| {
+            // A head that is the whole file leaves nothing to download, and
+            // finishing the download is what writes the file to the cache.
+            head.file_id == file_id && head.len() < head.file_size && head.is_fresh()
+        });
+        let streaming = AudioFileStreaming::open(
+            session.clone(),
+            file_id,
+            complete_tx,
+            bytes_per_second,
+            head,
+        );
 
         let session_ = session.clone();
         session.spawn(complete_rx.map_ok(move |mut file| {
@@ -440,7 +598,16 @@ impl AudioFileStreaming {
         file_id: FileId,
         complete_tx: oneshot::Sender<NamedTempFile>,
         bytes_per_second: usize,
+        head: Option<AudioFileHead>,
     ) -> Result<AudioFileStreaming, Error> {
+        if let Some(head) = head {
+            debug!(
+                "Starting file {file_id} from a prefetched head of {} bytes",
+                head.len()
+            );
+            return Self::open_after_head(session, complete_tx, bytes_per_second, head);
+        }
+
         let cdn_url = CdnUrl::new(file_id).resolve_audio(&session).await?;
 
         let minimum_download_size = AudioFetchParams::get().minimum_download_size;
@@ -488,15 +655,7 @@ impl AudioFileStreaming {
 
         trace!("Streaming from {url}");
 
-        let header_value = response
-            .headers()
-            .get(CONTENT_RANGE)
-            .ok_or(AudioFileError::Header)?;
-        let str_value = header_value.to_str()?;
-        let hyphen_index = str_value.find('-').unwrap_or_default();
-        let slash_index = str_value.find('/').unwrap_or_default();
-        let upper_bound: usize = str_value[hyphen_index + 1..slash_index].parse()?;
-        let file_size = str_value[slash_index + 1..].parse()?;
+        let (upper_bound, file_size) = content_range(&response)?;
 
         let initial_request = StreamingRequest {
             streamer,
@@ -505,25 +664,68 @@ impl AudioFileStreaming {
             length: upper_bound + 1,
         };
 
-        let shared = Arc::new(AudioFileShared {
-            cdn_url: url.to_string(),
+        let shared = Arc::new(AudioFileShared::new(
+            url.to_string(),
             file_size,
             bytes_per_second,
-            cond: Condvar::new(),
-            download_status: Mutex::new(AudioFileDownloadStatus {
-                requested: RangeSet::new(),
-                downloaded: RangeSet::new(),
-            }),
-            download_streaming: AtomicBool::new(false),
-            download_slots: Semaphore::new(1),
-            ping_time_ms: AtomicUsize::new(0),
-            read_position: AtomicUsize::new(0),
-            throughput: AtomicUsize::new(0),
-        });
+        ));
 
         let write_file = NamedTempFile::new_in(session.config().tmp_dir.clone())?;
         write_file.as_file().set_len(file_size as u64)?;
 
+        Self::start(session, shared, initial_request, write_file, complete_tx)
+    }
+
+    /// Opens the file from a head held in memory: the head is written to the
+    /// file and counted as downloaded, and the download continues after it.
+    fn open_after_head(
+        session: Session,
+        complete_tx: oneshot::Sender<NamedTempFile>,
+        bytes_per_second: usize,
+        head: AudioFileHead,
+    ) -> Result<AudioFileStreaming, Error> {
+        let AudioFileHead {
+            url,
+            file_size,
+            data,
+            ..
+        } = head;
+        let shared = Arc::new(AudioFileShared::new(url, file_size, bytes_per_second));
+
+        let mut write_file = NamedTempFile::new_in(session.config().tmp_dir.clone())?;
+        write_file.as_file().set_len(file_size as u64)?;
+        write_file.write_all(&data)?;
+        shared
+            .download_status
+            .lock()
+            .expect(DOWNLOAD_STATUS_POISON_MSG)
+            .downloaded
+            .add_range(&Range::new(0, data.len()));
+
+        let offset = data.len();
+        let length = min(
+            AudioFetchParams::get().minimum_download_size,
+            file_size - offset,
+        );
+        let initial_request = StreamingRequest {
+            streamer: session
+                .spclient()
+                .stream_from_cdn(&shared.cdn_url, offset, length)?,
+            initial_response: None,
+            offset,
+            length,
+        };
+
+        Self::start(session, shared, initial_request, write_file, complete_tx)
+    }
+
+    fn start(
+        session: Session,
+        shared: Arc<AudioFileShared>,
+        initial_request: StreamingRequest,
+        write_file: NamedTempFile,
+        complete_tx: oneshot::Sender<NamedTempFile>,
+    ) -> Result<AudioFileStreaming, Error> {
         let read_file = write_file.reopen()?;
 
         let (stream_loader_command_tx, stream_loader_command_rx) =
@@ -683,5 +885,54 @@ impl Seek for AudioFile {
             AudioFile::Cached(ref mut file) => file.seek(pos),
             AudioFile::Streaming(ref mut file) => file.seek(pos),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use librespot_core::SessionConfig;
+
+    #[tokio::test]
+    async fn a_prefetched_head_reads_without_waiting_for_the_cdn() {
+        let session = Session::new(SessionConfig::default(), None);
+        let file_id = FileId::from_raw(&[7; 20]);
+        let data: Vec<u8> = (0..64 * 1024).map(|i| (i % 251) as u8).collect();
+        let head = AudioFileHead {
+            file_id,
+            cdn_url: CdnUrl::new(file_id),
+            // Nothing listens here, so the rest of the file never arrives.
+            url: "http://127.0.0.1:9/audio".into(),
+            file_size: 256 * 1024,
+            data: Bytes::from(data.clone()),
+        };
+        let (complete_tx, _complete_rx) = oneshot::channel();
+        let mut file =
+            AudioFileStreaming::open_after_head(session, complete_tx, 40 * 1024, head).unwrap();
+
+        let mut read = vec![0; data.len()];
+        let mut filled = 0;
+        while filled < read.len() {
+            let n = file.read(&mut read[filled..]).unwrap();
+            assert!(n > 0);
+            filled += n;
+        }
+        assert_eq!(read, data);
+
+        let status = file.shared.download_status.lock().unwrap();
+        assert_eq!(status.downloaded.contained_length_from_value(0), data.len());
+    }
+
+    #[test]
+    fn an_unresolved_head_is_not_fresh() {
+        let file_id = FileId::from_raw(&[7; 20]);
+        let head = AudioFileHead {
+            file_id,
+            cdn_url: CdnUrl::new(file_id),
+            url: "https://audio.example/file".into(),
+            file_size: 2,
+            data: Bytes::from_static(b"x"),
+        };
+        assert!(!head.is_fresh());
     }
 }
