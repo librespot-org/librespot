@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] Add `normalisation_report` field to `PlayerConfig` to receive the normalisation factor of each track as it starts playing (breaking)
 - [examples] Obtain an access token via OAuth to establish a new session and retrieve the stored credentials
 - [playback] Add `AudioKeyUnavailable` player event, emitted when Spotify refuses the audio key of the track being loaded (breaking)
+- [playback] Make the `local_file` module public, and add `LocalFileLookup::iter`, `len` and `is_empty`, so applications can list the local files the player can play
 
 ### Changed
 

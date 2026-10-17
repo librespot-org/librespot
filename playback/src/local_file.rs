@@ -22,15 +22,37 @@ use symphonia::core::{
 // There are some indications online that FLAC is supported, so check for this as well.
 const SUPPORTED_FILE_EXTENSIONS: &[&str; 4] = &["mp3", "mp4", "m4p", "flac"];
 
+/// The local files the player can play, by the `spotify:local:` URI each
+/// one is known by in a playlist.
 #[derive(Default)]
 pub struct LocalFileLookup(HashMap<SpotifyUri, PathBuf>);
 
 impl LocalFileLookup {
+    /// The file a `spotify:local:` URI plays from.
     pub fn get(&self, uri: &SpotifyUri) -> Option<&Path> {
         self.0.get(uri).map(PathBuf::as_path)
     }
+
+    /// Every file found, with its URI, in no particular order.
+    pub fn iter(&self) -> impl Iterator<Item = (&SpotifyUri, &Path)> {
+        self.0.iter().map(|(uri, path)| (uri, path.as_path()))
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
 }
 
+/// Finds the playable files in `directories` and their subdirectories, as
+/// the player does for [`PlayerConfig::local_file_directories`], so an
+/// application can show what is there. It reads each file's tags, so it
+/// blocks for as long as the disk takes.
+///
+/// [`PlayerConfig::local_file_directories`]: crate::config::PlayerConfig::local_file_directories
 pub fn create_local_file_lookup(directories: &[PathBuf]) -> LocalFileLookup {
     let mut lookup = LocalFileLookup(HashMap::new());
 
