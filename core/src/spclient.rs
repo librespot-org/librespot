@@ -21,6 +21,7 @@ use crate::{
         extended_metadata::BatchedEntityRequest,
         extended_metadata::{BatchedExtensionResponse, EntityRequest, ExtensionQuery},
         extension_kind::ExtensionKind,
+        playlist4_external::ListChanges,
     },
     token::Token,
     util,
@@ -60,6 +61,7 @@ const NO_METRICS_AND_SALT: RequestOptions = RequestOptions {
     metrics: false,
     salt: false,
     base_url: None,
+    once: false,
 };
 
 #[derive(Debug, Error)]
@@ -94,6 +96,9 @@ pub struct RequestOptions {
     metrics: bool,
     salt: bool,
     base_url: Option<&'static str>,
+    /// Send the request once, whatever the strategy: a change that is not
+    /// idempotent could otherwise be applied twice when its answer is lost.
+    once: bool,
 }
 
 impl Default for RequestOptions {
@@ -102,6 +107,7 @@ impl Default for RequestOptions {
             metrics: true,
             salt: true,
             base_url: None,
+            once: false,
         }
     }
 }
@@ -517,7 +523,7 @@ impl SpClient {
 
             last_response = self.session().http_client().request_body(request).await;
 
-            if last_response.is_ok() {
+            if last_response.is_ok() || options.once {
                 return last_response;
             }
 
@@ -670,6 +676,31 @@ impl SpClient {
         let endpoint = format!("/playlist/v2/playlist/{}", playlist_id.to_base62());
 
         self.request(&Method::GET, &endpoint, None, None).await
+    }
+
+    /// Applies `changes` to a playlist, as Spotify's own clients edit one:
+    /// each `Op` adds, removes or moves rows by index, so a `Rem` of one row
+    /// removes that row alone, even where the list holds its item more than
+    /// once. The changes are based on `ListChanges::base_revision`; a playlist
+    /// changed since answers with an `Aborted` error (HTTP 409) rather than
+    /// apply them to other rows. The answer is a `SelectedListContent` with
+    /// the new revision.
+    ///
+    /// The request is sent once: resent after Spotify applied it but its answer
+    /// was lost, it would be applied twice.
+    pub async fn post_playlist_changes(
+        &self,
+        playlist_id: &SpotifyId,
+        changes: &ListChanges,
+    ) -> SpClientResult {
+        let endpoint = format!("/playlist/v2/playlist/{}/changes", playlist_id.to_base62());
+        let options = RequestOptions {
+            once: true,
+            ..Default::default()
+        };
+
+        self.request_with_protobuf_and_options(&Method::POST, &endpoint, None, changes, &options)
+            .await
     }
 
     pub async fn get_user_profile(

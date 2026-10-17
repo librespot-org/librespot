@@ -18,9 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [connect] Add method `clear_queue` to `Spirc` to remove all manually queued tracks
 - [playback] Add `SetQueue` player event, emitting when the queue changes (context loaded, track added to queue, or queue set via Spotify Connect). Gated behind `ConnectConfig::emit_set_queue_events`
 - [examples] Obtain an access token via OAuth to establish a new session and retrieve the stored credentials
+- [core] Add method `post_playlist_changes` to `SpClient` to add, remove or move playlist rows by index, as Spotify's own clients do; it sends the change once
 
 ### Changed
 
+- [core] An HTTP 409 Conflict answer is an `Aborted` error instead of `Unknown`
 - [core] Made `SpotifyId::to_base62`, `SpotifyId::to_base16`, `FileId::to_base16`, `SpotifyUri::to_id`, `SpotifyUri::to_uri` infallible (breaking)
 - [oauth] Made the URLs clickable in a terminal
 
