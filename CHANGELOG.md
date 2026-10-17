@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- [connect] Retain playback snapshots after an unexpected disconnect so clients can restore context, shuffle order, and queued tracks on a new session
+- [connect] Add `PlaybackSnapshot::at_position`, `position_ms` and `is_playing`, to restore a snapshot where a player kept across the reconnect has got to
 - [connect] Add method `add_to_queue` to `Spirc` to add tracks, episodes, albums and playlists to the queue
 - [connect] Add method `clear_queue` to `Spirc` to remove all manually queued tracks
 - [playback] Add `SetQueue` player event, emitting when the queue changes (context loaded, track added to queue, or queue set via Spotify Connect). Gated behind `ConnectConfig::emit_set_queue_events`
