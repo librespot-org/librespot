@@ -16,6 +16,7 @@ use crate::{
             ChallengeAnswer, ChallengeType, ClientTokenRequest, ClientTokenRequestType,
             ClientTokenResponse, ClientTokenResponseType,
         },
+        collection2v2::{CollectionItem, PageRequest, PageResponse, WriteRequest},
         connect::PutStateRequest,
         context::Context,
         extended_metadata::BatchedEntityRequest,
@@ -672,6 +673,66 @@ impl SpClient {
         self.request(&Method::GET, &endpoint, None, None).await
     }
 
+    /// One page of one of the user's collection sets, such as `collection` for
+    /// Liked Songs and saved albums, `artist` for followed artists, or
+    /// `playcontextbans` for the tracks hidden in a playlist ("Hide in this
+    /// playlist" in Spotify's clients), whose items name the playlist in
+    /// `context_uri`. Pass the previous page's `next_page_token` for the next
+    /// page, or an empty one for the first. Spotify refuses a set it does not
+    /// know with an HTTP 403.
+    pub async fn get_collection_page(
+        &self,
+        set: &str,
+        pagination_token: &str,
+        limit: i32,
+    ) -> Result<PageResponse, Error> {
+        let request = PageRequest {
+            username: self.session().username(),
+            set: set.into(),
+            pagination_token: pagination_token.into(),
+            limit,
+            ..Default::default()
+        };
+        let body = request.write_to_bytes()?;
+        let response = self
+            .request(
+                &Method::POST,
+                "/collection/v2/paging",
+                Some(Self::collection_headers()),
+                Some(&body),
+            )
+            .await?;
+        Ok(PageResponse::parse_from_bytes(&response)?)
+    }
+
+    /// Adds `items` to one of the user's collection sets, or removes those
+    /// with `is_removed` set. A write names the state each item ends in, so
+    /// sending it again changes nothing.
+    pub async fn write_collection(&self, set: &str, items: Vec<CollectionItem>) -> SpClientResult {
+        let request = WriteRequest {
+            username: self.session().username(),
+            set: set.into(),
+            items,
+            ..Default::default()
+        };
+        let body = request.write_to_bytes()?;
+        self.request(
+            &Method::POST,
+            "/collection/v2/write",
+            Some(Self::collection_headers()),
+            Some(&body),
+        )
+        .await
+    }
+
+    fn collection_headers() -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        let value = HeaderValue::from_static("application/vnd.collection-v2.spotify.proto");
+        headers.insert(CONTENT_TYPE, value.clone());
+        headers.insert(ACCEPT, value);
+        headers
+    }
+
     pub async fn get_user_profile(
         &self,
         username: &str,
@@ -956,5 +1017,46 @@ impl SpClient {
             &NO_METRICS_AND_SALT,
         )
         .await
+    }
+}
+
+#[cfg(test)]
+mod collection_tests {
+    use crate::protocol::collection2v2::{
+        CollectionItem, ItemData, ItemProvider, PageResponse, PlayContextBansItemData, item_data,
+    };
+    use protobuf::{Enum, Message};
+
+    /// A hidden track is the track and its playlist, with the provider in the
+    /// item data, as Spotify 1.3.4 writes it.
+    #[test]
+    fn a_play_context_ban_round_trips() {
+        let item = CollectionItem {
+            uri: "spotify:track:14XWXWv5FoCbFzLksawpEe".into(),
+            added_at: 1_792_000_000,
+            context_uri: Some("spotify:playlist:37i9dQZEVXcJZyENOWUFo7".into()),
+            item_data: protobuf::MessageField::some(ItemData {
+                data: Some(item_data::Data::PlayContextBansItemData(
+                    PlayContextBansItemData {
+                        item_provider: ItemProvider::PROVIDER_CONTEXT.into(),
+                        ..Default::default()
+                    },
+                )),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let page = PageResponse {
+            items: vec![item.clone()],
+            ..Default::default()
+        };
+        let bytes = page.write_to_bytes().unwrap();
+        let read = PageResponse::parse_from_bytes(&bytes).unwrap();
+        assert_eq!(read.items, vec![item]);
+        let provider = match &read.items[0].item_data.data {
+            Some(item_data::Data::PlayContextBansItemData(data)) => data.item_provider.value(),
+            _ => -1,
+        };
+        assert_eq!(provider, ItemProvider::PROVIDER_CONTEXT.value());
     }
 }

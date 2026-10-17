@@ -59,6 +59,7 @@ fn compile() {
         proto_dir.join("authentication.proto"),
         proto_dir.join("canvaz.proto"),
         proto_dir.join("canvaz-meta.proto"),
+        proto_dir.join("collection2v2.proto"),
         proto_dir.join("explicit_content_pubsub.proto"),
         proto_dir.join("keyexchange.proto"),
         proto_dir.join("mercury.proto"),
