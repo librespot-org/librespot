@@ -23,8 +23,8 @@ enum PulseError {
     #[error("<PulseAudioSink> {0}")]
     ConnectionRefused(PAErr),
 
-    #[error("<PulseAudioSink> Failed to Drain Pulseaudio Buffer, {0}")]
-    DrainFailure(PAErr),
+    #[error("<PulseAudioSink> Failed to Flush Pulseaudio Buffer, {0}")]
+    FlushFailure(PAErr),
 
     #[error("<PulseAudioSink>")]
     NotConnected,
@@ -38,7 +38,7 @@ impl From<PulseError> for SinkError {
         use PulseError::*;
         let es = e.to_string();
         match e {
-            DrainFailure(_) | OnWrite(_) => SinkError::OnWrite(es),
+            FlushFailure(_) | OnWrite(_) => SinkError::OnWrite(es),
             ConnectionRefused(_) => SinkError::ConnectionRefused(es),
             NotConnected => SinkError::NotConnected(es),
             InvalidSampleSpec { .. } => SinkError::InvalidParams(es),
@@ -129,7 +129,9 @@ impl Sink for PulseAudioSink {
     fn stop(&mut self) -> SinkResult<()> {
         let sink = self.sink.take().ok_or(PulseError::NotConnected)?;
 
-        sink.drain().map_err(PulseError::DrainFailure)?;
+        // Discard what is still queued instead of playing it out, so pause
+        // is immediate instead of trailing by the buffer's length.
+        sink.flush().map_err(PulseError::FlushFailure)?;
         Ok(())
     }
 

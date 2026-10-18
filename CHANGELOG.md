@@ -51,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [audio] Try the next CDN URL when a fetch returns a non-206 status instead of only retrying on transport errors, fixing playback failures when the first CDN URL is reachable but does not stream audio.
 - [core] Bound socket setup, including name resolution and the proxy's CONNECT, by a five second timeout, and try IPv6 and IPv4 addresses side by side, so an unreachable address no longer stalls the connection. The proxy URL, which can hold credentials, is no longer logged
 - [core] Fixed missing proxy forwarding to the dealer
+- [playback] Flush the PulseAudio stream's buffer on stop instead of draining it, so Pause stops the sound immediately instead of trailing by the length of whatever was still queued
 
 ## [0.8.0] - 2025-11-10
 
