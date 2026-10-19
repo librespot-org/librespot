@@ -12,12 +12,18 @@ use symphonia::core::{
 
 use super::{AudioDecoder, AudioPacket, AudioPacketPosition, DecoderError, DecoderResult};
 
-use crate::{NUM_CHANNELS, PAGES_PER_MS, SAMPLE_RATE, player::NormalisationData, symphonia_util};
+use crate::{
+    NUM_CHANNELS, PAGES_PER_MS, SAMPLE_RATE, player::NormalisationData, resample::Resampler,
+    symphonia_util,
+};
 
 pub struct SymphoniaDecoder {
     probe_result: ProbeResult,
     decoder: Box<dyn Decoder>,
     sample_buffer: Option<SampleBuffer<f64>>,
+    resampler: Option<Resampler>,
+    resampled_start_ms: Option<u32>,
+    resampled_frames: u64,
 }
 
 #[derive(Default)]
@@ -32,6 +38,8 @@ pub(crate) struct LocalFileMetadata {
 }
 
 impl SymphoniaDecoder {
+    /// Decode stereo audio at 8,000 through 384,000 Hz, resampling as needed.
+    /// Bounding input rates limits per-packet expansion and filter resources.
     pub fn new<R>(input: R, hint: Hint) -> DecoderResult<Self>
     where
         R: MediaSource + 'static,
@@ -64,11 +72,7 @@ impl SymphoniaDecoder {
             DecoderError::SymphoniaDecoder("Could not retrieve sample rate".into())
         })?;
 
-        // TODO: The official client supports local files with sample rates other than 44,100 kHz.
-        // To play these accurately, we need to either resample the input audio, or introduce a way
-        // to change the player's current sample rate (likely by closing and re-opening the sink
-        // with new parameters).
-        if rate != SAMPLE_RATE {
+        if !(8000..=384000).contains(&rate) {
             return Err(DecoderError::SymphoniaDecoder(format!(
                 "Unsupported sample rate: {rate}"
             )));
@@ -89,6 +93,9 @@ impl SymphoniaDecoder {
             // We set the sample buffer when decoding the first full packet,
             // whose duration is also the ideal sample buffer size.
             sample_buffer: None,
+            resampler: Resampler::new(rate, SAMPLE_RATE, channels.count()),
+            resampled_start_ms: None,
+            resampled_frames: 0,
         })
     }
 
@@ -187,6 +194,31 @@ impl SymphoniaDecoder {
             None => (ts as f64 * PAGES_PER_MS) as u32,
         }
     }
+
+    fn resampled_packet(
+        &mut self,
+        samples: Vec<f64>,
+        skipped: bool,
+    ) -> Option<(AudioPacketPosition, AudioPacket)> {
+        if samples.is_empty() {
+            return None;
+        }
+        // The filter retains a few input frames between packets. Timestamp the
+        // actual output, rather than the next container packet's input clock.
+        let elapsed_ms = self.resampled_frames * 1000 / u64::from(SAMPLE_RATE);
+        let position_ms = self
+            .resampled_start_ms
+            .unwrap_or_default()
+            .saturating_add(elapsed_ms as u32);
+        self.resampled_frames += (samples.len() / usize::from(NUM_CHANNELS)) as u64;
+        Some((
+            AudioPacketPosition {
+                position_ms,
+                skipped,
+            },
+            AudioPacket::Samples(samples),
+        ))
+    }
 }
 
 impl AudioDecoder for SymphoniaDecoder {
@@ -213,6 +245,11 @@ impl AudioDecoder for SymphoniaDecoder {
         // Seeking is a `FormatReader` operation, so the decoder cannot reliably
         // know when a seek took place. Reset it to avoid audio glitches.
         self.decoder.reset();
+        if let Some(resampler) = &mut self.resampler {
+            resampler.reset();
+            self.resampled_start_ms = None;
+            self.resampled_frames = 0;
+        }
 
         Ok(self.ts_to_ms(seeked_to_ts.actual_ts))
     }
@@ -225,7 +262,10 @@ impl AudioDecoder for SymphoniaDecoder {
                 Ok(packet) => packet,
                 Err(Error::IoError(err)) => {
                     if err.kind() == io::ErrorKind::UnexpectedEof {
-                        return Ok(None);
+                        let samples = self.resampler.as_mut().map(Resampler::finish);
+                        return Ok(
+                            samples.and_then(|samples| self.resampled_packet(samples, skipped))
+                        );
                     } else {
                         return Err(DecoderError::SymphoniaDecoder(err.to_string()));
                     }
@@ -253,19 +293,125 @@ impl AudioDecoder for SymphoniaDecoder {
                     };
 
                     sample_buffer.copy_interleaved_ref(decoded);
-                    let samples = AudioPacket::Samples(sample_buffer.samples().to_vec());
-
-                    return Ok(Some((packet_position, samples)));
+                    if let Some(resampler) = &mut self.resampler {
+                        self.resampled_start_ms.get_or_insert(position_ms);
+                        let samples = resampler.process(sample_buffer.samples());
+                        if let Some(packet) = self.resampled_packet(samples, skipped) {
+                            return Ok(Some(packet));
+                        }
+                    } else {
+                        let samples = AudioPacket::Samples(sample_buffer.samples().to_vec());
+                        return Ok(Some((packet_position, samples)));
+                    }
                 }
                 Err(Error::DecodeError(_)) => {
                     // The packet failed to decode due to corrupted or invalid data, get a new
                     // packet and try again.
                     warn!("Skipping malformed audio packet at {position_ms} ms");
+                    if let Some(resampler) = &mut self.resampler {
+                        resampler.reset();
+                        self.resampled_start_ms = None;
+                        self.resampled_frames = 0;
+                    }
                     skipped = true;
                     continue;
                 }
                 Err(err) => return Err(err.into()),
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Cursor;
+
+    use super::*;
+
+    fn decoder(rate: u32) -> SymphoniaDecoder {
+        let input: &[u8] = match rate {
+            44100 => include_bytes!("testdata/stereo-44100.flac"),
+            48000 => include_bytes!("testdata/stereo-48000.flac"),
+            _ => unreachable!(),
+        };
+        SymphoniaDecoder::new(Cursor::new(input.to_vec()), Hint::new()).unwrap()
+    }
+
+    fn decode_remaining(decoder: &mut SymphoniaDecoder) -> Vec<(u32, Vec<f64>)> {
+        let mut packets = Vec::new();
+        while let Some((position, packet)) = decoder.next_packet().unwrap() {
+            assert!(!packet.is_empty());
+            packets.push((position.position_ms, packet.samples().unwrap().to_vec()));
+        }
+        assert!(decoder.next_packet().unwrap().is_none());
+        packets
+    }
+
+    #[test]
+    fn native_rate_flac_keeps_the_existing_decode_path() {
+        let mut decoder = decoder(44100);
+        assert!(decoder.resampler.is_none());
+        let packets = decode_remaining(&mut decoder);
+        let samples: Vec<_> = packets
+            .into_iter()
+            .flat_map(|(_, samples)| samples)
+            .collect();
+        assert_eq!(samples.len(), 44100 * 2 * 2);
+        assert!(samples.into_iter().all(|sample| sample == 0.0));
+    }
+
+    #[test]
+    fn very_low_rate_flac_is_rejected_before_resampling() {
+        let input = include_bytes!("testdata/stereo-1.flac");
+        let result = SymphoniaDecoder::new(Cursor::new(input.to_vec()), Hint::new());
+        assert!(matches!(
+            result,
+            Err(DecoderError::SymphoniaDecoder(message))
+                if message == "Unsupported sample rate: 1"
+        ));
+    }
+
+    #[test]
+    fn resampled_flac_has_the_full_duration_and_continuous_output_timestamps() {
+        let mut decoder = decoder(48000);
+        assert!(decoder.resampler.is_some());
+        let packets = decode_remaining(&mut decoder);
+        let mut frames = 0;
+        for (position_ms, samples) in &packets {
+            assert_eq!(*position_ms as usize, frames * 1000 / SAMPLE_RATE as usize);
+            assert!(
+                samples
+                    .iter()
+                    .all(|sample| sample.is_finite() && sample.abs() < 0.3)
+            );
+            frames += samples.len() / 2;
+        }
+        // The fixture is exactly 12,000 frames, or 250 ms, at 48 kHz.
+        assert_eq!(frames, 11025);
+        assert!(
+            packets
+                .iter()
+                .flat_map(|(_, samples)| samples)
+                .any(|sample| sample.abs() > 0.2)
+        );
+    }
+
+    #[test]
+    fn seeking_discards_resampler_history_including_after_eof() {
+        for read_to_end in [false, true] {
+            let mut used = decoder(48000);
+            if read_to_end {
+                decode_remaining(&mut used);
+            } else {
+                used.next_packet().unwrap().unwrap();
+            }
+            let mut fresh = decoder(48000);
+            let actual_ms = used.seek(100).unwrap();
+            assert_eq!(actual_ms, fresh.seek(100).unwrap());
+            let actual = decode_remaining(&mut used);
+            assert!(!actual.is_empty());
+            assert_eq!(actual[0].0, actual_ms);
+            assert_eq!(actual, decode_remaining(&mut fresh));
         }
     }
 }
