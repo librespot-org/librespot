@@ -1667,7 +1667,7 @@ impl PlayerInternal {
             }
 
             match self.sink.update_sample_rate(self.sink_sample_rate) {
-                Ok(()) => {},
+                Ok(()) => {}
                 Err(e) => {
                     error!("{e}");
                     self.handle_pause();
