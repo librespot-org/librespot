@@ -781,10 +781,10 @@ impl SpircTask {
             return Ok(());
         }
 
-        let is_current_track = matches! {
+        let is_current_track = matches!(
             (event.get_play_request_id(), self.play_request_id),
             (Some(event_id), Some(current_id)) if event_id == current_id
-        };
+        );
 
         // we only process events if the play_request_id matches. If it doesn't, it is
         // an event that belongs to a previous track and only arrives now due to a race
