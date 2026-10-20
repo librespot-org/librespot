@@ -67,6 +67,22 @@ pub enum UniqueFields {
     },
 }
 
+impl UniqueFields {
+    /// Human-readable artist names (or the show name for episodes), for display/logging.
+    pub fn artists_display(&self) -> String {
+        match self {
+            UniqueFields::Track { artists, .. } => artists
+                .0
+                .iter()
+                .map(|a| a.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", "),
+            UniqueFields::Local { artists, .. } => artists.clone().unwrap_or_default(),
+            UniqueFields::Episode { show_name, .. } => show_name.clone(),
+        }
+    }
+}
+
 impl AudioItem {
     pub async fn get_file(session: &Session, uri: SpotifyUri) -> AudioItemResult {
         let image_url = session

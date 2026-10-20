@@ -211,6 +211,7 @@ assets = [
 ]
 
 [workspace.lints]
+clippy.implicit_clone = "warn"
 clippy.redundant_closure_for_method_calls = "warn"
 
 [lints]
