@@ -39,6 +39,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [discovery] Return an HTTP error response instead of panicking on malformed discovery login requests
 - [core] Corrected discovery retry uptime limit to be 1 minute instead of 1 second
 - [audio] Try the next CDN URL when a fetch returns a non-206 status instead of only retrying on transport errors, fixing playback failures when the first CDN URL is reachable but does not stream audio.
+- [core] Made `SpotifyId::to_base62`, `SpotifyId::to_base16`, `FileId::to_base16`, `SpotifyUri::to_id` infallible (breaking)
+- [metadata] Removed `async-trait`. Implementations of `Metadata` don't need the `async-trait` annotation anymore. (breaking)
+- [core] Fixed some version constants containing `VERGEN_IDEMPOTENT_OUTPUT`
 
 ## [0.8.0] - 2025-11-10
 
@@ -513,3 +516,4 @@ v0.4.x as a stable branch until then.
 [0.1.2]: https://github.com/librespot-org/librespot/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/librespot-org/librespot/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/librespot-org/librespot/releases/tag/v0.1.0
+

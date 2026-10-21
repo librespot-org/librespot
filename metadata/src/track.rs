@@ -54,7 +54,6 @@ pub struct Tracks(pub Vec<SpotifyUri>);
 
 impl_deref_wrapped!(Tracks, Vec<SpotifyUri>);
 
-#[async_trait]
 impl Metadata for Track {
     type Message = protocol::metadata::Track;
 

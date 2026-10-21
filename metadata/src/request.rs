@@ -6,7 +6,6 @@ use librespot_core::{Error, Session};
 
 pub type RequestResult = Result<bytes::Bytes, Error>;
 
-#[async_trait]
 pub trait MercuryRequest {
     async fn request(session: &Session, uri: &str) -> RequestResult {
         let mut metrics_uri = uri.to_owned();
