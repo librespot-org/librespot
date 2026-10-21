@@ -20,7 +20,7 @@ A basic example in which the `Spirc` and `SpircTask` is used can be found here:
 # Example
 
 ```rust
-use std::{future::Future, thread};
+use std::{future::Future, sync::{Arc, atomic::AtomicBool}, thread};
 
 use librespot_connect::{ConnectConfig, Spirc};
 use librespot_core::{authentication::Credentials, Error, Session, SessionConfig};
@@ -50,12 +50,15 @@ async fn create_basic_spirc() -> Result<(), Error> {
 
     let mixer = mixer::find(None).expect("will default to SoftMixer");
 
+    let was_playing = Arc::new(AtomicBool::new(false));
+
     let (spirc, spirc_task): (Spirc, _) = Spirc::new(
         ConnectConfig::default(),
         session,
         credentials,
         player,
-        mixer(MixerConfig::default())?
+        mixer(MixerConfig::default())?,
+        was_playing,
     ).await?;
 
     Ok(())
