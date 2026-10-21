@@ -29,6 +29,11 @@ impl LocalFileLookup {
     pub fn get(&self, uri: &SpotifyUri) -> Option<&Path> {
         self.0.get(uri).map(PathBuf::as_path)
     }
+
+    /// Every matched local track, for applications that list what matched.
+    pub fn uris(&self) -> impl Iterator<Item = &SpotifyUri> {
+        self.0.keys()
+    }
 }
 
 pub fn create_local_file_lookup(directories: &[PathBuf]) -> LocalFileLookup {
