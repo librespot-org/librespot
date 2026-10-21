@@ -13,16 +13,31 @@
 
 use std::f64::consts::PI;
 
-/// Input samples each output sample is made from. Sixty-four give a
-/// passband flat to about 19 kHz and images under the window's floor.
-const TAPS: usize = 64;
+/// Input frames each output frame is made from when the input rate is at or
+/// below the output rate. A hundred and twenty-eight keep the passband flat
+/// to 20 kHz and what would alias or image some 80 dB down. Downsampling
+/// lengthens the filter by the rate ratio, so the transition band stays as
+/// narrow in output hertz at 96 or 192 kHz as at 48 kHz.
+const BASE_TAPS: usize = 128;
+
+/// The most filter phases kept in the coefficient table. Common rate pairs
+/// need at most 441 (8 kHz into 44.1 kHz). A rarer pair that needs more, such
+/// as 48,001 Hz, which needs 44,100, interpolates between neighbouring phases
+/// instead, so the table stays small whatever the input rate.
+const MAX_PHASES: usize = 512;
 
 pub struct Resampler {
     up: usize,
     down: usize,
     channels: usize,
-    /// `up` phases of `TAPS` coefficients each, normalised to unit gain.
-    taps: Vec<f64>,
+    /// Coefficients in each phase.
+    taps: usize,
+    /// Phases in `table`. `up` when it fits under [`MAX_PHASES`], when every
+    /// output position has a phase of its own.
+    phases: usize,
+    /// `phases` rows of `taps` coefficients, each normalised to unit gain,
+    /// plus one more row when interpolating, for the last phase to lean on.
+    table: Vec<f64>,
     /// Interleaved input frames still in reach: the tail of what came
     /// before, then whatever has not produced its outputs yet.
     input: Vec<f64>,
@@ -44,26 +59,33 @@ impl Resampler {
         let divisor = gcd(from_hz, to_hz);
         let up = (to_hz / divisor) as usize;
         let down = (from_hz / divisor) as usize;
-        let half = TAPS / 2;
-        Some(Self {
+        let stretch = (down as f64 / up as f64).max(1.0);
+        let taps = ((BASE_TAPS as f64 * stretch).ceil() as usize).next_multiple_of(2);
+        let phases = up.min(MAX_PHASES);
+        let mut resampler = Self {
             up,
             down,
             channels,
-            taps: kernel(up, down),
-            input: vec![0.0; (half - 1) * channels],
-            next: half - 1,
+            taps,
+            phases,
+            table: kernel(up, down, taps, phases),
+            input: Vec::new(),
+            next: 0,
             phase: 0,
             input_frames: 0,
             output_frames: 0,
             finished: false,
-        })
+        };
+        resampler.reset();
+        Some(resampler)
     }
 
     /// Clear the filter history after seeking or skipping corrupted input.
     pub fn reset(&mut self) {
+        let half = self.taps / 2;
         self.input.clear();
-        self.input.resize((TAPS / 2 - 1) * self.channels, 0.0);
-        self.next = TAPS / 2 - 1;
+        self.input.resize((half - 1) * self.channels, 0.0);
+        self.next = half - 1;
         self.phase = 0;
         self.input_frames = 0;
         self.output_frames = 0;
@@ -89,26 +111,36 @@ impl Resampler {
         self.finished = true;
         let output_frames = (self.input_frames * self.up as u64).div_ceil(self.down as u64);
         self.input
-            .resize(self.input.len() + TAPS / 2 * self.channels, 0.0);
+            .resize(self.input.len() + self.taps / 2 * self.channels, 0.0);
         self.convert(Some(output_frames))
     }
 
     fn convert(&mut self, output_limit: Option<u64>) -> Vec<f64> {
-        let half = TAPS / 2;
+        let half = self.taps / 2;
         let frames = self.input.len() / self.channels;
-        let mut out = Vec::new();
+        let available = (frames.saturating_sub(self.next + half) as u64 * self.up as u64)
+            .div_ceil(self.down as u64) as usize;
+        let mut out = Vec::with_capacity(available * self.channels);
         while self.next + half < frames
             && output_limit.is_none_or(|limit| self.output_frames < limit)
         {
-            let taps = &self.taps[self.phase * TAPS..(self.phase + 1) * TAPS];
-            let start = (self.next + 1 - half) * self.channels;
-            for channel in 0..self.channels {
-                let sum: f64 = taps
-                    .iter()
-                    .enumerate()
-                    .map(|(k, tap)| self.input[start + k * self.channels + channel] * tap)
-                    .sum();
-                out.push(sum);
+            let window = &self.input[(self.next + 1 - half) * self.channels..];
+            if self.phases == self.up {
+                let taps = self.row(self.phase);
+                for channel in 0..self.channels {
+                    out.push(dot(taps, window, channel, self.channels));
+                }
+            } else {
+                // Sit between two of the table's phases and blend their outputs.
+                let position = self.phase as u64 * self.phases as u64;
+                let row = (position / self.up as u64) as usize;
+                let fraction = (position % self.up as u64) as f64 / self.up as f64;
+                let (before, after) = (self.row(row), self.row(row + 1));
+                for channel in 0..self.channels {
+                    let a = dot(before, window, channel, self.channels);
+                    let b = dot(after, window, channel, self.channels);
+                    out.push(a + (b - a) * fraction);
+                }
             }
             let position = self.phase + self.down;
             self.next += position / self.up;
@@ -121,32 +153,47 @@ impl Resampler {
         self.next -= keep_from;
         out
     }
+
+    fn row(&self, row: usize) -> &[f64] {
+        &self.table[row * self.taps..(row + 1) * self.taps]
+    }
+}
+
+/// One channel of `input`, interleaved over `channels`, weighted by `taps`.
+#[inline]
+fn dot(taps: &[f64], input: &[f64], channel: usize, channels: usize) -> f64 {
+    taps.iter()
+        .zip(input[channel..].iter().step_by(channels))
+        .map(|(tap, sample)| tap * sample)
+        .sum()
 }
 
 /// The taps for every phase: a sinc cut just under the lower of the two
 /// Nyquist limits, under a Blackman window, each phase scaled to unit
-/// gain so a steady level comes out at the level it went in.
-fn kernel(up: usize, down: usize) -> Vec<f64> {
-    let half = (TAPS / 2) as f64;
+/// gain so a steady level comes out at the level it went in. When the table
+/// holds fewer phases than `up`, one more row closes the last interval.
+fn kernel(up: usize, down: usize, taps: usize, phases: usize) -> Vec<f64> {
+    let half = (taps / 2) as f64;
     let cutoff = 0.475 * (up as f64 / down as f64).min(1.0);
-    let mut taps = Vec::with_capacity(up * TAPS);
-    for phase in 0..up {
-        let offset = phase as f64 / up as f64;
-        let start = taps.len();
-        for k in 0..TAPS {
+    let rows = if phases == up { phases } else { phases + 1 };
+    let mut table = Vec::with_capacity(rows * taps);
+    for row in 0..rows {
+        let offset = row as f64 / phases as f64;
+        let start = table.len();
+        for k in 0..taps {
             let u = offset + half - 1.0 - k as f64;
             let x = u / half;
             let window = 0.42 + 0.5 * (PI * x).cos() + 0.08 * (2.0 * PI * x).cos();
             let angle = 2.0 * PI * cutoff * u;
             let sinc = if u == 0.0 { 1.0 } else { angle.sin() / angle };
-            taps.push(2.0 * cutoff * sinc * window);
+            table.push(2.0 * cutoff * sinc * window);
         }
-        let sum: f64 = taps[start..].iter().sum();
-        for tap in &mut taps[start..] {
+        let sum: f64 = table[start..].iter().sum();
+        for tap in &mut table[start..] {
             *tap /= sum;
         }
     }
-    taps
+    table
 }
 
 fn gcd(a: u32, b: u32) -> u32 {
@@ -266,5 +313,55 @@ mod tests {
         output.extend(resampler.finish());
         assert!(output.chunks_exact(2).all(|frame| frame[1] == 0.0));
         assert!(output.chunks_exact(2).any(|frame| frame[0].abs() > 0.1));
+    }
+
+    /// The output's RMS level over its steady middle, after `from` frames of
+    /// a stereo tone at `hz`.
+    fn steady_rms(hz: f64, from: u32) -> f64 {
+        let mut resampler = Resampler::new(from, 44100, 2).unwrap();
+        let mut out = resampler.process(&tone(hz, from, from as usize));
+        out.extend(resampler.finish());
+        let middle = &out[2000..out.len() - 2000];
+        (middle.iter().map(|sample| sample * sample).sum::<f64>() / middle.len() as f64).sqrt()
+    }
+
+    #[test]
+    fn the_passband_is_flat_and_tones_above_the_output_nyquist_limit_do_not_alias() {
+        // A half-scale tone has an RMS level of 0.354. Each of these would fold
+        // back into the audible band if the filter let it through.
+        for (hz, from) in [(23_500.0, 48000), (25_000.0, 96000), (30_000.0, 192_000)] {
+            let level = steady_rms(hz, from);
+            let db = 20.0 * (level / 0.354).log10();
+            assert!(db < -75.0, "{hz} Hz at {from} Hz leaks at {db:.1} dB");
+        }
+        for from in [22050, 48000, 96000, 192_000, 384_000] {
+            for hz in [1000.0, 10_000.0, 20_000.0] {
+                if hz < f64::from(from) * 0.45 {
+                    let level = steady_rms(hz, from);
+                    let db = 20.0 * (level / 0.354).log10();
+                    assert!(
+                        db.abs() < 0.05,
+                        "{hz} Hz at {from} Hz comes out at {db:.2} dB"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn high_rates_downsample_accurately() {
+        check(96000, 44100, 0.005);
+        check(192_000, 44100, 0.005);
+        check(384_000, 44100, 0.005);
+    }
+
+    #[test]
+    fn uncommon_rates_interpolate_phases_from_a_bounded_table() {
+        let resampler = Resampler::new(48001, 44100, 2).unwrap();
+        assert_eq!(resampler.up, 44100);
+        assert!(resampler.phases < resampler.up);
+        assert!(resampler.table.len() <= (MAX_PHASES + 1) * resampler.taps);
+        check(48001, 44100, 0.005);
+        check(8001, 44100, 0.02);
     }
 }
