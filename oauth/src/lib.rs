@@ -18,7 +18,7 @@
 //! `docs/device-authorization.md`.
 
 use std::{
-    io::{self, BufRead, BufReader, Write},
+    io::{self, BufRead, BufReader, IsTerminal, Write},
     net::{SocketAddr, TcpListener},
     sync::mpsc,
     time::{Duration, Instant},
@@ -282,11 +282,11 @@ fn build_token(
         _ => default_scopes.to_vec(),
     };
     let refresh_token = match resp.refresh_token() {
-        Some(t) => t.secret().to_string(),
+        Some(t) => t.secret().clone(),
         _ => "".to_string(), // Spotify always provides a refresh token.
     };
     OAuthToken {
-        access_token: resp.access_token().secret().to_string(),
+        access_token: resp.access_token().secret().clone(),
         refresh_token,
         expires_at: Instant::now()
             + resp
@@ -294,6 +294,15 @@ fn build_token(
                 .unwrap_or_else(|| Duration::from_secs(3600)),
         token_type: format!("{:?}", resp.token_type()),
         scopes: token_scopes,
+    }
+}
+
+fn print_browse_to(url: &str) {
+    let safe: String = url.chars().filter(|c| !c.is_control()).collect();
+    if io::stdout().is_terminal() {
+        println!("Browse to: \x1b]8;;{safe}\x1b\\{safe}\x1b]8;;\x1b\\");
+    } else {
+        println!("Browse to: {safe}");
     }
 }
 
@@ -317,7 +326,7 @@ impl OAuthClient {
         if self.should_open_url {
             open::that_in_background(auth_url.as_str());
         }
-        println!("Browse to: {auth_url}");
+        print_browse_to(auth_url.as_str());
 
         pkce_verifier
     }
@@ -458,7 +467,7 @@ impl OAuthClientBuilder {
             }
         })?;
 
-        let client = BasicClient::new(ClientId::new(self.client_id.to_string()))
+        let client = BasicClient::new(ClientId::new(self.client_id.clone()))
             .set_auth_uri(auth_url)
             .set_token_uri(token_url)
             .set_redirect_uri(redirect_url);
@@ -514,7 +523,7 @@ pub fn get_access_token(
         .set_pkce_challenge(pkce_challenge)
         .url();
 
-    println!("Browse to: {auth_url}");
+    print_browse_to(auth_url.as_str());
 
     let code = match get_socket_address(redirect_uri) {
         Some(addr) => get_authcode_listener(addr, String::from("Go back to your terminal :)")),
@@ -543,17 +552,17 @@ pub fn get_access_token(
         _ => scopes.into_iter().map(Into::into).collect(),
     };
     let refresh_token = match token.refresh_token() {
-        Some(t) => t.secret().to_string(),
+        Some(t) => t.secret().clone(),
         _ => "".to_string(), // Spotify always provides a refresh token.
     };
     Ok(OAuthToken {
-        access_token: token.access_token().secret().to_string(),
+        access_token: token.access_token().secret().clone(),
         refresh_token,
         expires_at: Instant::now()
             + token
                 .expires_in()
                 .unwrap_or_else(|| Duration::from_secs(3600)),
-        token_type: format!("{:?}", token.token_type()).to_string(), // Urgh!?
+        token_type: format!("{:?}", token.token_type()),
         scopes: token_scopes,
     })
 }
@@ -616,7 +625,7 @@ impl DeviceAuthClient {
         if self.should_open_url {
             open::that_in_background(url);
         }
-        println!("Browse to: {url}");
+        print_browse_to(url);
         println!("If prompted, enter code: {}", auth.user_code());
     }
 

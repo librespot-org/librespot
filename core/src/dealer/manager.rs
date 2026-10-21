@@ -148,6 +148,8 @@ impl DealerManager {
         debug!("Launching dealer");
 
         let session = self.session();
+
+        let proxy = session.config().proxy.clone();
         // the url has to be a function that can retrieve a new url,
         // otherwise when we later try to reconnect with the initial url/token
         // and the token is expired we will just get 401 error
@@ -156,7 +158,7 @@ impl DealerManager {
         let dealer = self
             .lock(move |inner| inner.builder.take())
             .ok_or(DealerError::BuilderNotAvailable)?
-            .launch(get_url, None)
+            .launch(get_url, proxy)
             .await
             .map_err(DealerError::LaunchFailure)?;
 

@@ -44,7 +44,14 @@ pub enum HandshakeError {
     InvalidLength,
     #[error("server key verification failed")]
     VerificationFailed,
+    #[error("invalid handshake packet size {0}")]
+    InvalidPacketSize(usize),
 }
+
+// The size that prefixes a handshake packet counts its own four bytes. The
+// server's response holds a few keys and signatures, so anything near this
+// size is not a handshake packet, and it arrives before the server is verified.
+const MAX_HANDSHAKE_PACKET_SIZE: usize = 64 * 1024;
 
 pub async fn handshake<T: AsyncRead + AsyncWrite + Unpin>(
     mut connection: T,
@@ -233,9 +240,20 @@ where
 {
     let header = read_into_accumulator(connection, 4, acc).await?;
     let size = BigEndian::read_u32(header) as usize;
-    let data = read_into_accumulator(connection, size - 4, acc).await?;
+    let data = read_into_accumulator(connection, packet_body_size(size)?, acc).await?;
     let message = M::parse_from_bytes(data)?;
     Ok(message)
+}
+
+fn packet_body_size(size: usize) -> io::Result<usize> {
+    size.checked_sub(4)
+        .filter(|_| size <= MAX_HANDSHAKE_PACKET_SIZE)
+        .ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                HandshakeError::InvalidPacketSize(size),
+            )
+        })
 }
 
 async fn read_into_accumulator<'b, T: AsyncRead + Unpin>(
@@ -276,8 +294,43 @@ fn compute_keys(shared_secret: &[u8], packets: &[u8]) -> io::Result<(Vec<u8>, Ve
 
 #[cfg(test)]
 mod tests {
-    use super::platform_for;
+    use std::io;
+
+    use super::{APResponseMessage, MAX_HANDSHAKE_PACKET_SIZE, platform_for, recv_packet};
     use crate::protocol::keyexchange::Platform;
+
+    async fn recv_with_size(size: u32) -> (io::Result<APResponseMessage>, usize) {
+        let mut stream = size.to_be_bytes().to_vec();
+        stream.extend_from_slice(&[0; 16]);
+        let mut acc = Vec::new();
+        let result = recv_packet(&mut stream.as_slice(), &mut acc).await;
+        (result, acc.len())
+    }
+
+    #[tokio::test]
+    async fn packet_sizes_below_the_header_are_rejected() {
+        for size in [0, 3] {
+            let (result, _) = recv_with_size(size).await;
+            let err = result.expect_err("a size below four bytes must fail");
+            assert_eq!(err.kind(), io::ErrorKind::InvalidData, "size {size}");
+        }
+    }
+
+    #[tokio::test]
+    async fn packet_sizes_over_the_limit_are_rejected_before_allocating() {
+        let size = (MAX_HANDSHAKE_PACKET_SIZE + 1) as u32;
+        let (result, accumulated) = recv_with_size(size).await;
+        let err = result.expect_err("an oversized packet must fail");
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+        assert_eq!(accumulated, 4, "only the size header is buffered");
+    }
+
+    #[tokio::test]
+    async fn an_empty_packet_is_read() {
+        let (result, accumulated) = recv_with_size(4).await;
+        result.expect("a packet holding only its size is valid");
+        assert_eq!(accumulated, 4);
+    }
 
     #[test]
     fn windows_on_arm_uses_supported_desktop_platform() {
