@@ -38,6 +38,15 @@ enum AlsaError {
         e: alsa::Error,
     },
 
+    #[error(
+        "<AlsaSink> Device {device} Does Not Support Sample Rate {requested}, Nearest Supported is {actual}"
+    )]
+    SampleRateMismatch {
+        device: String,
+        requested: u32,
+        actual: u32,
+    },
+
     #[error("<AlsaSink> Device {device} Unsupported Access Type RWInterleaved, {e}")]
     UnsupportedAccessType { device: String, e: alsa::Error },
 
@@ -73,6 +82,9 @@ impl From<AlsaError> for SinkError {
         match e {
             DrainFailure(_) | OnWrite(_) => SinkError::OnWrite(es),
             PcmSetUp { .. } => SinkError::ConnectionRefused(es),
+            UnsupportedSampleRate { .. } | SampleRateMismatch { .. } => {
+                SinkError::UnsupportedSampleRate(es)
+            }
             NotConnected => SinkError::NotConnected(es),
             _ => SinkError::InvalidParams(es),
         }
@@ -192,6 +204,19 @@ fn open_device(dev_name: &str, format: AudioFormat, sample_rate: u32) -> SinkRes
                 e,
             }
         })?;
+
+        // `ValueOr::Nearest` silently picks the closest rate the device supports.
+        // Playing at any other rate than requested would change the speed and pitch.
+        let actual_rate = hwp.get_rate().map_err(AlsaError::HwParams)?;
+
+        if actual_rate != sample_rate {
+            return Err(AlsaError::SampleRateMismatch {
+                device: dev_name.to_string(),
+                requested: sample_rate,
+                actual: actual_rate,
+            }
+            .into());
+        }
 
         hwp.set_channels(NUM_CHANNELS as u32)
             .map_err(|e| AlsaError::UnsupportedChannelCount {
@@ -416,8 +441,23 @@ impl Open for AlsaSink {
 
 impl Sink for AlsaSink {
     fn start(&mut self) -> SinkResult<()> {
+        self.start_at(SAMPLE_RATE)
+    }
+
+    fn start_at(&mut self, sample_rate: u32) -> SinkResult<()> {
         if self.pcm.is_none() {
-            self.start_internal(SAMPLE_RATE)?;
+            let (pcm, bytes_per_period) = open_device(&self.device, self.format, sample_rate)?;
+            self.pcm = Some(pcm);
+
+            if self.period_buffer.capacity() != bytes_per_period {
+                self.period_buffer = Vec::with_capacity(bytes_per_period);
+            }
+
+            // Should always match the "Period Buffer size in bytes: " trace! message.
+            trace!(
+                "Period Buffer capacity: {:?}",
+                self.period_buffer.capacity()
+            );
         }
 
         Ok(())
@@ -434,13 +474,6 @@ impl Sink for AlsaSink {
 
             pcm.drain().map_err(AlsaError::DrainFailure)?;
         }
-
-        Ok(())
-    }
-
-    fn update_sample_rate(&mut self, new_sample_rate: u32) -> SinkResult<()> {
-        self.stop()?;
-        self.start_internal(new_sample_rate)?;
 
         Ok(())
     }
@@ -479,23 +512,6 @@ impl SinkAsBytes for AlsaSink {
 
 impl AlsaSink {
     pub const NAME: &'static str = "alsa";
-
-    fn start_internal(&mut self, sample_rate: u32) -> SinkResult<()> {
-        let (pcm, bytes_per_period) = open_device(&self.device, self.format, sample_rate)?;
-        self.pcm = Some(pcm);
-
-        if self.period_buffer.capacity() != bytes_per_period {
-            self.period_buffer = Vec::with_capacity(bytes_per_period);
-        }
-
-        // Should always match the "Period Buffer size in bytes: " trace! message.
-        trace!(
-            "Period Buffer capacity: {:?}",
-            self.period_buffer.capacity()
-        );
-
-        Ok(())
-    }
 
     fn write_buf(&mut self) -> SinkResult<()> {
         if self.pcm.is_some() {

@@ -38,7 +38,7 @@ use futures_util::{
 use librespot_metadata::{audio::UniqueFields, track::Tracks};
 
 use crate::SAMPLES_PER_SECOND;
-use crate::audio_backend::SinkError;
+use crate::audio_backend::{SinkError, SinkResult};
 use symphonia::core::io::MediaSource;
 use symphonia::core::probe::Hint;
 use tokio::sync::{mpsc, oneshot};
@@ -816,6 +816,14 @@ impl PlayerState {
         }
     }
 
+    fn sample_rate(&self) -> Option<u32> {
+        use self::PlayerState::*;
+        match *self {
+            Paused { sample_rate, .. } | Playing { sample_rate, .. } => Some(sample_rate),
+            _ => None,
+        }
+    }
+
     fn playing_to_end_of_track(&mut self) {
         use self::PlayerState::*;
         let new_state = mem::replace(self, Invalid);
@@ -1485,7 +1493,11 @@ impl Future for PlayerInternal {
             }
 
             if self.state.is_playing() {
-                self.ensure_sink_running();
+                if let Some(sample_rate) = self.state.sample_rate() {
+                    if let Err(e) = self.ensure_sink_running(sample_rate) {
+                        self.handle_sink_start_error(e);
+                    }
+                }
 
                 if let PlayerState::Playing {
                     ref track_id,
@@ -1652,27 +1664,47 @@ impl Future for PlayerInternal {
 }
 
 impl PlayerInternal {
-    fn ensure_sink_running(&mut self) {
+    fn ensure_sink_running(&mut self, sample_rate: u32) -> SinkResult<()> {
+        if self.sink_status == SinkStatus::Running && self.sink_sample_rate != sample_rate {
+            debug!(
+                "Changing sink sample rate from {} Hz to {} Hz",
+                self.sink_sample_rate, sample_rate
+            );
+            // Sets `sink_status` to `TemporarilyClosed`, so the sink is restarted at the new rate below.
+            self.ensure_sink_stopped(true);
+        }
+
         if self.sink_status != SinkStatus::Running {
             trace!("== Starting sink ==");
             if let Some(callback) = &mut self.sink_event_callback {
                 callback(SinkStatus::Running);
             }
-            match self.sink.start() {
-                Ok(()) => self.sink_status = SinkStatus::Running,
-                Err(e) => {
-                    error!("{e}");
-                    self.handle_pause();
-                }
-            }
+            self.sink.start_at(sample_rate)?;
+            self.sink_status = SinkStatus::Running;
+            self.sink_sample_rate = sample_rate;
+        }
 
-            match self.sink.update_sample_rate(self.sink_sample_rate) {
-                Ok(()) => {}
-                Err(e) => {
-                    error!("{e}");
-                    self.handle_pause();
-                }
+        Ok(())
+    }
+
+    fn handle_sink_start_error(&mut self, e: SinkError) {
+        error!("{e}");
+
+        match self.state {
+            // The sink can never play this track at its sample rate, so skip it.
+            PlayerState::Playing {
+                ref track_id,
+                play_request_id,
+                ..
+            } if matches!(e, SinkError::UnsupportedSampleRate(_)) => {
+                let track_id = track_id.clone();
+                self.state.playing_to_end_of_track();
+                self.send_event(PlayerEvent::Unavailable {
+                    track_id,
+                    play_request_id,
+                });
             }
+            _ => self.handle_pause(),
         }
     }
 
@@ -1754,6 +1786,7 @@ impl PlayerInternal {
                 ref track_id,
                 play_request_id,
                 stream_position_ms,
+                sample_rate,
                 ..
             } => {
                 let track_id = track_id.clone();
@@ -1764,7 +1797,9 @@ impl PlayerInternal {
                     play_request_id,
                     position_ms: stream_position_ms,
                 });
-                self.ensure_sink_running();
+                if let Err(e) = self.ensure_sink_running(sample_rate) {
+                    self.handle_sink_start_error(e);
+                }
             }
             PlayerState::Loading {
                 ref mut start_playback,
@@ -1959,60 +1994,8 @@ impl PlayerInternal {
             NormalisationData::get_factor(&config, loaded_track.normalisation_data);
 
         if start_playback {
-            self.ensure_sink_running();
-
-            if self.sink_sample_rate != loaded_track.sample_rate {
-                debug!(
-                    "Updating sink sample rate from {} Hz to {} Hz",
-                    self.sink_sample_rate, loaded_track.sample_rate
-                );
-
-                match self.sink.update_sample_rate(loaded_track.sample_rate) {
-                    Ok(()) => {
-                        self.sink_sample_rate = loaded_track.sample_rate;
-                    }
-                    Err(e) => {
-                        error!("{e}");
-
-                        let reaction_event = match e {
-                            SinkError::SampleRateChangeNotSupported => {
-                                // The sink does not support changing its sample rate; this track
-                                // will never be playable.
-                                PlayerEvent::Unavailable {
-                                    track_id: track_id.clone(),
-                                    play_request_id,
-                                }
-                            }
-                            _ => {
-                                // Could be a transient error; try the next track
-                                PlayerEvent::EndOfTrack {
-                                    track_id: track_id.clone(),
-                                    play_request_id,
-                                }
-                            }
-                        };
-
-                        self.send_event(reaction_event);
-
-                        self.state = PlayerState::EndOfTrack {
-                            track_id,
-                            play_request_id,
-                            loaded_track,
-                        };
-
-                        return;
-                    }
-                }
-            }
-
-            self.send_event(PlayerEvent::Playing {
-                track_id: track_id.clone(),
-                play_request_id,
-                position_ms,
-            });
-
             self.state = PlayerState::Playing {
-                track_id,
+                track_id: track_id.clone(),
                 play_request_id,
                 decoder: loaded_track.decoder,
                 audio_item: loaded_track.audio_item,
@@ -2028,6 +2011,15 @@ impl PlayerInternal {
                 is_explicit: loaded_track.is_explicit,
                 sample_rate: loaded_track.sample_rate,
             };
+
+            match self.ensure_sink_running(loaded_track.sample_rate) {
+                Ok(()) => self.send_event(PlayerEvent::Playing {
+                    track_id,
+                    play_request_id,
+                    position_ms,
+                }),
+                Err(e) => self.handle_sink_start_error(e),
+            }
         } else {
             self.ensure_sink_stopped(false);
 

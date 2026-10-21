@@ -92,10 +92,6 @@ impl Sink for StdoutSink {
         Ok(())
     }
 
-    fn update_sample_rate(&mut self, _new_sample_rate: u32) -> SinkResult<()> {
-        Err(SinkError::SampleRateChangeNotSupported)
-    }
-
     sink_as_bytes!();
 }
 
