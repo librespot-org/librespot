@@ -396,16 +396,21 @@ impl Spirc {
         Ok(self.commands.send(SpircCommand::Load(command))?)
     }
 
-    /// Adds a track, episode, album or playlist to the queue.
+    /// Adds a track, episode, local file, album or playlist to the queue.
     ///
     /// Does nothing if we are not the active device.
     ///
     /// For albums and playlists, all tracks/episodes are resolved and added to the queue.
+    /// A local file plays when [`PlayerConfig::local_file_directories`] holds it, as it
+    /// does in a context.
+    ///
+    /// [`PlayerConfig::local_file_directories`]: librespot_playback::config::PlayerConfig::local_file_directories
     pub fn add_to_queue(&self, uri: SpotifyUri) -> Result<(), Error> {
         if !matches!(
             uri,
             SpotifyUri::Track { .. }
                 | SpotifyUri::Episode { .. }
+                | SpotifyUri::Local { .. }
                 | SpotifyUri::Album { .. }
                 | SpotifyUri::Playlist { .. }
         ) {
@@ -1639,7 +1644,9 @@ impl SpircTask {
 
     async fn handle_add_to_queue(&mut self, uri: SpotifyUri) {
         let track_uris: Vec<String> = match uri {
-            SpotifyUri::Track { .. } | SpotifyUri::Episode { .. } => vec![uri.to_uri()],
+            SpotifyUri::Track { .. } | SpotifyUri::Episode { .. } | SpotifyUri::Local { .. } => {
+                vec![uri.to_uri()]
+            }
             SpotifyUri::Album { .. } | SpotifyUri::Playlist { .. } => {
                 match self.session.spclient().get_context(&uri.to_uri()).await {
                     Ok(context) => context
