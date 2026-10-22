@@ -9,8 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- [playback] Resample stereo local files to 44.1 kHz, including the final audio frames, and clear the resampler history when seeking
-- [playback] Play local files with any channel count: mono plays on both sides and surround is mixed down to stereo, and the resampling filter lengthens with the rate ratio so 96 and 192 kHz files are rejected above 22 kHz as cleanly as 48 kHz ones
+- [playback] Play local files from 8 to 384 kHz using Rubato to resample to 44.1 kHz, preserving duration and resetting filter history on seek; mono plays on both sides and wider layouts are mixed down to stereo
 - [connect] Picking a track in a list plays that track: an empty `track_uri` (or `track_uid`) sent next to the one that identifies the track is ignored, instead of failing to resolve and playing the first track of the context
 
 ### Added

@@ -1,208 +1,145 @@
-// Adapted from spiraljng/librespot commit a4bc693865a2a88ed056b2a0c7f75cb2e6b695a0 (MIT).
-// Original local-file resampling work by arlo (@spiraljng).
+// Local-file playback originally adapted from spiraljng/librespot commit
+// a4bc693865a2a88ed056b2a0c7f75cb2e6b695a0 (MIT), by arlo (@spiraljng).
+// Channel and spectral regression coverage contributed by Carmine Paolino (@crmne).
 
-//! Sample rate conversion into the player's rate.
+//! Streaming sample rate conversion into the player's fixed rate.
 //!
-//! Spotify streams arrive at [`crate::SAMPLE_RATE`] and the playback pipeline is
-//! built around it, but a local file can carry any rate. Converting here
-//! lets those files play instead of being rejected, and keeps every
-//! downstream stage (sink, mixer, position tracking) on one rate.
-//!
-//! It uses a polyphase windowed-sinc filter and computes only the taps
-//! needed for each output sample.
+//! Rubato owns the filter and interpolation. This adapter batches interleaved
+//! decoder packets, removes the library's startup delay and flushes its tail
+//! without extending the source duration. Native-rate audio bypasses it.
 
-use std::f64::consts::PI;
+use audioadapter_buffers::direct::InterleavedSlice;
+use rubato::{Async, FixedAsync, Resampler as _, SincInterpolationParameters, WindowFunction};
 
-/// Input frames each output frame is made from when the input rate is at or
-/// below the output rate. A hundred and twenty-eight keep the passband flat
-/// to 20 kHz and what would alias or image some 80 dB down. Downsampling
-/// lengthens the filter by the rate ratio, so the transition band stays as
-/// narrow in output hertz at 96 or 192 kHz as at 48 kHz.
-const BASE_TAPS: usize = 128;
-
-/// The most filter phases kept in the coefficient table. Common rate pairs
-/// need at most 441 (8 kHz into 44.1 kHz). A rarer pair that needs more, such
-/// as 48,001 Hz, which needs 44,100, interpolates between neighbouring phases
-/// instead, so the table stays small whatever the input rate.
-const MAX_PHASES: usize = 512;
+/// A fixed input block keeps buffering independent of container packet sizes.
+const CHUNK_FRAMES: usize = 2048;
 
 pub struct Resampler {
-    up: usize,
-    down: usize,
+    inner: Async<f64>,
+    from_hz: u32,
+    to_hz: u32,
     channels: usize,
-    /// Coefficients in each phase.
-    taps: usize,
-    /// Phases in `table`. `up` when it fits under [`MAX_PHASES`], when every
-    /// output position has a phase of its own.
-    phases: usize,
-    /// `phases` rows of `taps` coefficients, each normalised to unit gain,
-    /// plus one more row when interpolating, for the last phase to lean on.
-    table: Vec<f64>,
-    /// Interleaved input frames still in reach: the tail of what came
-    /// before, then whatever has not produced its outputs yet.
     input: Vec<f64>,
-    /// The frame in `input` the next output sample sits on or just after.
-    next: usize,
-    /// How far past `next` the output sits, in steps of `1 / up`.
-    phase: usize,
+    output: Vec<f64>,
+    delay_left: usize,
     input_frames: u64,
     output_frames: u64,
     finished: bool,
 }
 
 impl Resampler {
-    /// `None` when the rates agree and nothing needs doing.
+    /// `None` when the rates agree or the format is outside the decoder's limits.
     pub fn new(from_hz: u32, to_hz: u32, channels: usize) -> Option<Self> {
-        if from_hz == to_hz || from_hz == 0 || to_hz == 0 || channels == 0 {
+        if from_hz == to_hz
+            || !(8000..=384000).contains(&from_hz)
+            || !(8000..=384000).contains(&to_hz)
+            || channels == 0
+        {
             return None;
         }
-        let divisor = gcd(from_hz, to_hz);
-        let up = (to_hz / divisor) as usize;
-        let down = (from_hz / divisor) as usize;
-        let stretch = (down as f64 / up as f64).max(1.0);
-        let taps = ((BASE_TAPS as f64 * stretch).ceil() as usize).next_multiple_of(2);
-        let phases = up.min(MAX_PHASES);
-        let mut resampler = Self {
-            up,
-            down,
+        let ratio = f64::from(to_hz) / f64::from(from_hz);
+        // Preserve a narrow transition band at high input rates. Rubato selects
+        // the cutoff for this window and rounds the filter length to SIMD width.
+        // Its 128-phase table stays bounded even for uncommon rates like 48,001 Hz.
+        let taps = (256.0 / ratio.min(1.0)).ceil() as usize;
+        let inner = Async::new_sinc(
+            ratio,
+            1.0,
+            &SincInterpolationParameters::new(taps, WindowFunction::BlackmanHarris2),
+            CHUNK_FRAMES,
             channels,
-            taps,
-            phases,
-            table: kernel(up, down, taps, phases),
-            input: Vec::new(),
-            next: 0,
-            phase: 0,
+            FixedAsync::Input,
+        )
+        .expect("valid fixed resampling parameters");
+        // The first generated sample is already one output step into the
+        // stream. Keep the residual alignment within one output frame.
+        let delay_left = inner.output_delay().saturating_sub(1);
+        let output = vec![0.0; inner.output_frames_max() * channels];
+        Some(Self {
+            inner,
+            from_hz,
+            to_hz,
+            channels,
+            input: Vec::with_capacity(CHUNK_FRAMES * channels),
+            output,
+            delay_left,
             input_frames: 0,
             output_frames: 0,
             finished: false,
-        };
-        resampler.reset();
-        Some(resampler)
+        })
     }
 
-    /// Clear the filter history after seeking or skipping corrupted input.
+    /// Discard filter history and pending audio after seeking or corrupt input.
     pub fn reset(&mut self) {
-        let half = self.taps / 2;
+        self.inner.reset();
         self.input.clear();
-        self.input.resize((half - 1) * self.channels, 0.0);
-        self.next = half - 1;
-        self.phase = 0;
+        self.delay_left = self.inner.output_delay().saturating_sub(1);
         self.input_frames = 0;
         self.output_frames = 0;
         self.finished = false;
     }
 
-    /// Converts complete interleaved frames, retaining the lookahead needed
-    /// by the symmetric filter until the following chunk arrives.
-    pub fn process(&mut self, samples: &[f64]) -> Vec<f64> {
+    /// Convert complete interleaved frames, retaining at most one input block.
+    pub fn process(&mut self, mut samples: &[f64]) -> Vec<f64> {
         debug_assert_eq!(samples.len() % self.channels, 0);
         debug_assert!(!self.finished);
         self.input_frames += (samples.len() / self.channels) as u64;
-        self.input.extend_from_slice(samples);
-        self.convert(None)
+        let mut out = Vec::new();
+        let block_samples = CHUNK_FRAMES * self.channels;
+        while !samples.is_empty() {
+            let count = (block_samples - self.input.len()).min(samples.len());
+            self.input.extend_from_slice(&samples[..count]);
+            samples = &samples[count..];
+            if self.input.len() == block_samples {
+                self.convert(&mut out);
+            }
+        }
+        out
     }
 
-    /// Flush the filter's lookahead with silence, without extending the audio's
-    /// duration. Repeated calls produce no additional samples.
+    /// Flush with silence, emitting exactly the source duration, once.
     pub fn finish(&mut self) -> Vec<f64> {
         if self.finished {
             return Vec::new();
         }
         self.finished = true;
-        let output_frames = (self.input_frames * self.up as u64).div_ceil(self.down as u64);
-        self.input
-            .resize(self.input.len() + self.taps / 2 * self.channels, 0.0);
-        self.convert(Some(output_frames))
-    }
-
-    fn convert(&mut self, output_limit: Option<u64>) -> Vec<f64> {
-        let half = self.taps / 2;
-        let frames = self.input.len() / self.channels;
-        let available = (frames.saturating_sub(self.next + half) as u64 * self.up as u64)
-            .div_ceil(self.down as u64) as usize;
-        let mut out = Vec::with_capacity(available * self.channels);
-        while self.next + half < frames
-            && output_limit.is_none_or(|limit| self.output_frames < limit)
-        {
-            let window = &self.input[(self.next + 1 - half) * self.channels..];
-            if self.phases == self.up {
-                let taps = self.row(self.phase);
-                for channel in 0..self.channels {
-                    out.push(dot(taps, window, channel, self.channels));
-                }
-            } else {
-                // Sit between two of the table's phases and blend their outputs.
-                let position = self.phase as u64 * self.phases as u64;
-                let row = (position / self.up as u64) as usize;
-                let fraction = (position % self.up as u64) as f64 / self.up as f64;
-                let (before, after) = (self.row(row), self.row(row + 1));
-                for channel in 0..self.channels {
-                    let a = dot(before, window, channel, self.channels);
-                    let b = dot(after, window, channel, self.channels);
-                    out.push(a + (b - a) * fraction);
-                }
-            }
-            let position = self.phase + self.down;
-            self.next += position / self.up;
-            self.phase = position % self.up;
-            self.output_frames += 1;
+        let mut out = Vec::new();
+        while self.output_frames < self.total_output_frames() {
+            self.input.resize(CHUNK_FRAMES * self.channels, 0.0);
+            self.convert(&mut out);
         }
-        // Keep only the frames the next output still reaches back to.
-        let keep_from = (self.next + 1 - half).min(frames);
-        self.input.drain(..keep_from * self.channels);
-        self.next -= keep_from;
         out
     }
 
-    fn row(&self, row: usize) -> &[f64] {
-        &self.table[row * self.taps..(row + 1) * self.taps]
+    fn total_output_frames(&self) -> u64 {
+        (self.input_frames * u64::from(self.to_hz)).div_ceil(u64::from(self.from_hz))
+    }
+
+    /// Buffers are sized from Rubato's limits and always contain one full block.
+    fn convert(&mut self, out: &mut Vec<f64>) {
+        let input = InterleavedSlice::new(&self.input, self.channels, CHUNK_FRAMES)
+            .expect("complete interleaved input block");
+        let output_frames = self.output.len() / self.channels;
+        let mut output = InterleavedSlice::new_mut(&mut self.output, self.channels, output_frames)
+            .expect("preallocated interleaved output block");
+        let (_, produced) = self
+            .inner
+            .process_into_buffer(&input, &mut output, None)
+            .expect("buffers sized to Rubato's input and output limits");
+        let skip = self.delay_left.min(produced);
+        self.delay_left -= skip;
+        let available = produced - skip;
+        let remaining = self.total_output_frames() - self.output_frames;
+        let frames = remaining.min(available as u64) as usize;
+        out.extend_from_slice(&self.output[skip * self.channels..(skip + frames) * self.channels]);
+        self.output_frames += frames as u64;
+        self.input.clear();
     }
 }
-
-/// One channel of `input`, interleaved over `channels`, weighted by `taps`.
-#[inline]
-fn dot(taps: &[f64], input: &[f64], channel: usize, channels: usize) -> f64 {
-    taps.iter()
-        .zip(input[channel..].iter().step_by(channels))
-        .map(|(tap, sample)| tap * sample)
-        .sum()
-}
-
-/// The taps for every phase: a sinc cut just under the lower of the two
-/// Nyquist limits, under a Blackman window, each phase scaled to unit
-/// gain so a steady level comes out at the level it went in. When the table
-/// holds fewer phases than `up`, one more row closes the last interval.
-fn kernel(up: usize, down: usize, taps: usize, phases: usize) -> Vec<f64> {
-    let half = (taps / 2) as f64;
-    let cutoff = 0.475 * (up as f64 / down as f64).min(1.0);
-    let rows = if phases == up { phases } else { phases + 1 };
-    let mut table = Vec::with_capacity(rows * taps);
-    for row in 0..rows {
-        let offset = row as f64 / phases as f64;
-        let start = table.len();
-        for k in 0..taps {
-            let u = offset + half - 1.0 - k as f64;
-            let x = u / half;
-            let window = 0.42 + 0.5 * (PI * x).cos() + 0.08 * (2.0 * PI * x).cos();
-            let angle = 2.0 * PI * cutoff * u;
-            let sinc = if u == 0.0 { 1.0 } else { angle.sin() / angle };
-            table.push(2.0 * cutoff * sinc * window);
-        }
-        let sum: f64 = table[start..].iter().sum();
-        for tap in &mut table[start..] {
-            *tap /= sum;
-        }
-    }
-    table
-}
-
-fn gcd(a: u32, b: u32) -> u32 {
-    if b == 0 { a } else { gcd(b, a % b) }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::f64::consts::PI;
 
     /// A stereo tone at half scale.
     fn tone(hz: f64, rate: u32, frames: usize) -> Vec<f64> {
@@ -214,23 +151,33 @@ mod tests {
             .collect()
     }
 
-    /// Where output frame `n` sits on the input's clock, in input frames:
-    /// the filter is symmetric about its output, so there is no delay.
-    fn input_time(resampler: &Resampler, n: usize) -> f64 {
-        n as f64 * resampler.down as f64 / resampler.up as f64
-    }
-
     fn check(from: u32, to: u32, tolerance: f64) {
         let mut resampler = Resampler::new(from, to, 2).unwrap();
         let mut out = resampler.process(&tone(1000.0, from, from as usize));
         out.extend(resampler.finish());
         let frames = out.len() / 2;
         assert_eq!(frames, to as usize);
+        // Rubato reports delay in whole output frames. Allow at most one frame
+        // of residual phase, then compare every sample to catch pitch or gain
+        // errors without assuming the old filter's exact fractional alignment.
+        let ideal = |n: usize, shift: f64| {
+            0.5 * (2.0 * PI * 1000.0 * (n as f64 + shift) / f64::from(to)).sin()
+        };
+        let shift = (-128..=128)
+            .map(|step| f64::from(step) / 128.0)
+            .min_by(|a, b| {
+                let error = |shift| {
+                    (200..frames - 200)
+                        .step_by(97)
+                        .map(|n| (out[2 * n] - ideal(n, shift)).powi(2))
+                        .sum::<f64>()
+                };
+                error(*a).total_cmp(&error(*b))
+            })
+            .unwrap();
         let mut worst = 0.0f64;
         for n in 200..frames - 200 {
-            let t = input_time(&resampler, n) / f64::from(from);
-            let ideal = 0.5 * (2.0 * PI * 1000.0 * t).sin();
-            worst = worst.max((out[2 * n] - ideal).abs());
+            worst = worst.max((out[2 * n] - ideal(n, shift)).abs());
             assert_eq!(out[2 * n], out[2 * n + 1]);
         }
         assert!(worst < tolerance, "{from} to {to}: off by {worst}");
@@ -356,11 +303,11 @@ mod tests {
     }
 
     #[test]
-    fn uncommon_rates_interpolate_phases_from_a_bounded_table() {
-        let resampler = Resampler::new(48001, 44100, 2).unwrap();
-        assert_eq!(resampler.up, 44100);
-        assert!(resampler.phases < resampler.up);
-        assert!(resampler.table.len() <= (MAX_PHASES + 1) * resampler.taps);
+    fn uncommon_rates_use_the_same_bounded_buffers() {
+        let common = Resampler::new(48000, 44100, 2).unwrap();
+        let uncommon = Resampler::new(48001, 44100, 2).unwrap();
+        assert_eq!(common.input.capacity(), uncommon.input.capacity());
+        assert_eq!(common.output.len(), uncommon.output.len());
         check(48001, 44100, 0.005);
         check(8001, 44100, 0.02);
     }

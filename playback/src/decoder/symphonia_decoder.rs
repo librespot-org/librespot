@@ -93,8 +93,8 @@ impl SymphoniaDecoder {
                 "Unsupported number of channels: {channels}"
             )));
         }
-        let stereo_gains =
-            (channels.count() != NUM_CHANNELS as usize).then(|| stereo_gains(channels));
+        let stereo_gains = (channels != (Channels::FRONT_LEFT | Channels::FRONT_RIGHT))
+            .then(|| stereo_gains(channels));
 
         Ok(Self {
             probe_result,
@@ -585,13 +585,27 @@ mod tests {
         start: f64,
         ideal: impl Fn(f64) -> f64,
     ) -> f64 {
-        frames[256..frames.len() - 256]
-            .iter()
-            .enumerate()
-            .map(|(n, frame)| {
-                let t = start + (n + 256) as f64 / f64::from(SAMPLE_RATE);
-                (frame[side] - ideal(t)).abs()
+        // The library reports delay in whole frames, so its fractional
+        // alignment may differ by up to one frame from the previous filter.
+        // Fit only that bounded constant offset, then check all output samples.
+        let error = |n: usize, shift: f64| {
+            let t = start + (n as f64 + shift) / f64::from(SAMPLE_RATE);
+            (frames[n][side] - ideal(t)).abs()
+        };
+        let shift = (-128..=128)
+            .map(|step| f64::from(step) / 128.0)
+            .min_by(|a, b| {
+                let score = |shift| {
+                    (256..frames.len() - 256)
+                        .step_by(97)
+                        .map(|n| error(n, shift).powi(2))
+                        .sum::<f64>()
+                };
+                score(*a).total_cmp(&score(*b))
             })
+            .unwrap();
+        (256..frames.len() - 256)
+            .map(|n| error(n, shift))
             .fold(0.0, f64::max)
     }
 
@@ -676,6 +690,18 @@ mod tests {
                 assert!(sum > 0.5, "{channels}: {sum}");
             }
         }
+    }
+
+    #[test]
+    fn two_channels_without_a_stereo_layout_are_mixed_by_position() {
+        let channels = Channels::FRONT_CENTRE | Channels::LFE1;
+        let gains = stereo_gains(channels);
+        let mut stereo = Vec::new();
+        mix_to_stereo(&[0.5, 1.0, -0.5, -1.0], &gains, &mut stereo);
+        assert_eq!(stereo[0], stereo[1]);
+        assert_eq!(stereo[2], stereo[3]);
+        assert!((stereo[0] - 0.5 * std::f64::consts::FRAC_1_SQRT_2).abs() < 1e-12);
+        assert_eq!(stereo[0], -stereo[2]);
     }
 
     #[test]
