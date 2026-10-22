@@ -15,12 +15,12 @@ use symphonia::core::{
     probe::{Hint, ProbeResult},
 };
 
-// "Spotify supports .mp3, .mp4, and .m4p files. It doesn’t support .mp4 files that contain video,
-// or the iTunes lossless format (M4A)."
-// https://community.spotify.com/t5/FAQs/Local-Files/ta-p/5186118
-//
-// There are some indications online that FLAC is supported, so check for this as well.
-const SUPPORTED_FILE_EXTENSIONS: &[&str; 4] = &["mp3", "mp4", "m4p", "flac"];
+// The extensions the enabled Symphonia decoders can probe and decode:
+// MP3 and FLAC from the start, and MP4 audio once isomp4 and aac are
+// enabled. The Spotify app itself lists .m4a files among a folder's
+// local files, so they are indexed here too; .m4p is kept from before,
+// though FairPlay-protected files will not decode.
+const SUPPORTED_FILE_EXTENSIONS: &[&str; 5] = &["mp3", "mp4", "m4p", "m4a", "flac"];
 
 #[derive(Default)]
 pub struct LocalFileLookup(HashMap<SpotifyUri, PathBuf>);
