@@ -83,16 +83,16 @@ async fn receive_data(
 
         let code = response.status();
         if code != StatusCode::PARTIAL_CONTENT {
-            if code == StatusCode::TOO_MANY_REQUESTS {
-                if let Some(duration) = HttpClient::get_retry_after(response.headers()) {
-                    warn!(
-                        "Rate limiting, retrying in {} seconds...",
-                        duration.as_secs()
-                    );
-                    // sleeping here means we hold onto this streamer "slot"
-                    // (we don't decrease the number of open requests)
-                    tokio::time::sleep(duration).await;
-                }
+            if code == StatusCode::TOO_MANY_REQUESTS
+                && let Some(duration) = HttpClient::get_retry_after(response.headers())
+            {
+                warn!(
+                    "Rate limiting, retrying in {} seconds...",
+                    duration.as_secs()
+                );
+                // sleeping here means we hold onto this streamer "slot"
+                // (we don't decrease the number of open requests)
+                tokio::time::sleep(duration).await;
             }
 
             break Err(AudioFileError::StatusCode(code).into());

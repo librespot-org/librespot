@@ -170,10 +170,10 @@ impl Login5Manager {
         }
 
         let auth_token = self.lock(|inner| {
-            if let Some(token) = &inner.auth_token {
-                if token.is_expired() {
-                    inner.auth_token = None;
-                }
+            if let Some(token) = &inner.auth_token
+                && token.is_expired()
+            {
+                inner.auth_token = None;
             }
             inner.auth_token.clone()
         });

@@ -554,10 +554,10 @@ impl Player {
     }
 
     fn command(&self, cmd: PlayerCommand) {
-        if let Some(commands) = self.commands.as_ref() {
-            if let Err(e) = commands.send(cmd) {
-                error!("Player Commands Error: {e}");
-            }
+        if let Some(commands) = self.commands.as_ref()
+            && let Err(e) = commands.send(cmd)
+        {
+            error!("Player Commands Error: {e}");
         }
     }
 
@@ -688,10 +688,10 @@ impl Drop for Player {
     fn drop(&mut self) {
         debug!("Shutting down player thread ...");
         self.commands = None;
-        if let Some(handle) = self.thread_handle.take() {
-            if let Err(e) = handle.join() {
-                error!("Player thread Error: {e:?}");
-            }
+        if let Some(handle) = self.thread_handle.take()
+            && let Err(e) = handle.join()
+        {
+            error!("Player thread Error: {e:?}");
         }
     }
 }
@@ -1376,10 +1376,10 @@ impl Future for PlayerInternal {
                 _ => None,
             };
 
-            if let Some(cmd) = cmd {
-                if let Err(e) = self.handle_command(cmd) {
-                    error!("Error handling command: {e}");
-                }
+            if let Some(cmd) = cmd
+                && let Err(e) = self.handle_command(cmd)
+            {
+                error!("Error handling command: {e}");
             }
 
             // Handle loading of a new track to play
@@ -1501,28 +1501,24 @@ impl Future for PlayerInternal {
                                                     Some(reported_nominal_start_time) => {
                                                         let mut notify = false;
 
-                                                        if packet_position.skipped {
-                                                            if let Some(ahead) = new_stream_position
+                                                        if packet_position.skipped
+                                                            && let Some(ahead) = new_stream_position
                                                                 .checked_sub(Duration::from_millis(
                                                                     expected_position_ms as u64,
                                                                 ))
-                                                            {
-                                                                notify |=
-                                                                    ahead >= Duration::from_secs(1)
-                                                            }
+                                                        {
+                                                            notify |=
+                                                                ahead >= Duration::from_secs(1)
                                                         }
 
                                                         if let Some(lag) = now
                                                             .checked_duration_since(
                                                                 reported_nominal_start_time,
                                                             )
-                                                        {
-                                                            if let Some(lag) =
+                                                            && let Some(lag) =
                                                                 lag.checked_sub(new_stream_position)
-                                                            {
-                                                                notify |=
-                                                                    lag >= Duration::from_secs(1)
-                                                            }
+                                                        {
+                                                            notify |= lag >= Duration::from_secs(1)
                                                         }
 
                                                         notify
@@ -2008,32 +2004,31 @@ impl PlayerInternal {
             track_id: previous_track_id,
             ..
         } = &self.state
+            && *previous_track_id == track_id
         {
-            if *previous_track_id == track_id {
-                let mut loaded_track = match mem::replace(&mut self.state, PlayerState::Invalid) {
-                    PlayerState::EndOfTrack { loaded_track, .. } => loaded_track,
-                    _ => {
-                        return Err(Error::internal(format!(
-                            "PlayerInternal::handle_command_load repeating the same track: invalid state: {:?}",
-                            self.state
-                        )));
-                    }
-                };
-
-                if position_ms != loaded_track.stream_position_ms {
-                    // This may be blocking.
-                    loaded_track.stream_position_ms = loaded_track.decoder.seek(position_ms)?;
-                }
-                self.preload = PlayerPreload::None;
-                self.start_playback(track_id, play_request_id, loaded_track, play);
-                if let PlayerState::Invalid = self.state {
+            let mut loaded_track = match mem::replace(&mut self.state, PlayerState::Invalid) {
+                PlayerState::EndOfTrack { loaded_track, .. } => loaded_track,
+                _ => {
                     return Err(Error::internal(format!(
-                        "PlayerInternal::handle_command_load repeating the same track: start_playback() did not transition to valid player state: {:?}",
+                        "PlayerInternal::handle_command_load repeating the same track: invalid state: {:?}",
                         self.state
                     )));
                 }
-                return Ok(());
+            };
+
+            if position_ms != loaded_track.stream_position_ms {
+                // This may be blocking.
+                loaded_track.stream_position_ms = loaded_track.decoder.seek(position_ms)?;
             }
+            self.preload = PlayerPreload::None;
+            self.start_playback(track_id, play_request_id, loaded_track, play);
+            if let PlayerState::Invalid = self.state {
+                return Err(Error::internal(format!(
+                    "PlayerInternal::handle_command_load repeating the same track: start_playback() did not transition to valid player state: {:?}",
+                    self.state
+                )));
+            }
+            return Ok(());
         }
 
         // Check if we are already playing the track. If so, just do a seek and update our info.
@@ -2049,69 +2044,68 @@ impl PlayerInternal {
             ref mut decoder,
             ..
         } = self.state
+            && *current_track_id == track_id
         {
-            if *current_track_id == track_id {
-                // we can use the current decoder. Ensure it's at the correct position.
-                if position_ms != *stream_position_ms {
-                    // This may be blocking.
-                    *stream_position_ms = decoder.seek(position_ms)?;
-                }
+            // we can use the current decoder. Ensure it's at the correct position.
+            if position_ms != *stream_position_ms {
+                // This may be blocking.
+                *stream_position_ms = decoder.seek(position_ms)?;
+            }
 
-                // Move the info from the current state into a PlayerLoadedTrackData so we can use
-                // the usual code path to start playback.
-                let old_state = mem::replace(&mut self.state, PlayerState::Invalid);
+            // Move the info from the current state into a PlayerLoadedTrackData so we can use
+            // the usual code path to start playback.
+            let old_state = mem::replace(&mut self.state, PlayerState::Invalid);
 
-                if let PlayerState::Playing {
-                    stream_position_ms,
+            if let PlayerState::Playing {
+                stream_position_ms,
+                decoder,
+                audio_item,
+                stream_loader_controller,
+                bytes_per_second,
+                duration_ms,
+                normalisation_data,
+                is_explicit,
+                ..
+            }
+            | PlayerState::Paused {
+                stream_position_ms,
+                decoder,
+                audio_item,
+                stream_loader_controller,
+                bytes_per_second,
+                duration_ms,
+                normalisation_data,
+                is_explicit,
+                ..
+            } = old_state
+            {
+                let loaded_track = PlayerLoadedTrackData {
                     decoder,
-                    audio_item,
+                    normalisation_data,
                     stream_loader_controller,
+                    audio_item,
                     bytes_per_second,
                     duration_ms,
-                    normalisation_data,
-                    is_explicit,
-                    ..
-                }
-                | PlayerState::Paused {
                     stream_position_ms,
-                    decoder,
-                    audio_item,
-                    stream_loader_controller,
-                    bytes_per_second,
-                    duration_ms,
-                    normalisation_data,
                     is_explicit,
-                    ..
-                } = old_state
-                {
-                    let loaded_track = PlayerLoadedTrackData {
-                        decoder,
-                        normalisation_data,
-                        stream_loader_controller,
-                        audio_item,
-                        bytes_per_second,
-                        duration_ms,
-                        stream_position_ms,
-                        is_explicit,
-                    };
+                };
 
-                    self.preload = PlayerPreload::None;
-                    self.start_playback(track_id, play_request_id, loaded_track, play);
+                self.preload = PlayerPreload::None;
+                self.start_playback(track_id, play_request_id, loaded_track, play);
 
-                    if let PlayerState::Invalid = self.state {
-                        return Err(Error::internal(format!(
-                            "PlayerInternal::handle_command_load already playing this track: start_playback() did not transition to valid player state: {:?}",
-                            self.state
-                        )));
-                    }
-
-                    return Ok(());
-                } else {
+                if let PlayerState::Invalid = self.state {
                     return Err(Error::internal(format!(
-                        "PlayerInternal::handle_command_load already playing this track: invalid state: {:?}",
+                        "PlayerInternal::handle_command_load already playing this track: start_playback() did not transition to valid player state: {:?}",
                         self.state
                     )));
                 }
+
+                return Ok(());
+            } else {
+                return Err(Error::internal(format!(
+                    "PlayerInternal::handle_command_load already playing this track: invalid state: {:?}",
+                    self.state
+                )));
             }
         }
 
@@ -2120,26 +2114,25 @@ impl PlayerInternal {
             track_id: loaded_track_id,
             ..
         } = &self.preload
+            && track_id == *loaded_track_id
         {
-            if track_id == *loaded_track_id {
-                let preload = std::mem::replace(&mut self.preload, PlayerPreload::None);
-                if let PlayerPreload::Ready {
-                    track_id,
-                    mut loaded_track,
-                } = preload
-                {
-                    if position_ms != loaded_track.stream_position_ms {
-                        // This may be blocking
-                        loaded_track.stream_position_ms = loaded_track.decoder.seek(position_ms)?;
-                    }
-                    self.start_playback(track_id, play_request_id, *loaded_track, play);
-                    return Ok(());
-                } else {
-                    return Err(Error::internal(format!(
-                        "PlayerInternal::handle_command_loading preloaded track: invalid state: {:?}",
-                        self.state
-                    )));
+            let preload = std::mem::replace(&mut self.preload, PlayerPreload::None);
+            if let PlayerPreload::Ready {
+                track_id,
+                mut loaded_track,
+            } = preload
+            {
+                if position_ms != loaded_track.stream_position_ms {
+                    // This may be blocking
+                    loaded_track.stream_position_ms = loaded_track.decoder.seek(position_ms)?;
                 }
+                self.start_playback(track_id, play_request_id, *loaded_track, play);
+                return Ok(());
+            } else {
+                return Err(Error::internal(format!(
+                    "PlayerInternal::handle_command_loading preloaded track: invalid state: {:?}",
+                    self.state
+                )));
             }
         }
 
@@ -2221,11 +2214,10 @@ impl PlayerInternal {
             track_id: current_track_id,
             ..
         } = &self.state
+            && *current_track_id == track_id
         {
-            if *current_track_id == track_id {
-                // we already have the requested track loaded.
-                preload_track = false;
-            }
+            // we already have the requested track loaded.
+            preload_track = false;
         }
 
         // schedule the preload of the current track if desired.
@@ -2392,8 +2384,8 @@ impl PlayerInternal {
             PlayerCommand::EmitFilterExplicitContentChangedEvent(filter) => {
                 self.send_event(PlayerEvent::FilterExplicitContentChanged { filter });
 
-                if filter {
-                    if let PlayerState::Playing {
+                if filter
+                    && let PlayerState::Playing {
                         ref track_id,
                         play_request_id,
                         is_explicit,
@@ -2405,18 +2397,17 @@ impl PlayerInternal {
                         is_explicit,
                         ..
                     } = self.state
-                    {
-                        let track_id = track_id.clone();
+                {
+                    let track_id = track_id.clone();
 
-                        if is_explicit {
-                            warn!(
-                                "Currently loaded track is explicit, which client setting forbids -- skipping to next track."
-                            );
-                            self.send_event(PlayerEvent::EndOfTrack {
-                                track_id,
-                                play_request_id,
-                            })
-                        }
+                    if is_explicit {
+                        warn!(
+                            "Currently loaded track is explicit, which client setting forbids -- skipping to next track."
+                        );
+                        self.send_event(PlayerEvent::EndOfTrack {
+                            track_id,
+                            play_request_id,
+                        })
                     }
                 }
             }

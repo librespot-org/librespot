@@ -246,15 +246,15 @@ impl Session {
         info!("Authenticated as '{username}' !");
         self.set_username(username);
         self.set_auth_data(&reusable_credentials.auth_data);
-        if let Some(cache) = self.cache() {
-            if store_credentials {
-                let cred_changed = cache
-                    .credentials()
-                    .map(|c| c != reusable_credentials)
-                    .unwrap_or(true);
-                if cred_changed {
-                    cache.save_credentials(&reusable_credentials);
-                }
+        if let Some(cache) = self.cache()
+            && store_credentials
+        {
+            let cred_changed = cache
+                .credentials()
+                .map(|c| c != reusable_credentials)
+                .unwrap_or(true);
+            if cred_changed {
+                cache.save_credentials(&reusable_credentials);
             }
         }
 
@@ -274,10 +274,10 @@ impl Session {
         tokio::spawn(async move {
             if let Err(e) = sender_task.await {
                 error!("{e}");
-                if let Some(session) = session_weak.try_upgrade() {
-                    if !session.is_invalid() {
-                        session.shutdown();
-                    }
+                if let Some(session) = session_weak.try_upgrade()
+                    && !session.is_invalid()
+                {
+                    session.shutdown();
                 }
             }
         });
@@ -362,14 +362,14 @@ impl Session {
     }
 
     fn check_catalogue(attributes: &UserAttributes) {
-        if let Some(account_type) = attributes.get("type") {
-            if account_type != "premium" {
-                error!("librespot does not support {account_type:?} accounts.");
-                info!("Please support Spotify and your artists and sign up for a premium account.");
+        if let Some(account_type) = attributes.get("type")
+            && account_type != "premium"
+        {
+            error!("librespot does not support {account_type:?} accounts.");
+            info!("Please support Spotify and your artists and sign up for a premium account.");
 
-                // TODO: logout instead of exiting
-                exit(1);
-            }
+            // TODO: logout instead of exiting
+            exit(1);
         }
     }
 

@@ -170,11 +170,11 @@ impl<'ct> ConnectState {
     pub fn prev_track(&mut self) -> Result<Option<&MessageField<ProvidedTrack>>, Error> {
         let old_track = self.player_mut().track.take();
 
-        if let Some(old_track) = old_track {
-            if old_track.is_context() || old_track.is_autoplay() {
-                // todo: O(n)
-                self.next_tracks_mut().insert(0, old_track);
-            }
+        if let Some(old_track) = old_track
+            && (old_track.is_context() || old_track.is_autoplay())
+        {
+            // todo: O(n)
+            self.next_tracks_mut().insert(0, old_track);
         }
 
         // handle possible delimiter

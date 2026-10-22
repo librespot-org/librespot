@@ -544,16 +544,14 @@ impl SpircTask {
                     session_update,
                     match |session_update| self.handle_session_update(session_update)
                 },
-                cmd = async { commands?.recv().await }, if commands.is_some() && self.connect_established => if let Some(cmd) = cmd {
-                    if let Err(e) = self.handle_command(cmd).await {
+                cmd = async { commands?.recv().await }, if commands.is_some() && self.connect_established => if let Some(cmd) = cmd
+                    && let Err(e) = self.handle_command(cmd).await {
                         debug!("could not dispatch command: {e}");
-                    }
-                },
-                event = async { player_events?.recv().await }, if player_events.is_some() => if let Some(event) = event {
-                    if let Err(e) = self.handle_player_event(event) {
+                    },
+                event = async { player_events?.recv().await }, if player_events.is_some() => if let Some(event) = event
+                    && let Err(e) = self.handle_player_event(event) {
                         error!("could not dispatch player event: {e}");
-                    }
-                },
+                    },
                 _ = async { sleep(UPDATE_STATE_DELAY).await }, if self.update_state => {
                     self.update_state = false;
 
@@ -596,11 +594,10 @@ impl SpircTask {
                     }).await
                 }, if allow_context_resolving && self.context_resolver.has_next() => {
                     let update_state = self.handle_next_context(next_context);
-                    if update_state {
-                        if let Err(why) = self.notify().await {
+                    if update_state
+                        && let Err(why) = self.notify().await {
                             error!("update after context resolving failed: {why}")
                         }
-                    }
                 },
                 else => break
             }

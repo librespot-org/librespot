@@ -350,15 +350,14 @@ impl DealerShared {
             }
         };
 
-        if let Some(split) = split_uri(&msg.uri) {
-            if self
+        if let Some(split) = split_uri(&msg.uri)
+            && self
                 .message_handlers
                 .lock()
                 .expect(DEALER_MESSAGE_HANDLERS_POISON_MSG)
                 .retain(split, &mut |tx| tx.send(msg.clone()).is_ok())
-            {
-                return;
-            }
+        {
+            return;
         }
 
         debug!("No subscriber for msg.uri: {}", msg.uri);
@@ -487,10 +486,10 @@ impl Dealer {
 
         self.shared.notify_drop.close();
 
-        if let Some(handle) = self.handle.take() {
-            if let Err(e) = CancelOnDrop(handle).await {
-                error!("error aborting dealer operations: {e}");
-            }
+        if let Some(handle) = self.handle.take()
+            && let Err(e) = CancelOnDrop(handle).await
+        {
+            error!("error aborting dealer operations: {e}");
         }
     }
 }

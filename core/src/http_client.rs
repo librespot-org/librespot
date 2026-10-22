@@ -200,15 +200,15 @@ impl HttpClient {
             if let Ok(response) = &response {
                 let code = response.status();
 
-                if code == StatusCode::TOO_MANY_REQUESTS {
-                    if let Some(duration) = Self::get_retry_after(response.headers()) {
-                        warn!(
-                            "Rate limited by service, retrying in {} seconds...",
-                            duration.as_secs()
-                        );
-                        tokio::time::sleep(duration).await;
-                        continue;
-                    }
+                if code == StatusCode::TOO_MANY_REQUESTS
+                    && let Some(duration) = Self::get_retry_after(response.headers())
+                {
+                    warn!(
+                        "Rate limited by service, retrying in {} seconds...",
+                        duration.as_secs()
+                    );
+                    tokio::time::sleep(duration).await;
+                    continue;
                 }
 
                 if !code.is_success() {
@@ -262,24 +262,24 @@ impl HttpClient {
         let mut retry_after_ms = None;
         if let Some(header_val) = headers.get("X-RateLimit-Next") {
             // *.akamaized.net (Akamai)
-            if let Ok(date_str) = header_val.to_str() {
-                if let Ok(target) = Date::from_iso8601(date_str) {
-                    retry_after_ms = Some(target.as_timestamp_ms().saturating_sub(now))
-                }
+            if let Ok(date_str) = header_val.to_str()
+                && let Ok(target) = Date::from_iso8601(date_str)
+            {
+                retry_after_ms = Some(target.as_timestamp_ms().saturating_sub(now))
             }
         } else if let Some(header_val) = headers.get("Fastly-RateLimit-Reset") {
             // *.scdn.co (Fastly)
-            if let Ok(timestamp) = header_val.to_str() {
-                if let Ok(target) = timestamp.parse::<i64>() {
-                    retry_after_ms = Some(target.saturating_sub(now))
-                }
+            if let Ok(timestamp) = header_val.to_str()
+                && let Ok(target) = timestamp.parse::<i64>()
+            {
+                retry_after_ms = Some(target.saturating_sub(now))
             }
         } else if let Some(header_val) = headers.get("Retry-After") {
             // Generic RFC compliant (including *.spotify.com)
-            if let Ok(retry_after) = header_val.to_str() {
-                if let Ok(duration) = retry_after.parse::<i64>() {
-                    retry_after_ms = Some(duration * 1000)
-                }
+            if let Ok(retry_after) = header_val.to_str()
+                && let Ok(duration) = retry_after.parse::<i64>()
+            {
+                retry_after_ms = Some(duration * 1000)
             }
         }
 
