@@ -1,16 +1,16 @@
-use rand::Rng;
-use rand_distr::Alphanumeric;
-use vergen_gitcl::{BuildBuilder, Emitter, GitclBuilder};
+use rand::RngExt;
+use rand::distr::Alphanumeric;
+use vergen_gitcl::{Build, Emitter, Gitcl};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let gitcl = GitclBuilder::default()
+    let gitcl = Gitcl::builder()
         .sha(true) // outputs 'VERGEN_GIT_SHA', and sets the 'short' flag true
         .commit_date(true) // outputs 'VERGEN_GIT_COMMIT_DATE'
-        .build()?;
+        .build();
 
-    let build = BuildBuilder::default()
+    let build = Build::builder()
         .build_date(true) // outputs 'VERGEN_BUILD_DATE'
-        .build()?;
+        .build();
 
     Emitter::default()
         .add_instructions(&build)?

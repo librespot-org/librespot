@@ -34,7 +34,7 @@ use futures_util::StreamExt;
 use librespot_protocol::authentication::AuthenticationType;
 use num_traits::FromPrimitive;
 use pin_project_lite::pin_project;
-use quick_xml::events::Event;
+use quick_xml::{XmlVersion, events::Event};
 use thiserror::Error;
 use tokio::{
     sync::mpsc,
@@ -246,15 +246,15 @@ impl Session {
         info!("Authenticated as '{username}' !");
         self.set_username(username);
         self.set_auth_data(&reusable_credentials.auth_data);
-        if let Some(cache) = self.cache() {
-            if store_credentials {
-                let cred_changed = cache
-                    .credentials()
-                    .map(|c| c != reusable_credentials)
-                    .unwrap_or(true);
-                if cred_changed {
-                    cache.save_credentials(&reusable_credentials);
-                }
+        if let Some(cache) = self.cache()
+            && store_credentials
+        {
+            let cred_changed = cache
+                .credentials()
+                .map(|c| c != reusable_credentials)
+                .unwrap_or(true);
+            if cred_changed {
+                cache.save_credentials(&reusable_credentials);
             }
         }
 
@@ -274,10 +274,10 @@ impl Session {
         tokio::spawn(async move {
             if let Err(e) = sender_task.await {
                 error!("{e}");
-                if let Some(session) = session_weak.try_upgrade() {
-                    if !session.is_invalid() {
-                        session.shutdown();
-                    }
+                if let Some(session) = session_weak.try_upgrade()
+                    && !session.is_invalid()
+                {
+                    session.shutdown();
                 }
             }
         });
@@ -362,14 +362,14 @@ impl Session {
     }
 
     fn check_catalogue(attributes: &UserAttributes) {
-        if let Some(account_type) = attributes.get("type") {
-            if account_type != "premium" {
-                error!("librespot does not support {account_type:?} accounts.");
-                info!("Please support Spotify and your artists and sign up for a premium account.");
+        if let Some(account_type) = attributes.get("type")
+            && account_type != "premium"
+        {
+            error!("librespot does not support {account_type:?} accounts.");
+            info!("Please support Spotify and your artists and sign up for a premium account.");
 
-                // TODO: logout instead of exiting
-                exit(1);
-            }
+            // TODO: logout instead of exiting
+            exit(1);
         }
     }
 
@@ -820,7 +820,7 @@ where
                 loop {
                     match reader.read_event_into(&mut buf) {
                         Ok(Event::Start(ref element)) => {
-                            std::str::from_utf8(element)?.clone_into(&mut current_element)
+                            element.as_ref().clone_into(&mut current_element)
                         }
                         Ok(Event::End(_)) => {
                             current_element = String::new();
@@ -829,7 +829,7 @@ where
                             if !current_element.is_empty() {
                                 let _ = user_attributes.insert(
                                     current_element.clone(),
-                                    value.xml_content()?.to_string(),
+                                    value.xml_content(XmlVersion::Explicit1_1).to_string(),
                                 );
                             }
                         }

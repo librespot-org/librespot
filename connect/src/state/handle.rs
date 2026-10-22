@@ -43,10 +43,8 @@ impl ConnectState {
     pub fn handle_set_repeat_context(&mut self, repeat: bool) -> Result<(), Error> {
         self.set_repeat_context(repeat);
 
-        if repeat {
-            if let ContextType::Autoplay = self.fill_up_context {
-                self.fill_up_context = ContextType::Default;
-            }
+        if repeat && let ContextType::Autoplay = self.fill_up_context {
+            self.fill_up_context = ContextType::Default;
         }
 
         let ctx = self.get_context(ContextType::Default)?;

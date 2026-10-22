@@ -115,15 +115,14 @@ impl Credentials {
 
         // decrypt data using ECB mode without padding
         let blob = {
-            use aes::cipher::generic_array::GenericArray;
-            use aes::cipher::{BlockDecrypt, BlockSizeUser, KeyInit};
+            use aes::cipher::{BlockCipherDecrypt, BlockSizeUser, KeyInit};
 
             let mut data = BASE64.decode(encrypted_blob)?;
-            let cipher = Aes192::new(GenericArray::from_slice(&key));
+            let cipher = Aes192::new_from_slice(&key).map_err(|_| AuthenticationError::Key)?;
             let block_size = Aes192::block_size();
 
             for chunk in data.chunks_exact_mut(block_size) {
-                cipher.decrypt_block(GenericArray::from_mut_slice(chunk));
+                cipher.decrypt_block(chunk.try_into().expect("full block"));
             }
 
             let l = data.len();

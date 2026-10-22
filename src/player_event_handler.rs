@@ -280,10 +280,10 @@ impl EventHandler {
 impl Drop for EventHandler {
     fn drop(&mut self) {
         debug!("Shutting down EventHandler thread ...");
-        if let Some(handle) = self.thread_handle.take() {
-            if let Err(e) = handle.join() {
-                error!("EventHandler thread Error: {e:?}");
-            }
+        if let Some(handle) = self.thread_handle.take()
+            && let Err(e) = handle.join()
+        {
+            error!("EventHandler thread Error: {e:?}");
         }
     }
 }

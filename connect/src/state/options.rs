@@ -8,7 +8,7 @@ use crate::{
     },
 };
 use protobuf::MessageField;
-use rand::Rng;
+use rand::RngExt;
 
 #[derive(Default, Debug)]
 pub(crate) struct ShuffleState {
