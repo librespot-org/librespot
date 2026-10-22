@@ -36,7 +36,7 @@ use hyper::{
 };
 use hyper_util::client::legacy::ResponseFuture;
 use protobuf::{Enum, EnumOrUnknown, Message, MessageFull};
-use rand::RngCore;
+use rand::Rng;
 use serde::Serialize;
 use sysinfo::System;
 use thiserror::Error;

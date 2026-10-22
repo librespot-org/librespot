@@ -66,9 +66,9 @@ portaudio-rs = { version = "0.3", optional = true }
 sdl2 = { version = "0.38", optional = true }
 
 # GStreamer dependencies
-gstreamer = { version = "0.24", optional = true }
-gstreamer-app = { version = "0.24", optional = true }
-gstreamer-audio = { version = "0.24", optional = true }
+gstreamer = { version = "0.25", optional = true }
+gstreamer-app = { version = "0.25", optional = true }
+gstreamer-audio = { version = "0.25", optional = true }
 
 # PulseAudio dependencies
 libpulse-binding = { version = "2", optional = true, default-features = false }
@@ -85,15 +85,15 @@ symphonia = { version = "0.5", default-features = false, features = [
     "mp3",
     "ogg",
     "vorbis",
-    "flac"
+    "flac",
 ] }
 
 # Legacy Ogg container decoder for the passthrough decoder
 ogg = { version = "0.9", optional = true }
 
 # Dithering
-rand = { version = "0.9", default-features = false, features = ["small_rng"] }
-rand_distr = "0.5"
+rand = { version = "0.10", default-features = false, features = ["thread_rng"] }
+rand_distr = "0.6"
 
 # Local file handling
 form_urlencoded = "1.2.2"

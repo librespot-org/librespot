@@ -43,7 +43,7 @@ impl fmt::Display for dyn Ditherer {
 }
 
 fn create_rng() -> SmallRng {
-    SmallRng::from_os_rng()
+    SmallRng::from_rng(&mut rand::rng())
 }
 
 pub struct TriangularDitherer {

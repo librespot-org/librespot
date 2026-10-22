@@ -34,7 +34,7 @@ use futures_util::StreamExt;
 use librespot_protocol::authentication::AuthenticationType;
 use num_traits::FromPrimitive;
 use pin_project_lite::pin_project;
-use quick_xml::events::Event;
+use quick_xml::{XmlVersion, events::Event};
 use thiserror::Error;
 use tokio::{
     sync::mpsc,
@@ -820,7 +820,7 @@ where
                 loop {
                     match reader.read_event_into(&mut buf) {
                         Ok(Event::Start(ref element)) => {
-                            std::str::from_utf8(element)?.clone_into(&mut current_element)
+                            element.as_ref().clone_into(&mut current_element)
                         }
                         Ok(Event::End(_)) => {
                             current_element = String::new();
@@ -829,7 +829,7 @@ where
                             if !current_element.is_empty() {
                                 let _ = user_attributes.insert(
                                     current_element.clone(),
-                                    value.xml_content()?.to_string(),
+                                    value.xml_content(XmlVersion::Explicit1_1).to_string(),
                                 );
                             }
                         }

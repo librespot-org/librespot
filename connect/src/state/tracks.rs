@@ -9,7 +9,7 @@ use crate::{
     },
 };
 use protobuf::MessageField;
-use rand::Rng;
+use rand::RngExt;
 
 // identifier used as part of the uid
 pub const IDENTIFIER_DELIMITER: &str = "delimiter";
