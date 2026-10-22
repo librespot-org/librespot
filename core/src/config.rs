@@ -1,4 +1,4 @@
-use std::{fmt, path::PathBuf, str::FromStr};
+use std::{fmt, path::PathBuf, str::FromStr, sync::Mutex};
 
 use librespot_protocol::devices::DeviceType as ProtoDeviceType;
 use url::Url;
@@ -13,12 +13,36 @@ pub(crate) const IOS_CLIENT_ID: &str = "58bd3c95768941ea9eb4350aaa033eb3";
 /// See [std::env::consts::OS]
 pub const OS: &str = std::env::consts::OS;
 
+static OS_OVERRIDE: Mutex<&'static str> = Mutex::new(std::env::consts::OS);
+
+pub fn os() -> &'static str {
+    *OS_OVERRIDE.lock().expect("os poisoned")
+}
+
+pub fn override_os(os: &'static str) {
+    *OS_OVERRIDE.lock().expect("os poisoned") = os
+}
+
+static OS_VER: Mutex<Option<String>> = Mutex::new(None);
+
 // valid versions for some os:
 // 'android': 30
 // 'ios': 17
 /// See [sysinfo::System::os_version]
 pub fn os_version() -> String {
-    sysinfo::System::os_version().unwrap_or("0".into())
+    let mut os_ver = OS_VER.lock().expect("os_version has been poisoned");
+    match &*os_ver {
+        Some(ver) => ver.clone(),
+        None => {
+            let ver = sysinfo::System::os_version().unwrap_or("0".into());
+            *os_ver = Some(ver.clone());
+            ver
+        }
+    }
+}
+
+pub fn override_os_ver(ver: String) {
+    *OS_VER.lock().expect("os_version has been poisoned") = Some(ver)
 }
 
 #[derive(Clone, Debug)]
@@ -54,7 +78,7 @@ impl SessionConfig {
 
 impl Default for SessionConfig {
     fn default() -> Self {
-        Self::default_for_os(OS)
+        Self::default_for_os(os())
     }
 }
 

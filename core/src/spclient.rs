@@ -3,7 +3,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use crate::config::{OS, os_version};
+use crate::config::{os, os_version};
 use crate::{
     Error, FileId, SpotifyId, SpotifyUri,
     apresolve::SocketAddress,
@@ -184,7 +184,7 @@ impl SpClient {
         // on macOS and Windows. On Android and iOS we can send a platform-specific client ID and are
         // then presented with a hash cash challenge. On Linux, we have to pass the old keymaster ID.
         // We delegate most of this logic to `SessionConfig`.
-        let os = OS;
+        let os = os();
         let client_id = match os {
             "macos" | "windows" => self.session().client_id(),
             os => SessionConfig::default_for_os(os).client_id,
