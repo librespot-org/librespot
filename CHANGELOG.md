@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- [playback] Skip nested symbolic links and directory aliases during local file discovery, using iterative traversal to avoid directory cycles and stack exhaustion
 - [playback] Play local files from 8 to 384 kHz using Rubato to resample to 44.1 kHz, preserving duration and resetting filter history on seek; mono plays on both sides and wider layouts are mixed down to stereo
 - [connect] Picking a track in a list plays that track: an empty `track_uri` (or `track_uid`) sent next to the one that identifies the track is ignored, instead of failing to resolve and playing the first track of the context
 
