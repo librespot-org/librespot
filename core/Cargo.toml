@@ -106,6 +106,8 @@ tokio = { version = "1", features = [
 tokio-stream = { version = "0.1", default-features = false }
 tokio-tungstenite = { version = "0.28", default-features = false }
 tokio-util = { version = "0.7", default-features = false }
+# Call the existing hyper TCP connector through its already-transitive trait.
+tower-service = "0.3"
 url = "2"
 uuid = { version = "1", default-features = false, features = ["v4"] }
 
@@ -119,7 +121,7 @@ vergen-gitcl = { version = "1.0.8", default-features = false, features = [
 vergen = "=9.0.6"
 
 [dev-dependencies]
-tokio = { version = "1", features = ["macros"] }
+tokio = { version = "1", features = ["macros", "test-util"] }
 
 [lints]
 workspace = true
