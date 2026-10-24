@@ -20,18 +20,20 @@ use std::{
 #[cfg(feature = "passthrough-decoder")]
 use crate::decoder::PassthroughDecoder;
 use crate::{
-    audio::{AudioDecrypt, AudioFetchParams, AudioFile, StreamLoaderController},
+    audio::{AudioDecrypt, AudioFetchParams, AudioFile, AudioFileHead, StreamLoaderController},
     audio_backend::Sink,
     config::{Bitrate, NormalisationMethod, NormalisationType, PlayerConfig},
     convert::Converter,
-    core::{Error, Session, SpotifyId, SpotifyUri, util::SeqGenerator},
+    core::{
+        Error, FileId, Session, SpotifyId, SpotifyUri, audio_key::AudioKey, util::SeqGenerator,
+    },
     decoder::{AudioDecoder, AudioPacket, AudioPacketPosition, SymphoniaDecoder},
     local_file::{LocalFileLookup, create_local_file_lookup},
     metadata::audio::{AudioFileFormat, AudioFiles, AudioItem},
     mixer::VolumeGetter,
 };
 use futures_util::{
-    StreamExt, TryFutureExt, future, future::FusedFuture,
+    FutureExt, StreamExt, TryFutureExt, future, future::FusedFuture,
     stream::futures_unordered::FuturesUnordered,
 };
 use librespot_metadata::{audio::UniqueFields, track::Tracks};
@@ -43,6 +45,21 @@ use tokio::sync::{mpsc, oneshot};
 use crate::SAMPLES_PER_SECOND;
 
 const PRELOAD_NEXT_TRACK_BEFORE_END_DURATION_MS: u32 = 30000;
+
+/// How much of an upcoming track's file [`Player::prefetch`] downloads ahead:
+/// about three seconds of audio at 320 kbit/s, enough to start playing while
+/// the rest of the file streams in.
+const PREFETCH_HEAD_BYTES: usize = 128 * 1024;
+
+/// The most upcoming tracks [`Player::prefetch`] holds at once.
+const PREFETCH_MAX_TRACKS: usize = 3;
+
+/// How many of the upcoming tracks [`Player::prefetch`] asks the audio key
+/// for: only the next one. Spotify refuses keys asked for in quick
+/// succession, and the key is the one thing a load needs that a skip never
+/// waits long for.
+const PREFETCH_KEY_TRACKS: usize = 1;
+
 pub const DB_VOLTAGE_RATIO: f64 = 20.0;
 pub const PCM_AT_0DBFS: f64 = 1.0;
 
@@ -95,7 +112,63 @@ struct PlayerInternal {
     last_progress_update: Instant,
 
     local_file_lookup: Arc<LocalFileLookup>,
+    prefetches: Prefetches,
 }
+
+/// A track's metadata, resolved to the file that will be played.
+#[derive(Clone)]
+struct ResolvedTrack {
+    audio_item: AudioItem,
+    format: AudioFileFormat,
+    file_id: FileId,
+    bytes_per_second: usize,
+}
+
+/// What [`Player::prefetch`] fetched for an upcoming track: everything loading it
+/// would otherwise wait for one request after another before decoding starts,
+/// except the audio key, which is fetched on its own.
+struct PrefetchedTrack {
+    track: ResolvedTrack,
+    head: Option<AudioFileHead>,
+}
+
+type PrefetchFuture =
+    future::Shared<Pin<Box<dyn Future<Output = Option<Arc<PrefetchedTrack>>> + Send>>>;
+
+type PrefetchKeyFuture = future::Shared<Pin<Box<dyn Future<Output = Option<AudioKey>> + Send>>>;
+
+struct Prefetch {
+    future: PrefetchFuture,
+    task: tokio::task::AbortHandle,
+    /// The audio key, asked for once the track is the next one.
+    key: Option<(PrefetchKeyFuture, tokio::task::AbortHandle)>,
+}
+
+impl Prefetch {
+    fn abort(&self) {
+        self.task.abort();
+        if let Some((_, task)) = &self.key {
+            task.abort();
+        }
+    }
+
+    fn into_prefetched(self) -> Prefetched {
+        Prefetched {
+            track: self.future,
+            key: self.key.map(|(key, _)| key),
+        }
+    }
+}
+
+/// What a load takes over from a prefetch.
+struct Prefetched {
+    track: PrefetchFuture,
+    key: Option<PrefetchKeyFuture>,
+}
+
+type Prefetches = Arc<Mutex<HashMap<SpotifyUri, Prefetch>>>;
+
+const PREFETCHES_POISON_MSG: &str = "prefetches mutex should not be poisoned";
 
 static PLAYER_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -108,6 +181,7 @@ enum PlayerCommand {
     Preload {
         track_id: SpotifyUri,
     },
+    Prefetch(Vec<SpotifyUri>),
     Play,
     Pause,
     Stop,
@@ -530,6 +604,7 @@ impl Player {
                 last_progress_update: Instant::now(),
 
                 local_file_lookup: Arc::new(local_file_lookup),
+                prefetches: Arc::default(),
             };
 
             // While PlayerInternal is written as a future, it still contains blocking code.
@@ -571,6 +646,19 @@ impl Player {
 
     pub fn preload(&self, track_id: SpotifyUri) {
         self.command(PlayerCommand::Preload { track_id });
+    }
+
+    /// Prepares the start of the tracks likely to play next, so that loading
+    /// one of them, for example when skipping, starts playback without
+    /// waiting for its metadata, audio key and first bytes in turn.
+    ///
+    /// For each of the first few tracks given, the player resolves the file
+    /// to play, requests its audio key and downloads the beginning of the
+    /// file into memory. Each call replaces the previous list: tracks no
+    /// longer named are dropped. Unlike [`Player::preload`], nothing is
+    /// decoded and only the head of each file is downloaded.
+    pub fn prefetch(&self, track_ids: Vec<SpotifyUri>) {
+        self.command(PlayerCommand::Prefetch(track_ids));
     }
 
     pub fn play(&self) {
@@ -931,6 +1019,29 @@ impl PlayerState {
     }
 }
 
+/// The tracks worth prefetching out of a list: the first few distinct tracks
+/// and episodes, in order, each with whether to prefetch its audio key.
+fn tracks_to_prefetch(track_ids: Vec<SpotifyUri>) -> Vec<(SpotifyUri, bool)> {
+    let mut wanted = Vec::with_capacity(PREFETCH_MAX_TRACKS);
+    for track_id in track_ids {
+        if wanted.len() == PREFETCH_MAX_TRACKS {
+            break;
+        }
+        if matches!(
+            track_id,
+            SpotifyUri::Track { .. } | SpotifyUri::Episode { .. }
+        ) && !wanted.contains(&track_id)
+        {
+            wanted.push(track_id);
+        }
+    }
+    wanted
+        .into_iter()
+        .enumerate()
+        .map(|(position, track_id)| (track_id, position < PREFETCH_KEY_TRACKS))
+        .collect()
+}
+
 struct PlayerTrackLoader {
     session: Session,
     config: PlayerConfig,
@@ -993,10 +1104,12 @@ impl PlayerTrackLoader {
         &self,
         track_uri: SpotifyUri,
         position_ms: u32,
+        prefetched: Option<Prefetched>,
     ) -> Option<PlayerLoadedTrackData> {
         match track_uri {
             SpotifyUri::Track { .. } | SpotifyUri::Episode { .. } => {
-                self.load_remote_track(track_uri, position_ms).await
+                self.load_remote_track(track_uri, position_ms, prefetched)
+                    .await
             }
             SpotifyUri::Local { .. } => self.load_local_track(track_uri, position_ms).await,
             _ => {
@@ -1006,11 +1119,9 @@ impl PlayerTrackLoader {
         }
     }
 
-    async fn load_remote_track(
-        &self,
-        track_uri: SpotifyUri,
-        position_ms: u32,
-    ) -> Option<PlayerLoadedTrackData> {
+    /// Reads a track's metadata and picks the file to play in the configured
+    /// bitrate.
+    async fn resolve_remote_track(&self, track_uri: SpotifyUri) -> Option<ResolvedTrack> {
         let track_id: SpotifyId = match (&track_uri).try_into() {
             Ok(id) => id,
             Err(_) => {
@@ -1090,10 +1201,98 @@ impl PlayerTrackLoader {
 
         let bytes_per_second = self.stream_data_rate(format)?;
 
+        Some(ResolvedTrack {
+            audio_item,
+            format,
+            file_id,
+            bytes_per_second,
+        })
+    }
+
+    /// Fetches what [`Player::prefetch`] keeps for an upcoming track.
+    async fn prefetch(&self, track_uri: SpotifyUri) -> Option<PrefetchedTrack> {
+        let track = self.resolve_remote_track(track_uri).await?;
+        let file_id = track.file_id;
+        let cached = self
+            .session
+            .cache()
+            .and_then(|cache| cache.file_path(file_id))
+            .is_some_and(|path| path.exists());
+        let head = async {
+            if cached {
+                None
+            } else {
+                AudioFileHead::fetch(&self.session, file_id, PREFETCH_HEAD_BYTES)
+                    .await
+                    .map_err(|e| debug!("Unable to prefetch the head of {file_id}: {e}"))
+                    .ok()
+            }
+        };
+        let head = head.await;
+        debug!(
+            "Prefetched <{}>{}",
+            track.audio_item.name,
+            if head.is_some() { " and its head" } else { "" }
+        );
+        Some(PrefetchedTrack { track, head })
+    }
+
+    /// Fetches the audio key of a prefetched track, unless the session is
+    /// backing off after a refused key. A key that could not be had is asked
+    /// for again when the track loads.
+    async fn prefetch_key(&self, track_uri: SpotifyUri, track: PrefetchFuture) -> Option<AudioKey> {
+        let track_id: SpotifyId = (&track_uri).try_into().ok()?;
+        let file_id = track.await?.track.file_id;
+        self.session
+            .audio_key()
+            .try_request(track_id, file_id)
+            .await
+            .map_err(|e| debug!("Unable to prefetch the audio key of <{track_uri}>: {e}"))
+            .ok()
+    }
+
+    async fn load_remote_track(
+        &self,
+        track_uri: SpotifyUri,
+        position_ms: u32,
+        prefetched: Option<Prefetched>,
+    ) -> Option<PlayerLoadedTrackData> {
+        let track_id: SpotifyId = match (&track_uri).try_into() {
+            Ok(id) => id,
+            Err(_) => {
+                warn!("<{track_uri}> could not be converted to a base62 ID");
+                return None;
+            }
+        };
+
+        // A prefetch still on its way got there first, so waiting for it is never
+        // slower than starting again.
+        let (prefetched, mut prefetched_key) = match prefetched {
+            Some(Prefetched { track, key }) => (track.await, key),
+            None => (None, None),
+        };
+        let (track, mut head) = match prefetched {
+            Some(prefetched) => {
+                debug!(
+                    "Loading <{}> from its prefetch",
+                    prefetched.track.audio_item.name
+                );
+                (prefetched.track.clone(), prefetched.head.clone())
+            }
+            None => (self.resolve_remote_track(track_uri).await?, None),
+        };
+        let ResolvedTrack {
+            audio_item,
+            format,
+            file_id,
+            bytes_per_second,
+        } = track;
+
         // This is only a loop to be able to reload the file if an error occurred
         // while opening a cached file.
         loop {
-            let encrypted_file = AudioFile::open(&self.session, file_id, bytes_per_second);
+            let encrypted_file =
+                AudioFile::open_with_head(&self.session, file_id, bytes_per_second, head.take());
 
             let encrypted_file = match encrypted_file.await {
                 Ok(encrypted_file) => encrypted_file,
@@ -1110,12 +1309,19 @@ impl PlayerTrackLoader {
             // Not all audio files are encrypted. If we can't get a key, try loading the track
             // without decryption. If the file was encrypted after all, the decoder will fail
             // parsing and bail out, so we should be safe from outputting ear-piercing noise.
-            let key = match self.session.audio_key().request(track_id, file_id).await {
-                Ok(key) => Some(key),
-                Err(e) => {
-                    warn!("Unable to load key, continuing without decryption: {e}");
-                    None
-                }
+            let prefetched_key = match prefetched_key.take() {
+                Some(key) => key.await,
+                None => None,
+            };
+            let key = match prefetched_key {
+                Some(key) => Some(key),
+                None => match self.session.audio_key().request(track_id, file_id).await {
+                    Ok(key) => Some(key),
+                    Err(e) => {
+                        warn!("Unable to load key, continuing without decryption: {e}");
+                        None
+                    }
+                },
             };
 
             let mut decrypted_file = AudioDecrypt::new(key, encrypted_file);
@@ -2187,6 +2393,56 @@ impl PlayerInternal {
         Ok(())
     }
 
+    fn track_loader(&self) -> PlayerTrackLoader {
+        PlayerTrackLoader {
+            session: self.session.clone(),
+            config: self.config.clone(),
+            local_file_lookup: self.local_file_lookup.clone(),
+        }
+    }
+
+    fn handle_command_prefetch(&mut self, track_ids: Vec<SpotifyUri>) {
+        let wanted = tracks_to_prefetch(track_ids);
+
+        let mut prefetches = self.prefetches.lock().expect(PREFETCHES_POISON_MSG);
+        prefetches.retain(|track_id, prefetch| {
+            let keep = wanted.iter().any(|(wanted, _)| wanted == track_id);
+            if !keep {
+                prefetch.abort();
+            }
+            keep
+        });
+        for (track_id, with_key) in wanted {
+            let prefetch = prefetches.entry(track_id.clone()).or_insert_with(|| {
+                debug!("Prefetching <{track_id}>");
+                let loader = self.track_loader();
+                let uri = track_id.clone();
+                let fetch: Pin<Box<dyn Future<Output = Option<Arc<PrefetchedTrack>>> + Send>> =
+                    Box::pin(async move { loader.prefetch(uri).await.map(Arc::new) });
+                let future = fetch.shared();
+                // The task drives the prefetch until a load takes it over or the
+                // track is dropped from the list.
+                let task = tokio::spawn(future.clone().map(drop)).abort_handle();
+                Prefetch {
+                    future,
+                    task,
+                    key: None,
+                }
+            });
+            // A track prefetched further down the list gets its key once it
+            // is the next one.
+            if with_key && prefetch.key.is_none() {
+                let loader = self.track_loader();
+                let prefetch_future = prefetch.future.clone();
+                let fetch: Pin<Box<dyn Future<Output = Option<AudioKey>> + Send>> =
+                    Box::pin(async move { loader.prefetch_key(track_id, prefetch_future).await });
+                let key = fetch.shared();
+                let task = tokio::spawn(key.clone().map(drop)).abort_handle();
+                prefetch.key = Some((key, task));
+            }
+        }
+    }
+
     fn handle_command_preload(&mut self, track_id: SpotifyUri) {
         debug!("Preloading track");
         let mut preload_track = true;
@@ -2315,6 +2571,8 @@ impl PlayerInternal {
 
             PlayerCommand::Preload { track_id } => self.handle_command_preload(track_id),
 
+            PlayerCommand::Prefetch(track_ids) => self.handle_command_prefetch(track_ids),
+
             PlayerCommand::Seek(position_ms) => self.handle_command_seek(position_ms)?,
 
             PlayerCommand::Play => self.handle_play(),
@@ -2441,11 +2699,15 @@ impl PlayerInternal {
         // easily. Instead we spawn a thread to do the work and return a one-shot channel as the
         // future to work with.
 
-        let loader = PlayerTrackLoader {
-            session: self.session.clone(),
-            config: self.config.clone(),
-            local_file_lookup: self.local_file_lookup.clone(),
-        };
+        let loader = self.track_loader();
+        // Taken now rather than on the loading thread, so that the next list of
+        // tracks to prefetch, which no longer names this one, cannot drop it first.
+        let prefetched = self
+            .prefetches
+            .lock()
+            .expect(PREFETCHES_POISON_MSG)
+            .remove(&spotify_uri)
+            .map(Prefetch::into_prefetched);
 
         let (result_tx, result_rx) = oneshot::channel();
 
@@ -2453,7 +2715,7 @@ impl PlayerInternal {
         let handle = tokio::runtime::Handle::current();
 
         let load_handle = thread::spawn(move || {
-            let data = handle.block_on(loader.load_track(spotify_uri, position_ms));
+            let data = handle.block_on(loader.load_track(spotify_uri, position_ms, prefetched));
             if let Some(data) = data {
                 let _ = result_tx.send(data);
             }
@@ -2527,6 +2789,9 @@ impl fmt::Debug for PlayerCommand {
                 .finish(),
             PlayerCommand::Preload { track_id } => {
                 f.debug_tuple("Preload").field(&track_id).finish()
+            }
+            PlayerCommand::Prefetch(track_ids) => {
+                f.debug_tuple("Prefetch").field(&track_ids).finish()
             }
             PlayerCommand::Play => f.debug_tuple("Play").finish(),
             PlayerCommand::Pause => f.debug_tuple("Pause").finish(),
@@ -2707,5 +2972,52 @@ where
 
     fn byte_len(&self) -> Option<u64> {
         Some(self.length)
+    }
+}
+
+#[cfg(test)]
+mod prefetch_tests {
+    use super::{PREFETCH_KEY_TRACKS, PREFETCH_MAX_TRACKS, tracks_to_prefetch};
+    use crate::core::SpotifyUri;
+
+    #[test]
+    fn prefetch_keeps_the_first_distinct_tracks_and_episodes() {
+        let uri = |uri: &str| SpotifyUri::from_uri(uri).unwrap();
+        let first = uri("spotify:track:14XWXWv5FoCbFzLksawpEe");
+        let episode = uri("spotify:episode:5Xt5DXGzch68nYYamXrNxZ");
+        let album = uri("spotify:album:5qkGe4UpUa8dsokzuroQ72");
+        let others = [
+            uri("spotify:track:0000000000000000000002"),
+            uri("spotify:track:0000000000000000000003"),
+        ];
+
+        let wanted = tracks_to_prefetch(vec![
+            first.clone(),
+            album,
+            first.clone(),
+            episode.clone(),
+            others[0].clone(),
+            others[1].clone(),
+        ]);
+
+        assert_eq!(wanted.len(), PREFETCH_MAX_TRACKS);
+        assert_eq!(
+            wanted,
+            vec![(first, true), (episode, false), (others[0].clone(), false)]
+        );
+    }
+
+    #[test]
+    fn prefetch_asks_for_the_key_of_the_next_track_only() {
+        let uri = |uri: &str| SpotifyUri::from_uri(uri).unwrap();
+        let wanted = tracks_to_prefetch(vec![
+            uri("spotify:album:5qkGe4UpUa8dsokzuroQ72"),
+            uri("spotify:track:0000000000000000000002"),
+            uri("spotify:track:0000000000000000000003"),
+        ]);
+
+        let with_key: Vec<_> = wanted.iter().map(|(_, with_key)| *with_key).collect();
+        assert_eq!(PREFETCH_KEY_TRACKS, 1);
+        assert_eq!(with_key, vec![true, false]);
     }
 }

@@ -7,4 +7,6 @@ mod fetch;
 mod range_set;
 
 pub use decrypt::AudioDecrypt;
-pub use fetch::{AudioFetchParams, AudioFile, AudioFileError, StreamLoaderController};
+pub use fetch::{
+    AudioFetchParams, AudioFile, AudioFileError, AudioFileHead, StreamLoaderController,
+};
