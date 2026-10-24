@@ -9,10 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- [core] Ask for audio keys one at a time and at least 200 ms apart, and after Spotify refuses one wait 3, then 5, then 10 seconds before asking for another, so a burst of requests no longer prolongs a run of refusals; `AudioKeyManager::request` asks again for a refused key up to three times
 - [connect] Picking a track in a list plays that track: an empty `track_uri` (or `track_uid`) sent next to the one that identifies the track is ignored, instead of failing to resolve and playing the first track of the context
 
 ### Added
 
+- [core] Add `AudioKeyManager::try_request`, which asks for a key once and not at all while the session waits after a refusal, and `AudioKeyManager::is_backing_off`; `AudioKeyError` gains a `BackingOff` variant (breaking)
 - [docs] Document Android NDK context initialization requirement for Rodio/CPAL audio backend
 - [core] Add `Cache::with_memory_credentials` to keep credentials in memory instead of a file, for applications that store them in their own protected store
 - [connect] Add method `add_to_queue` to `Spirc` to add tracks, episodes, albums and playlists to the queue
