@@ -1,7 +1,7 @@
 use crate::symphonia_util;
 use librespot_core::{Error, SpotifyUri};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs,
     fs::File,
     io,
@@ -56,18 +56,38 @@ pub fn create_local_file_lookup(directories: &[PathBuf]) -> LocalFileLookup {
 }
 
 fn visit_dir(dir: &Path, accumulator: &mut LocalFileLookup) -> io::Result<()> {
-    for entry in fs::read_dir(dir)? {
-        let path = entry?.path();
-        if path.is_dir() {
-            visit_dir(&path, accumulator)?;
-        } else {
+    // Keep traversal off the call stack and do not follow nested links. The
+    // canonical set also handles directory aliases such as Windows junctions.
+    let mut pending = vec![dir.to_path_buf()];
+    let mut visited = HashSet::new();
+    while let Some(directory) = pending.pop() {
+        let directory = fs::canonicalize(directory)?;
+        if !visited.insert(directory.clone()) {
+            continue;
+        }
+        for entry in fs::read_dir(directory)? {
+            let entry = entry?;
+            let kind = entry.file_type()?;
+            let path = entry.path();
+            if kind.is_symlink() {
+                continue;
+            }
+            if kind.is_dir() {
+                pending.push(path);
+                continue;
+            }
+            if !kind.is_file() {
+                continue;
+            }
             let Some(file_extension) = path.extension().and_then(|e| e.to_str()) else {
                 continue;
             };
 
             let lowercase_extension = file_extension.to_lowercase();
 
-            if SUPPORTED_FILE_EXTENSIONS.contains(&lowercase_extension.as_str()) {
+            if SUPPORTED_FILE_EXTENSIONS.contains(&lowercase_extension.as_str())
+                || (cfg!(feature = "opus") && lowercase_extension == "opus")
+            {
                 let uri = match get_uri_from_file(path.as_path(), file_extension) {
                     Ok(uri) => uri,
                     Err(e) => {
@@ -164,4 +184,49 @@ fn get_uri_from_file(audio_path: &Path, file_extension: &str) -> Result<SpotifyU
         track_title: format_uri_part(track_title),
         duration: Duration::from_secs(time.seconds),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(feature = "opus")]
+    #[test]
+    fn discovers_tagged_opus_files() {
+        let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/decoder/testdata");
+        let lookup = create_local_file_lookup(std::slice::from_ref(&folder));
+        let uri = get_uri_from_file(&folder.join("stereo-48000.opus"), "opus").unwrap();
+        assert!(lookup.get(&uri).unwrap().ends_with("stereo-48000.opus"));
+        assert!(uri.to_uri().contains("Opus+Test"));
+    }
+
+    #[test]
+    fn directory_links_do_not_recurse_into_ancestors() {
+        let root = std::env::temp_dir().join(format!(
+            "librespot-lookup-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let child = root.join("child");
+        fs::create_dir_all(&child).unwrap();
+        #[cfg(unix)]
+        let link = std::os::unix::fs::symlink(&root, child.join("ancestor"));
+        #[cfg(windows)]
+        let link = std::os::windows::fs::symlink_dir(&root, child.join("ancestor"));
+        if let Err(error) = link {
+            fs::remove_dir_all(&root).unwrap();
+            if cfg!(windows) && error.kind() == io::ErrorKind::PermissionDenied {
+                return;
+            }
+            panic!("{error}");
+        }
+        let mut lookup = LocalFileLookup::default();
+        let result = visit_dir(&root, &mut lookup);
+        fs::remove_dir_all(&root).unwrap();
+        result.unwrap();
+        assert!(lookup.0.is_empty());
+    }
 }

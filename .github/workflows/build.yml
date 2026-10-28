@@ -69,6 +69,10 @@ jobs:
       - name: Run tests
         run: cargo test --workspace
 
+      - name: Test local Opus decoding
+        if: matrix.toolchain == 'stable'
+        run: cargo test -p librespot-playback --features opus
+
       - name: Install cargo-hack
         uses: taiki-e/install-action@cargo-hack
 
@@ -79,13 +83,13 @@ jobs:
         run: >
           cargo hack check -p librespot --each-feature --exclude-all-features
           --include-features native-tls
-          --exclude-features rustls-tls-native-roots,rustls-tls-webpki-roots
+          --exclude-features rustls-tls-native-roots,rustls-tls-webpki-roots${{ matrix.toolchain == '1.85' && ',opus' || '' }}
 
       - name: Check workspace with rustls-tls-native-roots
         run: >
           cargo hack check -p librespot --each-feature --exclude-all-features
           --include-features rustls-tls-native-roots
-          --exclude-features native-tls,rustls-tls-webpki-roots
+          --exclude-features native-tls,rustls-tls-webpki-roots${{ matrix.toolchain == '1.85' && ',opus' || '' }}
 
       - name: Check discovery features (Linux only)
         if: runner.os == 'Linux'

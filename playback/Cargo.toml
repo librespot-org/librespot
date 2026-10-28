@@ -45,6 +45,8 @@ rustls-tls-webpki-roots = [
     "librespot-audio/rustls-tls-webpki-roots",
     "librespot-metadata/rustls-tls-webpki-roots",
 ]
+# Optional local Ogg Opus decoding, using bundled libopus (Rust 1.89+).
+opus = ["dep:symphonia-adapter-libopus"]
 
 [dependencies]
 librespot-audio = { version = "0.8.0", path = "../audio", default-features = false }
@@ -54,6 +56,8 @@ librespot-metadata = { version = "0.8.0", path = "../metadata", default-features
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
 log = "0.4"
 portable-atomic = "1"
+rubato = { version = "4.0", default-features = false }
+audioadapter-buffers = "4.0"
 shell-words = "1.1"
 thiserror = "2"
 tokio = { version = "1", features = ["rt-multi-thread", "sync"] }
@@ -97,6 +101,11 @@ rand_distr = "0.5"
 
 # Local file handling
 form_urlencoded = "1.2.2"
+symphonia-adapter-libopus = { version = "0.2.9", optional = true }
+
+[dev-dependencies]
+# WAV, so the decoder tests can build files at any rate and channel layout.
+symphonia = { version = "0.5", default-features = false, features = ["wav", "pcm"] }
 
 [lints]
 workspace = true

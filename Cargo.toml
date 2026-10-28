@@ -36,6 +36,8 @@ repository = "https://github.com/librespot-org/librespot"
 edition = "2024"
 
 [features]
+# Local Opus decoding requires Rust 1.89 and CMake for bundled libopus.
+opus = ["librespot-playback/opus"]
 default = ["native-tls", "rodio-backend", "with-libmdns"]
 
 # TLS backends (mutually exclusive - compile-time checks in oauth/src/lib.rs)

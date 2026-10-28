@@ -250,3 +250,10 @@ Assuming you just compiled a ```debug``` build, you can run librespot with the f
 There are various runtime options, documented in the wiki, and visible by running librespot with the ```-h``` argument.
 
 Note that debug builds may cause buffer underruns and choppy audio when dithering is enabled (which it is by default). You can disable dithering with ```--dither none```.
+
+### Local Opus files
+
+Enable `--features opus` to decode local `.opus` files (Ogg Opus). This optional
+feature requires Rust 1.89 or newer and CMake plus a C compiler to build bundled
+libopus. Default builds keep the existing Rust minimum and do not link libopus.
+The feature uses the same local-file playback path as MP3 and FLAC.
