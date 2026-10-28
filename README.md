@@ -75,7 +75,7 @@ By default, this builds with native-tls (system TLS), rodio audio backend, and l
 
 librespot is also available via official package system on various operating systems such as Linux, FreeBSD, NetBSD. [Repology](https://repology.org/project/librespot/versions) offers a good overview.
 
-[![Packaging status](https://repology.org/badge/vertical-allrepos/librespot.svg)](https://repology.org/project/librespot/versions)
+[![Packaging status](https://repology.org/badge/vertical-allrepos/librespot.svg?exclude_unsupported=1)](https://repology.org/project/librespot/versions)
 
 ## Usage
 A sample program implementing a headless Spotify Connect receiver is provided.
