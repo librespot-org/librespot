@@ -1931,7 +1931,7 @@ async fn main() {
 
     let mut session = Session::new(setup.session_config.clone(), setup.cache.clone());
 
-    let mut sys = System::new();
+    let mut sys = System::new().ok();
 
     if let Some(zeroconf_backend) = setup.zeroconf_backend {
         // When started at boot as a service discovery may fail due to it
@@ -1958,9 +1958,13 @@ async fn main() {
             {
                 Ok(d) => break Some(d),
                 Err(e) => {
-                    sys.refresh_processes(ProcessesToUpdate::All, true);
+                    if let Some(sys) = sys.as_mut() {
+                        sys.refresh_processes(ProcessesToUpdate::All, true);
+                    }
 
-                    if Duration::from_secs(System::uptime()) <= DISCOVERY_RETRY_UPTIME_LIMIT {
+                    // If the uptime is unavailable, assume the system has been up long enough to not retry.
+                    let uptime = System::uptime().unwrap_or(u64::MAX);
+                    if Duration::from_secs(uptime) <= DISCOVERY_RETRY_UPTIME_LIMIT {
                         debug!("Retrying to initialise discovery: {e}");
                         tokio::time::sleep(DISCOVERY_RETRY_TIMEOUT).await;
                     } else {

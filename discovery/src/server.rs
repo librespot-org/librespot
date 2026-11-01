@@ -9,7 +9,7 @@ use aes::cipher::{KeyIvInit, StreamCipher};
 use base64::engine::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use bytes::Bytes;
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit, Mac};
 use http_body_util::{BodyExt, Full};
 use hyper::{Method, Request, Response, StatusCode, body::Incoming};
 

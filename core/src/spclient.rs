@@ -199,7 +199,7 @@ impl SpClient {
             .mut_or_insert_default();
 
         let os_version = os_version();
-        let kernel_version = System::kernel_version().unwrap_or_else(|| String::from("0"));
+        let kernel_version = System::kernel_version().unwrap_or_else(|_| String::from("0"));
 
         match os {
             "windows" => {

@@ -1,10 +1,10 @@
 use std::{env::consts::ARCH, io};
 
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit, Mac};
 use protobuf::Message;
 use rand::RngCore;
-use rsa::{BigUint, Pkcs1v15Sign, RsaPublicKey};
+use rsa::{BoxedUint, Pkcs1v15Sign, RsaPublicKey};
 use sha1::{Digest, Sha1};
 use thiserror::Error;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
@@ -80,8 +80,8 @@ pub async fn handshake<T: AsyncRead + AsyncWrite + Unpin>(
         .to_owned();
 
     // Prevent man-in-the-middle attacks: check server signature
-    let n = BigUint::from_bytes_be(&SERVER_KEY);
-    let e = BigUint::new(vec![65537]);
+    let n = BoxedUint::from_be_slice_vartime(&SERVER_KEY);
+    let e = BoxedUint::from(65537u32);
     let public_key = RsaPublicKey::new(n, e).map_err(|_| {
         io::Error::new(
             io::ErrorKind::InvalidData,
