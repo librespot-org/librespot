@@ -3,7 +3,7 @@ use std::{env::consts::ARCH, io};
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
 use hmac::{Hmac, KeyInit, Mac};
 use protobuf::Message;
-use rand::RngCore;
+use rand::Rng;
 use rsa::{BoxedUint, Pkcs1v15Sign, RsaPublicKey};
 use sha1::{Digest, Sha1};
 use thiserror::Error;

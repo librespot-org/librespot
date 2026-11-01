@@ -92,8 +92,8 @@ symphonia = { version = "0.5", default-features = false, features = [
 ogg = { version = "0.9", optional = true }
 
 # Dithering
-rand = { version = "0.9", default-features = false, features = ["small_rng"] }
-rand_distr = "0.5"
+rand = { version = "0.10", default-features = false, features = ["thread_rng"] }
+rand_distr = "0.6"
 
 # Local file handling
 form_urlencoded = "1.2.2"
