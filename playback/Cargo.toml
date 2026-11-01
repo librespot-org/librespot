@@ -66,9 +66,9 @@ portaudio-rs = { version = "0.3", optional = true }
 sdl2 = { version = "0.38", optional = true }
 
 # GStreamer dependencies
-gstreamer = { version = "0.24", optional = true }
-gstreamer-app = { version = "0.24", optional = true }
-gstreamer-audio = { version = "0.24", optional = true }
+gstreamer = { version = "0.25", optional = true }
+gstreamer-app = { version = "0.25", optional = true }
+gstreamer-audio = { version = "0.25", optional = true }
 
 # PulseAudio dependencies
 libpulse-binding = { version = "2", optional = true, default-features = false }
