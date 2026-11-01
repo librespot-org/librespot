@@ -398,13 +398,13 @@ impl AudioFile {
         session.spawn(complete_rx.map_ok(move |mut file| {
             debug!("Downloading file {file_id} complete");
 
-            if let Some(cache) = session_.cache() {
-                if let Some(cache_id) = cache.file_path(file_id) {
-                    if let Err(e) = cache.save_file(file_id, &mut file) {
-                        error!("Error caching file {file_id} to {cache_id:?}: {e}");
-                    } else {
-                        debug!("File {file_id} cached to {cache_id:?}");
-                    }
+            if let Some(cache) = session_.cache()
+                && let Some(cache_id) = cache.file_path(file_id)
+            {
+                if let Err(e) = cache.save_file(file_id, &mut file) {
+                    error!("Error caching file {file_id} to {cache_id:?}: {e}");
+                } else {
+                    debug!("File {file_id} cached to {cache_id:?}");
                 }
             }
         }));

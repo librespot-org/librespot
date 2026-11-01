@@ -157,10 +157,10 @@ impl SpClient {
 
     pub async fn client_token(&self) -> Result<String, Error> {
         let client_token = self.lock(|inner| {
-            if let Some(token) = &inner.client_token {
-                if token.is_expired() {
-                    inner.client_token = None;
-                }
+            if let Some(token) = &inner.client_token
+                && token.is_expired()
+            {
+                inner.client_token = None;
             }
             inner.client_token.clone()
         });
@@ -523,10 +523,10 @@ impl SpClient {
 
             // Break before the reconnection logic below, so that the current access point
             // is retained when max_tries == 1. Leave it up to the caller when to flush.
-            if let RequestStrategy::TryTimes(max_tries) = self.lock(|inner| inner.strategy) {
-                if tries >= max_tries {
-                    break;
-                }
+            if let RequestStrategy::TryTimes(max_tries) = self.lock(|inner| inner.strategy)
+                && tries >= max_tries
+            {
+                break;
             }
 
             // Reconnection logic: drop the current access point if we are experiencing issues.
@@ -535,7 +535,7 @@ impl SpClient {
                 match network_error.kind {
                     ErrorKind::Unavailable | ErrorKind::DeadlineExceeded => {
                         // Keep trying the current access point three times before dropping it.
-                        if tries % 3 == 0 {
+                        if tries.is_multiple_of(3) {
                             self.flush_accesspoint().await
                         }
                     }
