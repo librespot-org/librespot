@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 ARG alpine_version=alpine3.23
-ARG rust_version=1.95.0
+ARG rust_version=1.96.0
 FROM rust:${rust_version}-${alpine_version}
 
 ENV RUST_BACKTRACE=1
