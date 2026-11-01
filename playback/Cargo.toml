@@ -60,7 +60,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "sync"] }
 zerocopy = { version = "0.8", features = ["derive"] }
 
 # Backends
-alsa = { version = "0.10", optional = true }
+alsa = { version = "0.11", optional = true }
 jack = { version = "0.13", optional = true }
 portaudio-rs = { version = "0.3", optional = true }
 sdl2 = { version = "0.38", optional = true }
@@ -75,8 +75,8 @@ libpulse-binding = { version = "2", optional = true, default-features = false }
 libpulse-simple-binding = { version = "2", optional = true, default-features = false }
 
 # Rodio dependencies
-cpal = { version = "0.16", optional = true }
-rodio = { version = "0.21", optional = true, default-features = false, features = [
+cpal = { version = "0.18", optional = true }
+rodio = { version = "0.23", optional = true, default-features = false, features = [
     "playback",
 ] }
 

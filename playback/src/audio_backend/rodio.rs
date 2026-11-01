@@ -40,9 +40,9 @@ pub enum RodioError {
     #[error("<RodioSink> Play Error: {0}")]
     PlayError(#[from] rodio::PlayError),
     #[error("<RodioSink> Stream Error: {0}")]
-    StreamError(#[from] rodio::StreamError),
+    StreamError(#[from] rodio::DeviceSinkError),
     #[error("<RodioSink> Cannot Get Audio Devices: {0}")]
-    DevicesError(#[from] cpal::DevicesError),
+    DevicesError(#[from] cpal::Error),
     #[error("<RodioSink> {0}")]
     Samples(String),
 }
@@ -59,21 +59,13 @@ impl From<RodioError> for SinkError {
     }
 }
 
-impl From<cpal::DefaultStreamConfigError> for RodioError {
-    fn from(_: cpal::DefaultStreamConfigError) -> RodioError {
-        RodioError::NoDeviceAvailable
-    }
-}
-
-impl From<cpal::SupportedStreamConfigsError> for RodioError {
-    fn from(_: cpal::SupportedStreamConfigsError) -> RodioError {
-        RodioError::NoDeviceAvailable
-    }
+fn get_device_name(device: &cpal::Device) -> Option<String> {
+    device.description().ok().map(|d| d.name().to_string())
 }
 
 pub struct RodioSink {
-    rodio_sink: rodio::Sink,
-    _stream: rodio::OutputStream,
+    rodio_sink: rodio::Player,
+    _stream: rodio::MixerDeviceSink,
 }
 
 fn list_formats(device: &cpal::Device) {
@@ -107,11 +99,11 @@ fn list_formats(device: &cpal::Device) {
     }
 }
 
-fn list_outputs(host: &cpal::Host) -> Result<(), cpal::DevicesError> {
+fn list_outputs(host: &cpal::Host) -> Result<(), cpal::Error> {
     let mut default_device_name = None;
 
     if let Some(default_device) = host.default_output_device() {
-        default_device_name = default_device.name().ok();
+        default_device_name = get_device_name(&default_device);
         println!(
             "Default Audio Device:\n  {}",
             default_device_name.as_deref().unwrap_or("[unknown name]")
@@ -125,14 +117,14 @@ fn list_outputs(host: &cpal::Host) -> Result<(), cpal::DevicesError> {
     }
 
     for device in host.output_devices()? {
-        match device.name() {
+        match get_device_name(&device).ok_or(()) {
             Ok(name) if Some(&name) == default_device_name.as_ref() => (),
             Ok(name) => {
                 println!("  {name}");
                 list_formats(&device);
             }
-            Err(e) => {
-                warn!("Cannot get device name: {e}");
+            Err(()) => {
+                warn!("Cannot get device name");
                 println!("   [unknown name]");
                 list_formats(&device);
             }
@@ -146,7 +138,7 @@ fn create_sink(
     host: &cpal::Host,
     device: Option<String>,
     format: AudioFormat,
-) -> Result<(rodio::Sink, rodio::OutputStream), RodioError> {
+) -> Result<(rodio::Player, rodio::MixerDeviceSink), RodioError> {
     let cpal_device = match device.as_deref() {
         Some("?") => match list_outputs(host) {
             Ok(()) => exit(0),
@@ -158,7 +150,7 @@ fn create_sink(
         Some(device_name) => {
             // Ignore devices for which getting name fails, or format doesn't match
             host.output_devices()?
-                .find(|d| d.name().ok().is_some_and(|name| name == device_name)) // Ignore devices for which getting name fails
+                .find(|d| get_device_name(d).is_some_and(|name| name == device_name)) // Ignore devices for which getting name fails
                 .ok_or_else(|| RodioError::DeviceNotAvailable(device_name.to_string()))?
         }
         None => host
@@ -166,7 +158,7 @@ fn create_sink(
             .ok_or(RodioError::NoDeviceAvailable)?,
     };
 
-    let name = cpal_device.name().ok();
+    let name = get_device_name(&cpal_device);
     info!(
         "Using audio device: {}",
         name.as_deref().unwrap_or("[unknown name]")
@@ -175,12 +167,15 @@ fn create_sink(
     // First try native stereo 44.1 kHz playback, then fall back to the device default sample rate
     // (some devices only support 48 kHz and Rodio will resample linearly), then fall back to
     // whatever the default device config is (like mono).
-    let default_config = cpal_device.default_output_config()?;
+    let default_config = cpal_device
+        .default_output_config()
+        .map_err(|_| RodioError::NoDeviceAvailable)?;
     let config = cpal_device
-        .supported_output_configs()?
+        .supported_output_configs()
+        .map_err(|_| RodioError::NoDeviceAvailable)?
         .find(|c| c.channels() == NUM_CHANNELS as cpal::ChannelCount)
         .and_then(|c| {
-            c.try_with_sample_rate(cpal::SampleRate(SAMPLE_RATE))
+            c.try_with_sample_rate(SAMPLE_RATE)
                 .or_else(|| c.try_with_sample_rate(default_config.sample_rate()))
         })
         .unwrap_or(default_config);
@@ -193,7 +188,7 @@ fn create_sink(
         AudioFormat::S16 => cpal::SampleFormat::I16,
     };
 
-    let mut stream = match rodio::OutputStreamBuilder::default()
+    let mut stream = match rodio::DeviceSinkBuilder::default()
         .with_device(cpal_device.clone())
         .with_config(&config.config())
         .with_sample_format(sample_format)
@@ -202,14 +197,14 @@ fn create_sink(
         Ok(exact_stream) => exact_stream,
         Err(e) => {
             warn!("unable to create Rodio output, falling back to default: {e}");
-            rodio::OutputStreamBuilder::from_device(cpal_device)?.open_stream_or_fallback()?
+            rodio::DeviceSinkBuilder::from_device(cpal_device)?.open_sink_or_fallback()?
         }
     };
 
     // disable logging on stream drop
     stream.log_on_drop(false);
 
-    let sink = rodio::Sink::connect_new(stream.mixer());
+    let sink = rodio::Player::connect_new(stream.mixer());
     Ok((sink, stream))
 }
 
@@ -246,8 +241,8 @@ impl Sink for RodioSink {
             .map_err(|e| RodioError::Samples(e.to_string()))?;
         let samples_f32: &[f32] = &converter.f64_to_f32(samples);
         let source = rodio::buffer::SamplesBuffer::new(
-            NUM_CHANNELS as cpal::ChannelCount,
-            SAMPLE_RATE,
+            rodio::ChannelCount::new(NUM_CHANNELS as u16).expect("channel count is non-zero"),
+            rodio::SampleRate::new(SAMPLE_RATE).expect("sample rate is non-zero"),
             samples_f32,
         );
         self.rodio_sink.append(source);
