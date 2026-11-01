@@ -44,7 +44,7 @@ librespot-oauth = { version = "0.8.0", path = "../oauth", default-features = fal
 librespot-protocol = { version = "0.8.0", path = "../protocol", default-features = false }
 
 aes = "0.9"
-base64 = "0.22"
+base64 = "0.23"
 byteorder = "1.5"
 bytes = "1"
 data-encoding = "2.9"
@@ -76,8 +76,8 @@ hyper-util = { version = "0.1", default-features = false, features = [
 ] }
 log = "0.4"
 nonzero_ext = "0.3"
-num-bigint = "0.4"
-num-derive = "0.4"
+num-bigint = "0.5"
+num-derive = "0.5"
 num-integer = "0.1"
 num-traits = "0.2"
 pbkdf2 = { version = "0.13", default-features = false, features = ["hmac"] }
@@ -85,7 +85,7 @@ pin-project-lite = "0.2"
 priority-queue = "2.5"
 protobuf = "3.7"
 protobuf-json-mapping = "3.7"
-quick-xml = { version = "0.38", features = ["serialize"] }
+quick-xml = { version = "0.42", features = ["serialize"] }
 rand = { version = "0.10", default-features = false, features = ["thread_rng"] }
 rsa = "=0.10.0-rc.19"
 serde = { version = "1.0", features = ["derive"] }

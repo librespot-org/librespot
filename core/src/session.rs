@@ -820,7 +820,7 @@ where
                 loop {
                     match reader.read_event_into(&mut buf) {
                         Ok(Event::Start(ref element)) => {
-                            std::str::from_utf8(element)?.clone_into(&mut current_element)
+                            element.name().into_inner().clone_into(&mut current_element)
                         }
                         Ok(Event::End(_)) => {
                             current_element = String::new();
@@ -829,7 +829,9 @@ where
                             if !current_element.is_empty() {
                                 let _ = user_attributes.insert(
                                     current_element.clone(),
-                                    value.xml_content()?.to_string(),
+                                    value
+                                        .xml_content(quick_xml::XmlVersion::Implicit1_0)
+                                        .to_string(),
                                 );
                             }
                         }

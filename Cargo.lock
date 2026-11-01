@@ -433,7 +433,7 @@ dependencies = [
  "mach2",
  "ndk",
  "ndk-context",
- "num-derive",
+ "num-derive 0.4.2",
  "num-traits",
  "objc2-audio-toolbox",
  "objc2-core-audio",
@@ -1929,7 +1929,7 @@ dependencies = [
  "bitflags 2.13.2",
  "libc",
  "libpulse-sys",
- "num-derive",
+ "num-derive 0.4.2",
  "num-traits",
  "winapi",
 ]
@@ -1962,7 +1962,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d74371848b22e989f829cc1621d2ebd74960711557d8b45cfe740f60d0a05e61"
 dependencies = [
  "libc",
- "num-derive",
+ "num-derive 0.4.2",
  "num-traits",
  "pkg-config",
  "winapi",
@@ -2033,7 +2033,7 @@ name = "librespot-core"
 version = "0.8.0"
 dependencies = [
  "aes",
- "base64 0.22.1",
+ "base64 0.23.1",
  "byteorder",
  "bytes",
  "data-encoding",
@@ -2055,8 +2055,8 @@ dependencies = [
  "librespot-protocol",
  "log",
  "nonzero_ext",
- "num-bigint",
- "num-derive",
+ "num-bigint 0.5.1",
+ "num-derive 0.5.1",
  "num-integer",
  "num-traits",
  "pbkdf2",
@@ -2090,7 +2090,7 @@ name = "librespot-discovery"
 version = "0.8.0"
 dependencies = [
  "aes",
- "base64 0.22.1",
+ "base64 0.23.1",
  "bytes",
  "ctr",
  "dns-sd",
@@ -2366,6 +2366,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "num-bigint"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93e7820bc0a80a0238e650327316f929ba18d5be054b647490a3a6a339f3e7c0"
+dependencies = [
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
 name = "num-conv"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2383,6 +2393,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "num-derive"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e4e98dc3b890f6c23a0f9d3d491a2823d0dea0fa656302a13dd225fa924112a8"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.9",
+]
+
+[[package]]
 name = "num-integer"
 version = "0.1.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2397,7 +2418,7 @@ version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f83d14da390562dca69fc84082e73e548e1ad308d24accdedd2720017cb37824"
 dependencies = [
- "num-bigint",
+ "num-bigint 0.4.8",
  "num-integer",
  "num-traits",
 ]
@@ -2889,9 +2910,9 @@ dependencies = [
 
 [[package]]
 name = "quick-xml"
-version = "0.38.4"
+version = "0.42.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b66c2058c55a409d601666cffe35f04333cf1013010882cec174a7467cd4e21c"
+checksum = "41b1177fdf999d2321d3fb46ff47159d9c1fb9ad66a4879f8c50a0b504615e9b"
 dependencies = [
  "memchr",
  "serde",

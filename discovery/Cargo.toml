@@ -26,7 +26,7 @@ rustls-tls-webpki-roots = ["librespot-core/rustls-tls-webpki-roots"]
 librespot-core = { version = "0.8.0", path = "../core", default-features = false }
 
 aes = "0.9"
-base64 = "0.22"
+base64 = "0.23"
 bytes = "1"
 ctr = "0.10"
 dns-sd = { version = "0.1", optional = true }
