@@ -206,6 +206,16 @@ impl ContextResolver {
         self.find_next().is_some()
     }
 
+    /// Whether the next resolve is a further page of the default context (not
+    /// a replacement and not autoplay).
+    pub fn next_is_default_page(&self) -> bool {
+        matches!(
+            self.find_next(),
+            Some((next, _, _)) if next.update == ContextType::Default
+                && matches!(next.action, ContextAction::Append)
+        )
+    }
+
     pub async fn get_next_context(
         &self,
         recent_track_uri: impl Fn() -> Vec<String>,
