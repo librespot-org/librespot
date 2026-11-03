@@ -68,7 +68,9 @@ impl MappedCtrl for VolumeCtrl {
             mapped_volume
         };
 
-        (unmapped_volume * Self::MAX_VOLUME as f64) as u16
+        // Round instead of truncating, so that floating point errors do not
+        // unmap a volume to one step below the volume that was mapped.
+        (unmapped_volume * Self::MAX_VOLUME as f64).round() as u16
     }
 
     fn db_range(&self) -> f64 {
@@ -153,5 +155,36 @@ impl CubicMapping {
         // Note that this 60.0 is unrelated to DEFAULT_DB_RANGE.
         // Instead, it's the cubic voltage to dB ratio.
         f64::powf(10.0, -db_range / 60.0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn assert_round_trip(volume_ctrl: VolumeCtrl) {
+        for volume in 0..=VolumeCtrl::MAX_VOLUME {
+            let mapped_volume = volume_ctrl.to_mapped(volume);
+            assert_eq!(
+                volume,
+                volume_ctrl.as_unmapped(mapped_volume),
+                "{volume_ctrl:?} does not unmap the mapped volume back to {volume}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_log_round_trip() {
+        assert_round_trip(VolumeCtrl::Log(VolumeCtrl::DEFAULT_DB_RANGE));
+    }
+
+    #[test]
+    fn test_cubic_round_trip() {
+        assert_round_trip(VolumeCtrl::Cubic(VolumeCtrl::DEFAULT_DB_RANGE));
+    }
+
+    #[test]
+    fn test_linear_round_trip() {
+        assert_round_trip(VolumeCtrl::Linear);
     }
 }
