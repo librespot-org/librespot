@@ -577,7 +577,8 @@ impl SpircTask {
 
         if let Err(why) = self.session.dealer().start().await {
             error!("starting dealer failed: {why}");
-            return None;
+            // Only a restored spirc has playback to hand over at this point.
+            return self.has_playback().then(|| self.take_saved_state());
         }
 
         // Set when the reconnect watchdog decides we must restart to recover our
@@ -603,7 +604,9 @@ impl SpircTask {
                         error!("failed handling connection id update: {why}");
                         if !self.connect_established {
                             // Initial registration failed — can't process
-                            // commands without it, so restart spirc.
+                            // commands without it, so restart spirc, handing
+                            // over the playback of a restored spirc.
+                            force_restart = self.has_playback();
                             break;
                         }
                         // Re-registration after a dealer reconnect failed. Arm
@@ -792,11 +795,7 @@ impl SpircTask {
             // restart.
             let session = self.session.clone();
             tokio::spawn(async move { session.dealer().close().await });
-            return Some(SavedPlaybackState {
-                connect_state: mem::take(&mut self.connect_state),
-                play_status: mem::replace(&mut self.play_status, SpircPlayStatus::Stopped),
-                play_request_id: self.play_request_id.take(),
-            });
+            return Some(self.take_saved_state());
         }
 
         if !self.shutdown && self.connect_state.is_active() {
@@ -813,6 +812,18 @@ impl SpircTask {
 
         self.session.dealer().close().await;
         None
+    }
+
+    fn has_playback(&self) -> bool {
+        !matches!(self.play_status, SpircPlayStatus::Stopped)
+    }
+
+    fn take_saved_state(&mut self) -> SavedPlaybackState {
+        SavedPlaybackState {
+            connect_state: mem::take(&mut self.connect_state),
+            play_status: mem::replace(&mut self.play_status, SpircPlayStatus::Stopped),
+            play_request_id: self.play_request_id.take(),
+        }
     }
 
     fn handle_next_context(&mut self, next_context: Result<Context, Error>) -> bool {
@@ -1172,7 +1183,7 @@ impl SpircTask {
         // If we have active playback (e.g. restored from saved state),
         // update the position before registering so Spotify sees the
         // correct track position.
-        if !matches!(self.play_status, SpircPlayStatus::Stopped) {
+        if self.has_playback() {
             info!(
                 "re-registering with active playback state: {:?}",
                 self.play_status

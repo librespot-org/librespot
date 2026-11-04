@@ -57,8 +57,8 @@ const PING_TIMEOUT: Duration = Duration::from_secs(3);
 
 const RECONNECT_INTERVAL: Duration = Duration::from_secs(10);
 // Bounds each step of a reconnect attempt (URL resolution and the TCP/TLS/
-// websocket handshake), so a blackholed connection can't stall reconnection
-// forever.
+// websocket handshake), and the first connection as a whole, so a blackholed
+// connection can't stall the dealer forever.
 const RECONNECT_STEP_TIMEOUT: Duration = Duration::from_secs(30);
 
 const DEALER_REQUEST_HANDLERS_POISON_MSG: &str =
@@ -330,9 +330,14 @@ impl Builder {
         F: (Fn() -> Fut) + Send + 'static,
     {
         let dealer = create_dealer!(self, shared -> {
-            // Try to connect.
-            let url = get_url().await?;
-            let tasks = connect(&url, proxy.as_ref(), &shared, None).await?;
+            // Try to connect. Spirc restarts land here too, when the network is
+            // flaky: nothing would end a stalled handshake otherwise.
+            let tasks = tokio::time::timeout(RECONNECT_STEP_TIMEOUT, async {
+                let url = get_url().await?;
+                connect(&url, proxy.as_ref(), &shared, None).await
+            })
+            .await
+            .map_err(|_| Error::deadline_exceeded("timed out connecting to dealer"))??;
 
             // If a connection is established, continue in a background task.
             run(shared, Some(tasks), get_url, proxy, reconnect_tx)
