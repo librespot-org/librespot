@@ -1180,6 +1180,10 @@ impl SpircTask {
         trace!("Received connection ID update: {connection_id:?}");
         self.session.set_connection_id(&connection_id);
 
+        // Read before the PUT: a reconnect while it is in flight makes this
+        // registration outdated, and must still arm the watchdog.
+        let reconnect_gen = *self.session.dealer().reconnect_receiver().borrow();
+
         // If we have active playback (e.g. restored from saved state),
         // update the position before registering so Spotify sees the
         // correct track position.
@@ -1218,7 +1222,7 @@ impl SpircTask {
         // We successfully (re-)registered: record the dealer generation we
         // registered under and disarm the reconnect watchdog so it won't force
         // an unnecessary restart.
-        self.registered_reconnect_gen = *self.session.dealer().reconnect_receiver().borrow();
+        self.registered_reconnect_gen = reconnect_gen;
         self.reconnect_grace_until = None;
 
         let same_session = cluster.player_state.session_id == self.session.session_id()
