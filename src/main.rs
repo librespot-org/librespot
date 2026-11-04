@@ -6,7 +6,7 @@ use librespot::{
     connect::{ConnectConfig, Spirc},
     core::{
         Session, SessionConfig, authentication::Credentials, cache::Cache, config::DeviceType,
-        version,
+        error::ErrorKind, version,
     },
     discovery::DnsSdServiceBuilder,
     playback::{
@@ -1919,6 +1919,7 @@ async fn main() {
     // this much instead of exiting — exiting would kill playback that is
     // otherwise still running.
     const RECOVERY_RECONNECT_BACKOFF: Duration = Duration::from_secs(120);
+    const RECOVERY_RETRY_INTERVAL: Duration = Duration::from_secs(10);
 
     if env::var(RUST_BACKTRACE).is_err() {
         set_env_var(RUST_BACKTRACE, "full").await;
@@ -2081,8 +2082,11 @@ async fn main() {
 
                         // New account via Discovery — discard any saved
                         // playback state from the previous account and
-                        // reconnect right away.
-                        saved_playback_state = None;
+                        // reconnect right away. A saved state means that no
+                        // spirc is left to stop its playback.
+                        if saved_playback_state.take().is_some() {
+                            player.stop();
+                        }
                         reconnect_backoff_until = None;
 
                         if let Some(spirc) = spirc.take() {
@@ -2125,9 +2129,26 @@ async fn main() {
                     last_credentials.clone().unwrap_or_default(),
                     player.clone(),
                     mixer.clone(),
-                    saved_playback_state.take(),
+                    &mut saved_playback_state,
                 ).await {
                     Ok((spirc_, spirc_task_)) => (spirc_, spirc_task_),
+                    // Typically the network is still down, which is what lost
+                    // the session. The player keeps going in the meantime, so
+                    // keep trying unless the login itself was refused.
+                    Err(e) if saved_playback_state.is_some()
+                        && !matches!(e.kind, ErrorKind::PermissionDenied | ErrorKind::Unauthenticated) =>
+                    {
+                        warn!(
+                            "could not restore spirc, retrying in {}s: {e}",
+                            RECOVERY_RETRY_INTERVAL.as_secs()
+                        );
+                        if !session.is_invalid() {
+                            session.shutdown();
+                        }
+                        reconnect_backoff_until =
+                            Some(tokio::time::Instant::now() + RECOVERY_RETRY_INTERVAL);
+                        continue;
+                    }
                     Err(e) => {
                         error!("could not initialize spirc: {e}");
                         exit(1);

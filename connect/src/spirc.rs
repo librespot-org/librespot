@@ -81,6 +81,34 @@ fn is_no_context_error(err: &Error) -> bool {
     )
 }
 
+/// Whether the buffered events show that the load of `play_request_id` ended, as
+/// it started playing or paused. The events may hold a newer id.
+fn load_finished(events: &[PlayerEvent], mut play_request_id: Option<u64>) -> bool {
+    let mut finished = false;
+
+    for event in events {
+        match *event {
+            PlayerEvent::PlayRequestIdChanged {
+                play_request_id: id,
+            } => {
+                play_request_id = Some(id);
+                finished = false;
+            }
+            PlayerEvent::Playing {
+                play_request_id: id,
+                ..
+            }
+            | PlayerEvent::Paused {
+                play_request_id: id,
+                ..
+            } if play_request_id == Some(id) => finished = true,
+            _ => (),
+        }
+    }
+
+    finished
+}
+
 struct SpircTask {
     player: Arc<Player>,
     mixer: Arc<dyn Mixer>,
@@ -197,8 +225,14 @@ impl Spirc {
         credentials: Credentials,
         player: Arc<Player>,
         mixer: Arc<dyn Mixer>,
-    ) -> Result<(Spirc, impl Future<Output = Option<SavedPlaybackState>>), Error> {
-        Self::with_saved_state(config, session, credentials, player, mixer, None).await
+    ) -> Result<
+        (
+            Spirc,
+            impl Future<Output = Option<SavedPlaybackState>> + use<>,
+        ),
+        Error,
+    > {
+        Self::with_saved_state(config, session, credentials, player, mixer, &mut None).await
     }
 
     /// Like [`Spirc::new`], but restores playback state from a previous session.
@@ -206,14 +240,23 @@ impl Spirc {
     /// When `saved_state` is provided, the new SpircTask picks up where the
     /// old one left off — same track, position, and connect state — so the
     /// Player can continue without interruption after a session reconnect.
+    ///
+    /// The state is only taken on success: a failed restore can be tried again
+    /// with a new [`Session`].
     pub async fn with_saved_state(
         config: ConnectConfig,
         session: Session,
         credentials: Credentials,
         player: Arc<Player>,
         mixer: Arc<dyn Mixer>,
-        saved_state: Option<SavedPlaybackState>,
-    ) -> Result<(Spirc, impl Future<Output = Option<SavedPlaybackState>>), Error> {
+        saved_state: &mut Option<SavedPlaybackState>,
+    ) -> Result<
+        (
+            Spirc,
+            impl Future<Output = Option<SavedPlaybackState>> + use<>,
+        ),
+        Error,
+    > {
         fn extract_connection_id(msg: Message) -> Result<String, Error> {
             let connection_id = msg
                 .headers
@@ -226,32 +269,6 @@ impl Spirc {
         debug!("new Spirc[{spirc_id}]");
 
         let emit_set_queue_events = config.emit_set_queue_events;
-
-        let (connect_state, play_status, play_request_id) = match saved_state {
-            Some(saved) => {
-                info!("Spirc[{spirc_id}] restoring saved playback state");
-                let mut cs = saved.connect_state;
-                // Update to the new session's ID so Spotify sees us as the same device.
-                cs.set_session_id(session.session_id());
-                (cs, saved.play_status, saved.play_request_id)
-            }
-            None => (
-                ConnectState::new(config, &session),
-                SpircPlayStatus::Stopped,
-                None,
-            ),
-        };
-
-        // Subscribe to player events before any awaits below. Session setup
-        // (client_token / connect / login5) takes seconds, and a subscriber
-        // only receives events emitted after it subscribes — the previous
-        // SpircTask's channel died with it. Without this, events the Player
-        // emits meanwhile (EndOfTrack, Unavailable, ...) are lost, leaving a
-        // restored spirc stuck in a Playing/Loading state that nothing will
-        // ever advance. Buffered events are handled as soon as the task loop
-        // starts: its player-events select arm is not gated on
-        // connect_established.
-        let player_events = player.get_player_event_channel();
 
         let connection_id_update = session
             .dealer()
@@ -299,6 +316,34 @@ impl Spirc {
         // pre-acquire access_token (we need to be authenticated to retrieve a token)
         let _ = session.login5().auth_token().await?;
 
+        // The player events of a restored spirc are the channel of the previous
+        // SpircTask, which holds what the Player emitted since it ended
+        // (EndOfTrack, Unavailable, ...). Without them, it would stay stuck in a
+        // Playing/Loading state that nothing will ever advance. They are handled
+        // as soon as the task loop starts: its player-events select arm is not
+        // gated on connect_established.
+        let (connect_state, play_status, play_request_id, player_events) = match saved_state.take()
+        {
+            Some(saved) => {
+                info!("Spirc[{spirc_id}] restoring saved playback state");
+                let mut connect_state = saved.connect_state;
+                // Update to the new session's ID so Spotify sees us as the same device.
+                connect_state.set_session_id(session.session_id());
+                (
+                    connect_state,
+                    saved.play_status,
+                    saved.play_request_id,
+                    saved.player_events,
+                )
+            }
+            None => (
+                ConnectState::new(config, &session),
+                SpircPlayStatus::Stopped,
+                None,
+                Some(player.get_player_event_channel()),
+            ),
+        };
+
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
 
         let mut task = SpircTask {
@@ -321,7 +366,7 @@ impl Spirc {
             user_attributes_update,
             user_attributes_mutation,
             commands: Some(cmd_rx),
-            player_events: Some(player_events),
+            player_events,
 
             context_resolver: ContextResolver::new(session.clone()),
 
@@ -358,22 +403,40 @@ impl Spirc {
 
         // If the old session died while a track load was in flight, that load
         // belongs to the dead session: its audio-key request rode the dead AP
-        // connection and will fail — possibly before we could subscribe to
-        // player events above. Don't trust it: drop the stale play_request_id
-        // so late events from the old load are ignored, and re-issue the load
-        // on the new session (the Player cancels the old loader). Playing and
-        // Paused restores are untouched: audio is running and must not be
-        // interrupted.
+        // connection and will usually fail. Unless the buffered events show that
+        // it ended, which re-issuing would undo by seeking back to where it
+        // started, don't trust it: drop the stale play_request_id and these
+        // events, which may hold it again, so that the events of the old load are
+        // ignored, and re-issue the load on the new session (the Player cancels
+        // the old loader). Playing and Paused restores are untouched: audio is
+        // running and must not be interrupted.
         let reload = match task.play_status {
             SpircPlayStatus::LoadingPlay { position_ms } => Some((true, position_ms)),
             SpircPlayStatus::LoadingPause { position_ms } => Some((false, position_ms)),
             _ => None,
         };
         if let Some((start_playing, position_ms)) = reload {
-            info!("Spirc[{spirc_id}] restored mid-load state, re-issuing load at {position_ms}ms");
-            task.play_request_id = None;
-            if let Err(why) = task.load_track(start_playing, position_ms) {
-                error!("failed to re-issue load after restore: {why}");
+            let mut events = Vec::new();
+            if let Some(player_events) = task.player_events.as_mut() {
+                while let Ok(event) = player_events.try_recv() {
+                    events.push(event);
+                }
+            }
+
+            if load_finished(&events, task.play_request_id) {
+                for event in events {
+                    if let Err(e) = task.handle_player_event(event) {
+                        error!("could not dispatch player event: {e}");
+                    }
+                }
+            } else {
+                info!(
+                    "Spirc[{spirc_id}] restored mid-load state, re-issuing load at {position_ms}ms"
+                );
+                task.play_request_id = None;
+                if let Err(why) = task.load_track(start_playing, position_ms) {
+                    error!("failed to re-issue load after restore: {why}");
+                }
             }
         }
 
@@ -823,6 +886,7 @@ impl SpircTask {
             connect_state: mem::take(&mut self.connect_state),
             play_status: mem::replace(&mut self.play_status, SpircPlayStatus::Stopped),
             play_request_id: self.play_request_id.take(),
+            player_events: self.player_events.take(),
         }
     }
 
@@ -2254,5 +2318,75 @@ impl SpircTask {
 impl Drop for SpircTask {
     fn drop(&mut self) {
         debug!("drop Spirc[{}]", self.spirc_id);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const LOAD: u64 = 1;
+    const NEWER_LOAD: u64 = 2;
+
+    fn track() -> SpotifyUri {
+        SpotifyUri::from_uri("spotify:track:4uLU6hMCjMI75M1A2tKUQC").unwrap()
+    }
+
+    fn playing(play_request_id: u64) -> PlayerEvent {
+        PlayerEvent::Playing {
+            play_request_id,
+            track_id: track(),
+            position_ms: 0,
+        }
+    }
+
+    fn paused(play_request_id: u64) -> PlayerEvent {
+        PlayerEvent::Paused {
+            play_request_id,
+            track_id: track(),
+            position_ms: 0,
+        }
+    }
+
+    fn id_changed(play_request_id: u64) -> PlayerEvent {
+        PlayerEvent::PlayRequestIdChanged { play_request_id }
+    }
+
+    #[test]
+    fn load_without_events_has_not_finished() {
+        assert!(!load_finished(&[], Some(LOAD)));
+        assert!(!load_finished(&[], None));
+    }
+
+    #[test]
+    fn load_finishes_by_playing_or_pausing() {
+        assert!(load_finished(&[playing(LOAD)], Some(LOAD)));
+        assert!(load_finished(&[paused(LOAD)], Some(LOAD)));
+    }
+
+    #[test]
+    fn events_of_another_load_are_ignored() {
+        assert!(!load_finished(&[playing(NEWER_LOAD)], Some(LOAD)));
+        assert!(!load_finished(&[playing(LOAD)], None));
+    }
+
+    #[test]
+    fn a_failed_load_has_not_finished() {
+        let unavailable = PlayerEvent::Unavailable {
+            play_request_id: LOAD,
+            track_id: track(),
+        };
+
+        assert!(!load_finished(&[unavailable], Some(LOAD)));
+    }
+
+    #[test]
+    fn buffered_id_changes_are_followed() {
+        let events = [id_changed(NEWER_LOAD), playing(NEWER_LOAD)];
+        assert!(load_finished(&events, Some(LOAD)));
+        assert!(load_finished(&events, None));
+
+        let events = [playing(LOAD), id_changed(NEWER_LOAD)];
+        assert!(!load_finished(&events, Some(LOAD)));
     }
 }
