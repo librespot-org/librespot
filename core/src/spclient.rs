@@ -521,6 +521,12 @@ impl SpClient {
                 return last_response;
             }
 
+            // Retrying can stall for minutes on a lost connection, while the caller
+            // needs to get back to recovering from the lost session.
+            if self.session().is_invalid() {
+                break;
+            }
+
             // Break before the reconnection logic below, so that the current access point
             // is retained when max_tries == 1. Leave it up to the caller when to flush.
             if let RequestStrategy::TryTimes(max_tries) = self.lock(|inner| inner.strategy) {

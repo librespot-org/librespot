@@ -640,6 +640,11 @@ impl SpircTask {
 
         if let Err(why) = self.session.dealer().start().await {
             error!("starting dealer failed: {why}");
+            // nothing is registered yet, so there is only the playback to stop
+            if self.has_pending_shutdown() {
+                self.handle_pause();
+                return None;
+            }
             // Only a restored spirc has playback to hand over at this point.
             return self.has_playback().then(|| self.take_saved_state());
         }
@@ -830,7 +835,21 @@ impl SpircTask {
                     force_restart = true;
                     break;
                 },
+                // Only wakes the loop, for its condition to see the lost session.
+                // Otherwise an idle device stays parked until the next event, and
+                // a playing one runs that event, usually the preload of the next
+                // track, into the dead session and loses the track.
+                () = self.session.invalidated() => {},
                 else => break
+            }
+        }
+
+        // On an account change, main.rs shuts the session down right after asking
+        // us to stop, so the lost session may have ended the loop first. Not
+        // stopping here would leave the previous account's track playing.
+        if !self.shutdown && self.has_pending_shutdown() {
+            if let Err(why) = self.handle_command(SpircCommand::Shutdown).await {
+                error!("error during shutdown: {why}");
             }
         }
 
@@ -875,6 +894,13 @@ impl SpircTask {
 
         self.session.dealer().close().await;
         None
+    }
+
+    fn has_pending_shutdown(&mut self) -> bool {
+        self.commands.as_mut().is_some_and(|commands| {
+            std::iter::from_fn(|| commands.try_recv().ok())
+                .any(|command| matches!(command, SpircCommand::Shutdown))
+        })
     }
 
     fn has_playback(&self) -> bool {
@@ -1040,11 +1066,12 @@ impl SpircTask {
             SpircCommand::Shutdown => {
                 trace!("Received SpircCommand::Shutdown");
                 self.handle_pause();
-                self.handle_disconnect().await?;
+                // first, so that failing to disconnect still ends the spirc
                 self.shutdown = true;
                 if let Some(rx) = self.commands.as_mut() {
                     rx.close()
                 }
+                self.handle_disconnect().await?;
             }
             SpircCommand::Transfer(request) if !self.connect_state.is_active() => {
                 let device_id = self.session.device_id();
