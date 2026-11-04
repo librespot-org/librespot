@@ -52,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [core] Time out each address when connecting, so a blackholed address (e.g. a dead IPv6 route) can't starve the others.
 - [core] Treat HTTP 502 as unavailable, like 503.
 - [main] Keep trying to restore the playback when a new session can't be built, for example while the network is down, instead of exiting.
+- [playback] Drop a preload in flight when the session changes, instead of losing the next track when it fails on the previous session.
 
 ## [0.8.0] - 2025-11-10
 

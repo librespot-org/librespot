@@ -2323,7 +2323,15 @@ impl PlayerInternal {
 
             PlayerCommand::Stop => self.handle_player_stop(),
 
-            PlayerCommand::SetSession(session) => self.session = session,
+            PlayerCommand::SetSession(session) => {
+                self.session = session;
+                // A preload in flight rides the previous session, which is usually
+                // lost by now: when it fails, the track gets marked unavailable
+                // although it would load fine on the new session.
+                if matches!(self.preload, PlayerPreload::Loading { .. }) {
+                    self.preload = PlayerPreload::None;
+                }
+            }
 
             PlayerCommand::AddEventSender(sender) => self.event_senders.push(sender),
 
