@@ -884,21 +884,25 @@ impl SpircTask {
         }
     }
 
-    /// A context resolve failed and won't be retried automatically. Ensure the
-    /// device is left in a state a fresh user action can recover from: no
-    /// pending transfer and no load stuck waiting on the missing context.
+    /// A context resolve failed and won't be retried automatically. When a
+    /// transfer or a track that already failed to load was waiting on it, stop
+    /// so that a fresh user action can recover: nothing else would end their
+    /// wait.
     ///
-    /// Failures of automatic context updates while something is playing don't
-    /// require any cleanup and must leave the playback untouched.
+    /// Any other failure leaves the playback untouched, whatever its state: a
+    /// track that is loading doesn't need the context to finish, and failing to
+    /// update it in the background (autoplay, which podcasts don't support, or a
+    /// playlist modification) must not interrupt the playback.
     fn handle_resolve_failure(&mut self) -> bool {
-        self.pending_unavailable_tracks.clear();
-        let had_transfer = self.transfer_state.take().is_some();
-        let was_loading = matches!(
-            self.play_status,
-            SpircPlayStatus::LoadingPlay { .. } | SpircPlayStatus::LoadingPause { .. }
-        );
+        // what is still queued can finish the transfer, or skip the failed tracks
+        if self.context_resolver.has_next() {
+            return false;
+        }
 
-        if !had_transfer && !was_loading {
+        let had_transfer = self.transfer_state.take().is_some();
+        let had_unavailable_tracks = !mem::take(&mut self.pending_unavailable_tracks).is_empty();
+
+        if !had_transfer && !had_unavailable_tracks {
             return false;
         }
 
