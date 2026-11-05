@@ -232,8 +232,15 @@ impl KeyPacer {
         F: FnOnce() -> Fut,
         Fut: Future<Output = Result<AudioKey, Error>>,
     {
+        // A request waiting out the back-off holds the turn for all of it, so
+        // this has to answer before queueing for the turn.
+        if !wait && self.is_backing_off() {
+            return Err(AudioKeyError::BackingOff.into());
+        }
+
         let mut last_sent = self.turn.lock().await;
 
+        // The request that held the turn may have started a back-off.
         if let Some(until) = self.backoff_until() {
             if !wait {
                 return Err(AudioKeyError::BackingOff.into());
@@ -322,6 +329,15 @@ mod tests {
         }
     }
 
+    fn is_backing_off_error(result: &Result<AudioKey, Error>) -> bool {
+        matches!(
+            result
+                .as_ref()
+                .map_err(|e| e.error.downcast_ref::<AudioKeyError>()),
+            Err(Some(AudioKeyError::BackingOff))
+        )
+    }
+
     #[tokio::test(start_paused = true)]
     async fn requests_go_out_one_at_a_time_and_spaced() {
         let pacer = Arc::new(KeyPacer::default());
@@ -404,17 +420,77 @@ mod tests {
         let _ = pacer.ask(true, || server.clone().ask()).await;
         let optional = pacer.ask(false, || server.clone().ask()).await;
 
-        assert!(matches!(
-            optional
-                .as_ref()
-                .map_err(|e| e.error.downcast_ref::<AudioKeyError>()),
-            Err(Some(AudioKeyError::BackingOff))
-        ));
+        assert!(is_backing_off_error(&optional));
         assert_eq!(server.asked_at_ms(), vec![0]);
 
         tokio::time::advance(REFUSAL_BACKOFF[0]).await;
         let optional = pacer.ask(false, || server.clone().ask()).await;
         assert!(matches!(optional, Ok(KEY)));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn an_optional_request_does_not_wait_for_a_request_holding_the_turn() {
+        let pacer = Arc::new(KeyPacer::default());
+        let server = KeyServer::new(&[false, true]);
+
+        let _ = pacer.ask(true, || server.clone().ask()).await;
+
+        // This request holds the turn through the back-off.
+        let waiting = tokio::spawn({
+            let pacer = pacer.clone();
+            let server = server.clone();
+            async move { pacer.request(|| server.clone().ask()).await }
+        });
+        tokio::task::yield_now().await;
+
+        let start = Instant::now();
+        let optional = pacer.ask(false, || server.clone().ask()).await;
+
+        assert!(is_backing_off_error(&optional));
+        assert_eq!(start.elapsed(), Duration::ZERO);
+        assert_eq!(server.asked_at_ms(), vec![0]);
+
+        assert!(matches!(waiting.await.unwrap(), Ok(KEY)));
+        assert_eq!(server.asked_at_ms(), vec![0, 3050]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn an_optional_request_queued_behind_a_refusal_is_not_sent() {
+        let pacer = KeyPacer::default();
+        let server = KeyServer::new(&[false]);
+
+        // No back-off is on when the optional request starts waiting its
+        // turn, but the request ahead of it starts one.
+        let (first, optional) = futures_util::future::join(
+            pacer.ask(true, || server.clone().ask()),
+            pacer.ask(false, || server.clone().ask()),
+        )
+        .await;
+
+        assert!(first.as_ref().is_err_and(is_refusal));
+        assert!(is_backing_off_error(&optional));
+        assert_eq!(server.asked_at_ms(), vec![0]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_dropped_request_gives_up_its_turn_and_leaves_the_back_off() {
+        let pacer = KeyPacer::default();
+        let server = KeyServer::new(&[false, true]);
+
+        let _ = pacer.ask(true, || server.clone().ask()).await;
+
+        // A load the player has moved on from is dropped mid-wait.
+        let dropped = tokio::time::timeout(
+            Duration::from_secs(1),
+            pacer.request(|| server.clone().ask()),
+        )
+        .await;
+        assert!(dropped.is_err());
+        assert!(pacer.is_backing_off());
+
+        let key = pacer.request(|| server.clone().ask()).await;
+        assert!(matches!(key, Ok(KEY)));
+        assert_eq!(server.asked_at_ms(), vec![0, 3050]);
     }
 
     #[tokio::test(start_paused = true)]
