@@ -155,9 +155,9 @@ struct SpircTask {
     /// when no other future resolves, otherwise resets the delay
     update_state: bool,
 
-    /// When set, a dealer reconnect happened and we're waiting for a fresh
-    /// connection_id to re-register this device. If the deadline passes before
-    /// re-registration, we force a spirc restart to recover. Cleared whenever we
+    /// When set, the dealer connected or reconnected and we're waiting for a
+    /// fresh connection_id to register this device. If the deadline passes before
+    /// registration, we force a spirc restart to recover. Cleared whenever we
     /// successfully register.
     reconnect_grace_until: Option<Instant>,
 
@@ -202,9 +202,10 @@ const VOLUME_UPDATE_DELAY: Duration = Duration::from_millis(500);
 // to reduce updates to remote, we group some request by waiting for a set amount of time
 const UPDATE_STATE_DELAY: Duration = Duration::from_millis(200);
 
-// After a dealer reconnect, how long we wait for a fresh connection_id to
-// re-register this device before forcing a spirc restart to recover. The push
-// normally arrives within ~1-2s; this only fires if it never does.
+// After a dealer connection or reconnect, how long we wait for a fresh
+// connection_id to register this device before forcing a spirc restart to
+// recover. The push normally arrives within ~1-2s; this only fires if it never
+// does.
 const RECONNECT_REREGISTER_GRACE: Duration = Duration::from_secs(30);
 
 /// The spotify connect handle
@@ -649,6 +650,10 @@ impl SpircTask {
             return self.has_playback().then(|| self.take_saved_state());
         }
 
+        // The reconnect signal doesn't cover this first connection, whose
+        // connection_id can go missing just the same.
+        self.reconnect_grace_until = Some(Instant::now() + RECONNECT_REREGISTER_GRACE);
+
         // Set when the reconnect watchdog decides we must restart to recover our
         // device registration. Handled after the loop like the session-lost path.
         let mut force_restart = false;
@@ -817,9 +822,9 @@ impl SpircTask {
                             Some(Instant::now() + RECONNECT_REREGISTER_GRACE);
                     }
                 },
-                // Reconnect watchdog: a dealer reconnect did not result in a
-                // re-registration within the grace period (e.g. the new
-                // connection_id never arrived). Recover by restarting spirc.
+                // Reconnect watchdog: a dealer connection did not result in a
+                // registration within the grace period (e.g. the connection_id
+                // never arrived). Recover by restarting spirc.
                 _ = async {
                     match reconnect_grace {
                         Some(deadline) => sleep_until(deadline).await,
@@ -827,7 +832,7 @@ impl SpircTask {
                     }
                 }, if reconnect_grace.is_some() => {
                     warn!(
-                        "dealer reconnected but device was not re-registered within {}s; \
+                        "dealer connected but device was not registered within {}s; \
                          restarting spirc to refresh dealer subscriptions",
                         RECONNECT_REREGISTER_GRACE.as_secs()
                     );

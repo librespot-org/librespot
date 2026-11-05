@@ -45,7 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [core] Fix dealer websocket reconnect leaving spirc hung on stale subscription channels.
 - [connect] Save and restore playback state across session reconnects.
 - [core] Add a timeout to control-plane HTTP requests so a half-open connection can't hang the spirc event loop.
-- [connect] Add a reconnect watchdog that restarts spirc if the device is not re-registered after a dealer reconnect, so it can't silently disappear from Spotify Connect.
+- [connect] Add a reconnect watchdog that restarts spirc if the device is not registered after a dealer connection or reconnect, so it can't silently disappear from Spotify Connect.
 - [connect] End the spirc as soon as its session is lost instead of at the next event, which usually lost the next track on the dead session.
 - [connect] End the spirc on shutdown even when disconnecting fails.
 - [connect] Let user actions retry a context marked unavailable, and stop instead of staying stuck when an unresolved context strands a transfer or a track.
