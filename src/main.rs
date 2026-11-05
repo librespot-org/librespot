@@ -2123,18 +2123,27 @@ async fn main() {
 
                 let connect_config = setup.connect_config.clone();
 
-                let (spirc_, spirc_task_) = match Spirc::with_saved_state(
-                    connect_config,
-                    session.clone(),
-                    last_credentials.clone().unwrap_or_default(),
-                    player.clone(),
-                    mixer.clone(),
-                    &mut saved_playback_state,
-                ).await {
+                // The ctrl_c arm below isn't polled from here, and with the network
+                // down this call is where most of the time goes.
+                let spirc_result = tokio::select! {
+                    result = Spirc::with_saved_state(
+                        connect_config,
+                        session.clone(),
+                        last_credentials.clone().unwrap_or_default(),
+                        player.clone(),
+                        mixer.clone(),
+                        &mut saved_playback_state,
+                    ) => result,
+                    _ = tokio::signal::ctrl_c() => break,
+                };
+
+                let (spirc_, spirc_task_) = match spirc_result {
                     Ok((spirc_, spirc_task_)) => (spirc_, spirc_task_),
                     // Typically the network is still down, which is what lost
                     // the session. The player keeps going in the meantime, so
-                    // keep trying unless the login itself was refused.
+                    // keep trying, except on these kinds, which may be a refused
+                    // login: it can't be told apart here from an HTTP 401/403 or
+                    // a denied socket.
                     Err(e) if saved_playback_state.is_some()
                         && !matches!(e.kind, ErrorKind::PermissionDenied | ErrorKind::Unauthenticated) =>
                     {
