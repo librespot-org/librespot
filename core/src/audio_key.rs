@@ -15,8 +15,9 @@ pub struct AudioKey(pub [u8; 16]);
 
 #[derive(Debug, Error)]
 pub enum AudioKeyError {
-    #[error("audio key error")]
-    AesKey,
+    /// Spotify refused the key, with this code.
+    #[error("audio key error {0:#06x}")]
+    AesKey(u16),
     #[error("other end of channel disconnected")]
     Channel,
     #[error("unexpected packet type {0}")]
@@ -32,7 +33,7 @@ pub enum AudioKeyError {
 impl From<AudioKeyError> for Error {
     fn from(err: AudioKeyError) -> Self {
         match err {
-            AudioKeyError::AesKey => Error::unavailable(err),
+            AudioKeyError::AesKey(_) => Error::unavailable(err),
             AudioKeyError::Channel => Error::aborted(err),
             AudioKeyError::Sequence(_) => Error::aborted(err),
             AudioKeyError::Packet(_) => Error::unimplemented(err),
@@ -72,8 +73,9 @@ impl AudioKeyManager {
                     data.as_ref()[0],
                     data.as_ref()[1]
                 );
+                let code = BigEndian::read_u16(data.as_ref());
                 sender
-                    .send(Err(AudioKeyError::AesKey.into()))
+                    .send(Err(AudioKeyError::AesKey(code).into()))
                     .map_err(|_| AudioKeyError::Channel)?
             }
             _ => {
@@ -88,10 +90,11 @@ impl AudioKeyManager {
     /// Requests the audio key of `file`.
     ///
     /// Requests go out one at a time, at least 200 ms apart. When Spotify
-    /// refuses a key, the session waits 3, then 5, then 10 seconds before it
-    /// asks for any key again, and this key is asked for again after each
-    /// wait, up to three times, before the refusal is returned. A key that
-    /// arrives ends the wait.
+    /// refuses a key with code 2, the session waits 3, then 5, then 10 seconds
+    /// before it asks for any key again, and this key is asked for again after
+    /// each wait, up to seven times, about a minute, before the refusal is
+    /// returned. A key that arrives ends the wait. Any other refusal is
+    /// returned at once.
     pub async fn request(&self, track: SpotifyId, file: FileId) -> Result<AudioKey, Error> {
         let pacer = self.pacer();
         pacer.request(|| self.request_now(track, file)).await
@@ -151,10 +154,18 @@ impl AudioKeyManager {
 /// The shortest time between two audio key requests.
 const MIN_REQUEST_GAP: Duration = Duration::from_millis(200);
 
+/// The refusal code worth waiting out. Spotify does not document these codes.
+/// In the reports on librespot-org/librespot#1649, code 2 comes in bursts after
+/// many keys are asked for at once and asking again later gets the key, while
+/// code 1 goes on for every track of an account however long it waits. Only
+/// code 2 starts a back-off or is asked again, so any other refusal fails as
+/// quickly as it did before.
+const TEMPORARY_REFUSAL: u16 = 2;
+
 /// How long the session waits before asking for a key after one, two, and
-/// three or more refusals in a row. Spotify does not say that it limits how
-/// fast keys may be asked for, but refusals come in bursts that asking again
-/// at once prolongs, and that stop after a few seconds of quiet (see
+/// three or more temporary refusals in a row. Spotify does not say that it
+/// limits how fast keys may be asked for, but refusals come in bursts that
+/// asking again at once prolongs, and that stop after some quiet (see
 /// librespot-org/librespot#1649).
 const REFUSAL_BACKOFF: [Duration; 3] = [
     Duration::from_secs(3),
@@ -162,9 +173,12 @@ const REFUSAL_BACKOFF: [Duration; 3] = [
     Duration::from_secs(10),
 ];
 
-/// How many times [`AudioKeyManager::request`] asks again for a refused key,
-/// each time after the back-off.
-const REFUSAL_RETRIES: usize = 3;
+/// How many times [`AudioKeyManager::request`] asks again for a temporarily
+/// refused key, each time after the back-off. With the back-offs above, it
+/// asks at about 0, 3, 8, 18, 28, 38, 48 and 58 seconds. A burst has been seen
+/// to keep refusing until 28 seconds after its first refusal, and once for
+/// about 40.
+const REFUSAL_RETRIES: usize = 7;
 
 /// Paces the audio key requests of a session.
 #[derive(Default)]
@@ -177,16 +191,16 @@ struct KeyPacer {
 
 #[derive(Default)]
 struct Backoff {
-    /// Refusals in a row, since the last key that arrived.
+    /// Temporary refusals in a row, since the last key that arrived.
     refusals: usize,
     /// No key is asked for before this.
     until: Option<Instant>,
 }
 
-fn is_refusal(error: &Error) -> bool {
+fn is_temporary_refusal(error: &Error) -> bool {
     matches!(
         error.error.downcast_ref::<AudioKeyError>(),
-        Some(AudioKeyError::AesKey)
+        Some(AudioKeyError::AesKey(TEMPORARY_REFUSAL))
     )
 }
 
@@ -205,7 +219,7 @@ impl KeyPacer {
         self.backoff_until().is_some()
     }
 
-    /// Asks with `ask` until a refusal has been asked again
+    /// Asks with `ask` until a temporary refusal has been asked again
     /// [`REFUSAL_RETRIES`] times.
     async fn request<F, Fut>(&self, mut ask: F) -> Result<AudioKey, Error>
     where
@@ -215,7 +229,7 @@ impl KeyPacer {
         let mut retries = 0;
         loop {
             match self.ask(true, &mut ask).await {
-                Err(e) if is_refusal(&e) && retries < REFUSAL_RETRIES => {
+                Err(e) if is_temporary_refusal(&e) && retries < REFUSAL_RETRIES => {
                     retries += 1;
                     debug!("Asking again for a refused audio key ({retries}/{REFUSAL_RETRIES})");
                 }
@@ -257,14 +271,15 @@ impl KeyPacer {
         let mut backoff = self.backoff();
         match &result {
             Ok(_) => *backoff = Backoff::default(),
-            Err(e) if is_refusal(e) => {
+            Err(e) if is_temporary_refusal(e) => {
                 backoff.refusals += 1;
                 let delay = REFUSAL_BACKOFF[backoff.refusals.min(REFUSAL_BACKOFF.len()) - 1];
                 warn!("Spotify refused an audio key, waiting {delay:?} before asking for another");
                 backoff.until = Some(Instant::now() + delay);
             }
-            // A timeout or a lost connection says nothing about whether
-            // Spotify would give the key.
+            // Another refusal code will not pass by waiting, and a timeout or
+            // a lost connection says nothing about whether Spotify would give
+            // the key.
             Err(_) => {}
         }
 
@@ -280,11 +295,13 @@ mod tests {
     };
 
     use super::*;
+    use crate::{SessionConfig, session::Session};
 
     const KEY: AudioKey = AudioKey([7; 16]);
 
     /// A key server that answers each request in turn from `answers`,
-    /// refusing once they run out, and notes when each request came.
+    /// refusing temporarily once they run out, and notes when each request
+    /// came.
     struct KeyServer {
         answers: StdMutex<Vec<bool>>,
         asked_at: StdMutex<Vec<Instant>>,
@@ -314,7 +331,7 @@ mod tests {
             if self.answers.lock().unwrap().pop().unwrap_or(false) {
                 Ok(KEY)
             } else {
-                Err(AudioKeyError::AesKey.into())
+                Err(AudioKeyError::AesKey(TEMPORARY_REFUSAL).into())
             }
         }
 
@@ -371,14 +388,73 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
+    async fn a_key_refused_for_longer_than_three_retries_still_arrives() {
+        let pacer = KeyPacer::default();
+        // Refused four times over 18 s, and given at the next ask, at about
+        // 28 s.
+        let server = KeyServer::new(&[false, false, false, false, true]);
+
+        let key = pacer.request(|| server.clone().ask()).await;
+
+        assert!(matches!(key, Ok(KEY)));
+        assert_eq!(server.asked_at_ms(), vec![0, 3050, 8100, 18150, 28200]);
+        assert!(!pacer.is_backing_off());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn another_refusal_code_returns_at_once_and_starts_no_back_off() {
+        let pacer = KeyPacer::default();
+        let start = Instant::now();
+        let asked = AtomicUsize::new(0);
+
+        let key = pacer
+            .request(|| async {
+                asked.fetch_add(1, Ordering::SeqCst);
+                Err(AudioKeyError::AesKey(1).into())
+            })
+            .await;
+
+        assert!(matches!(
+            key.as_ref()
+                .map_err(|e| e.error.downcast_ref::<AudioKeyError>()),
+            Err(Some(AudioKeyError::AesKey(1)))
+        ));
+        assert_eq!(asked.load(Ordering::SeqCst), 1);
+        assert_eq!(start.elapsed(), Duration::ZERO);
+        assert!(!pacer.is_backing_off());
+    }
+
+    #[tokio::test]
+    async fn dispatch_passes_on_the_refusal_code() {
+        let session = Session::new(SessionConfig::default(), None);
+        let manager = session.audio_key();
+        let (tx, rx) = oneshot::channel();
+        manager.lock(|inner| inner.pending.insert(9, tx));
+
+        manager
+            .dispatch(
+                PacketType::AesKeyError,
+                Bytes::from_static(&[0, 0, 0, 9, 0, 2]),
+            )
+            .unwrap();
+
+        assert!(rx.await.unwrap().as_ref().is_err_and(is_temporary_refusal));
+    }
+
+    #[tokio::test(start_paused = true)]
     async fn a_key_refused_through_every_retry_is_reported() {
         let pacer = KeyPacer::default();
         let server = KeyServer::new(&[]);
 
         let key = pacer.request(|| server.clone().ask()).await;
 
-        assert!(key.as_ref().is_err_and(is_refusal));
+        assert!(key.as_ref().is_err_and(is_temporary_refusal));
         assert_eq!(server.asked_at_ms().len(), REFUSAL_RETRIES + 1);
+        // About a minute, with the 50 ms that each answer takes.
+        assert_eq!(
+            server.asked_at_ms(),
+            vec![0, 3050, 8100, 18150, 28200, 38250, 48300, 58350]
+        );
         assert!(pacer.is_backing_off());
 
         // The back-off stays at its longest until a key arrives.
@@ -396,7 +472,7 @@ mod tests {
         let server = KeyServer::new(&[false, true, true]);
 
         let first = pacer.ask(true, || server.clone().ask()).await;
-        assert!(first.as_ref().is_err_and(is_refusal));
+        assert!(first.as_ref().is_err_and(is_temporary_refusal));
         assert!(pacer.is_backing_off());
 
         // Another track's key waits for the back-off too.
@@ -467,7 +543,7 @@ mod tests {
         )
         .await;
 
-        assert!(first.as_ref().is_err_and(is_refusal));
+        assert!(first.as_ref().is_err_and(is_temporary_refusal));
         assert!(is_backing_off_error(&optional));
         assert_eq!(server.asked_at_ms(), vec![0]);
     }
