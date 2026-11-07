@@ -3,7 +3,6 @@ use std::{
     future::Future,
     io,
     pin::Pin,
-    process::exit,
     sync::{Arc, OnceLock, RwLock, Weak},
     task::{Context, Poll},
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -361,14 +360,15 @@ impl Session {
         );
     }
 
-    fn check_catalogue(attributes: &UserAttributes) {
-        if let Some(account_type) = attributes.get("type") {
+    /// Callers store the attributes first, so whoever sees the session shut down can read
+    /// the account type that caused it.
+    fn check_catalogue(&self, account_type: Option<&str>) {
+        if let Some(account_type) = account_type {
             if account_type != "premium" {
                 error!("librespot does not support {account_type:?} accounts.");
                 info!("Please support Spotify and your artists and sign up for a premium account.");
 
-                // TODO: logout instead of exiting
-                exit(1);
+                self.shutdown();
             }
         }
     }
@@ -595,21 +595,21 @@ impl Session {
     }
 
     pub fn set_user_attribute(&self, key: &str, value: &str) -> Option<String> {
-        let mut dummy_attributes = UserAttributes::new();
-        dummy_attributes.insert(key.to_owned(), value.to_owned());
-        Self::check_catalogue(&dummy_attributes);
-
-        self.0
+        let previous = self
+            .0
             .data
             .write()
             .expect(SESSION_DATA_POISON_MSG)
             .user_data
             .attributes
-            .insert(key.to_owned(), value.to_owned())
+            .insert(key.to_owned(), value.to_owned());
+
+        self.check_catalogue((key == "type").then_some(value));
+        previous
     }
 
     pub fn set_user_attributes(&self, attributes: UserAttributes) {
-        Self::check_catalogue(&attributes);
+        let account_type = attributes.get("type").cloned();
 
         self.0
             .data
@@ -617,7 +617,9 @@ impl Session {
             .expect(SESSION_DATA_POISON_MSG)
             .user_data
             .attributes
-            .extend(attributes)
+            .extend(attributes);
+
+        self.check_catalogue(account_type.as_deref());
     }
 
     pub fn get_user_attribute(&self, key: &str) -> Option<String> {
@@ -844,7 +846,7 @@ where
                 }
 
                 trace!("Received product info: {user_attributes:#?}");
-                Session::check_catalogue(&user_attributes);
+                let account_type = user_attributes.get("type").cloned();
 
                 session
                     .0
@@ -853,6 +855,8 @@ where
                     .expect(SESSION_DATA_POISON_MSG)
                     .user_data
                     .attributes = user_attributes;
+
+                session.check_catalogue(account_type.as_deref());
                 Ok(())
             }
             Some(SecretBlock)

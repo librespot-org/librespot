@@ -2122,6 +2122,12 @@ async fn main() {
 
                 warn!("Spirc shut down unexpectedly");
 
+                // The session shuts itself down for accounts other than Premium; reconnecting
+                // would only repeat that.
+                if session.get_user_attribute("type").is_some_and(|t| t != "premium") {
+                    exit(1);
+                }
+
                 let mut reconnect_exceeds_rate_limit = || {
                     auto_connect_times.retain(|&t| t.elapsed() < RECONNECT_RATE_LIMIT_WINDOW);
                     auto_connect_times.len() > RECONNECT_RATE_LIMIT
