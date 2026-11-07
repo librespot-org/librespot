@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [core] Try all resolved addresses for the dealer connection instead of failing after the first one.
 - [discovery] Return an HTTP error response instead of panicking on malformed discovery login requests
 - [core] Corrected discovery retry uptime limit to be 1 minute instead of 1 second
+- [playback] Round the volume read back from the softvol and Alsa mixers instead of truncating it, which made it one step lower than the volume that was set and lowered the volume on resume
 - [audio] Try the next CDN URL when a fetch returns a non-206 status instead of only retrying on transport errors, fixing playback failures when the first CDN URL is reachable but does not stream audio.
 
 ## [0.8.0] - 2025-11-10
