@@ -1,3 +1,4 @@
+use crate::SAMPLE_RATE;
 use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
@@ -15,6 +16,8 @@ pub enum SinkError {
     InvalidParams(String),
     #[error("Audio Sink Error Changing State: {0}")]
     StateChange(String),
+    #[error("Audio Sink Error Unsupported Sample Rate: {0}")]
+    UnsupportedSampleRate(String),
 }
 
 pub type SinkResult<T> = Result<T, SinkError>;
@@ -26,6 +29,18 @@ pub trait Open {
 pub trait Sink {
     fn start(&mut self) -> SinkResult<()> {
         Ok(())
+    }
+    /// Starts the sink at the given sample rate. The player owns the sample rate and passes it
+    /// every time it starts the sink. Sinks that can only play at [`SAMPLE_RATE`] don't need to
+    /// override this.
+    fn start_at(&mut self, sample_rate: u32) -> SinkResult<()> {
+        if sample_rate == SAMPLE_RATE {
+            self.start()
+        } else {
+            Err(SinkError::UnsupportedSampleRate(format!(
+                "{sample_rate} Hz (this backend only supports {SAMPLE_RATE} Hz)"
+            )))
+        }
     }
     fn stop(&mut self) -> SinkResult<()> {
         Ok(())

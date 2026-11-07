@@ -9,8 +9,6 @@ use alsa::{Direction, ValueOr};
 use std::process::exit;
 use thiserror::Error;
 
-const MAX_BUFFER: Frames = (SAMPLE_RATE / 2) as Frames;
-const MIN_BUFFER: Frames = (SAMPLE_RATE / 10) as Frames;
 const ZERO_FRAMES: Frames = 0;
 
 const MAX_PERIOD_DIVISOR: Frames = 4;
@@ -38,6 +36,15 @@ enum AlsaError {
         device: String,
         samplerate: u32,
         e: alsa::Error,
+    },
+
+    #[error(
+        "<AlsaSink> Device {device} Does Not Support Sample Rate {requested}, Nearest Supported is {actual}"
+    )]
+    SampleRateMismatch {
+        device: String,
+        requested: u32,
+        actual: u32,
     },
 
     #[error("<AlsaSink> Device {device} Unsupported Access Type RWInterleaved, {e}")]
@@ -75,6 +82,9 @@ impl From<AlsaError> for SinkError {
         match e {
             DrainFailure(_) | OnWrite(_) => SinkError::OnWrite(es),
             PcmSetUp { .. } => SinkError::ConnectionRefused(es),
+            UnsupportedSampleRate { .. } | SampleRateMismatch { .. } => {
+                SinkError::UnsupportedSampleRate(es)
+            }
             NotConnected => SinkError::NotConnected(es),
             _ => SinkError::InvalidParams(es),
         }
@@ -162,7 +172,7 @@ fn list_compatible_devices() -> SinkResult<()> {
     Ok(())
 }
 
-fn open_device(dev_name: &str, format: AudioFormat) -> SinkResult<(PCM, usize)> {
+fn open_device(dev_name: &str, format: AudioFormat, sample_rate: u32) -> SinkResult<(PCM, usize)> {
     let pcm = PCM::new(dev_name, Direction::Playback, false).map_err(|e| AlsaError::PcmSetUp {
         device: dev_name.to_string(),
         e,
@@ -187,13 +197,26 @@ fn open_device(dev_name: &str, format: AudioFormat) -> SinkResult<(PCM, usize)> 
                 e,
             })?;
 
-        hwp.set_rate(SAMPLE_RATE, ValueOr::Nearest).map_err(|e| {
+        hwp.set_rate(sample_rate, ValueOr::Nearest).map_err(|e| {
             AlsaError::UnsupportedSampleRate {
                 device: dev_name.to_string(),
-                samplerate: SAMPLE_RATE,
+                samplerate: sample_rate,
                 e,
             }
         })?;
+
+        // `ValueOr::Nearest` silently picks the closest rate the device supports.
+        // Playing at any other rate than requested would change the speed and pitch.
+        let actual_rate = hwp.get_rate().map_err(AlsaError::HwParams)?;
+
+        if actual_rate != sample_rate {
+            return Err(AlsaError::SampleRateMismatch {
+                device: dev_name.to_string(),
+                requested: sample_rate,
+                actual: actual_rate,
+            }
+            .into());
+        }
 
         hwp.set_channels(NUM_CHANNELS as u32)
             .map_err(|e| AlsaError::UnsupportedChannelCount {
@@ -240,8 +263,11 @@ fn open_device(dev_name: &str, format: AudioFormat) -> SinkResult<(PCM, usize)> 
                 Ok(s) => s,
             };
 
+            let max_buffer: Frames = (sample_rate / 2) as Frames;
+            let min_buffer: Frames = (sample_rate / 10) as Frames;
+
             let buffer_size = if min < max {
-                match (MIN_BUFFER..=MAX_BUFFER)
+                match (min_buffer..=max_buffer)
                     .rev()
                     .find(|f| (min..=max).contains(f))
                 {
@@ -269,7 +295,7 @@ fn open_device(dev_name: &str, format: AudioFormat) -> SinkResult<(PCM, usize)> 
             };
 
             if buffer_size == ZERO_FRAMES {
-                trace!("Desired Buffer Frame range: {MIN_BUFFER:?} - {MAX_BUFFER:?}",);
+                trace!("Desired Buffer Frame range: {min_buffer:?} - {max_buffer:?}",);
 
                 trace!("Actual Buffer Frame range as reported by the device: {min:?} - {max:?}",);
             }
@@ -415,8 +441,12 @@ impl Open for AlsaSink {
 
 impl Sink for AlsaSink {
     fn start(&mut self) -> SinkResult<()> {
+        self.start_at(SAMPLE_RATE)
+    }
+
+    fn start_at(&mut self, sample_rate: u32) -> SinkResult<()> {
         if self.pcm.is_none() {
-            let (pcm, bytes_per_period) = open_device(&self.device, self.format)?;
+            let (pcm, bytes_per_period) = open_device(&self.device, self.format, sample_rate)?;
             self.pcm = Some(pcm);
 
             if self.period_buffer.capacity() != bytes_per_period {
