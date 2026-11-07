@@ -37,7 +37,7 @@ use pin_project_lite::pin_project;
 use quick_xml::events::Event;
 use thiserror::Error;
 use tokio::{
-    sync::mpsc,
+    sync::{mpsc, watch},
     time::{Duration as TokioDuration, Instant as TokioInstant, Sleep, sleep},
 };
 use tokio_stream::wrappers::UnboundedReceiverStream;
@@ -115,6 +115,8 @@ struct SessionInternal {
     cache: Option<Arc<Cache>>,
 
     handle: tokio::runtime::Handle,
+
+    invalidated: watch::Sender<bool>,
 }
 
 /// A shared reference to a Spotify session.
@@ -157,6 +159,7 @@ impl Session {
             token_provider: OnceLock::new(),
             login5: OnceLock::new(),
             handle: tokio::runtime::Handle::current(),
+            invalidated: watch::Sender::new(false),
         }))
     }
 
@@ -640,10 +643,17 @@ impl Session {
         self.0.data.write().expect(SESSION_DATA_POISON_MSG).invalid = true;
         self.mercury().shutdown();
         self.channel().shutdown();
+        self.0.invalidated.send_replace(true);
     }
 
     pub fn is_invalid(&self) -> bool {
         self.0.data.read().expect(SESSION_DATA_POISON_MSG).invalid
+    }
+
+    /// Resolves once the session is invalid, see [Session::is_invalid].
+    pub async fn invalidated(&self) {
+        // can't fail: the sender lives as long as self
+        let _ = self.0.invalidated.subscribe().wait_for(|i| *i).await;
     }
 }
 
@@ -953,5 +963,26 @@ where
         }
 
         Poll::Pending
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn invalidated_resolves_on_shutdown() {
+        let session = Session::new(SessionConfig::default(), None);
+        let still_waiting = |session: Session| async move {
+            tokio::time::timeout(Duration::ZERO, session.invalidated())
+                .await
+                .is_err()
+        };
+
+        assert!(still_waiting(session.clone()).await);
+
+        session.shutdown();
+
+        assert!(!still_waiting(session.clone()).await);
     }
 }

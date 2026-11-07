@@ -21,11 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] Add `SetQueue` player event, emitting when the queue changes (context loaded, track added to queue, or queue set via Spotify Connect). Gated behind `ConnectConfig::emit_set_queue_events`
 - [examples] Obtain an access token via OAuth to establish a new session and retrieve the stored credentials
 - [playback] Add track's artists to playback loading verbose logs
+- [core] Add `Session::invalidated` to wait for a session to become invalid
 
 ### Changed
 
 - [core] Made `SpotifyId::to_base62`, `SpotifyId::to_base16`, `FileId::to_base16`, `SpotifyUri::to_id`, `SpotifyUri::to_uri` infallible (breaking)
 - [oauth] Made the URLs clickable in a terminal
+- [connect] `Spirc::new` now returns a future resolving to `Option<SavedPlaybackState>` instead of `()`; pass it to `Spirc::with_saved_state` to restore playback across session reconnects (breaking)
 
 ### Fixed
 
@@ -40,6 +42,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [discovery] Return an HTTP error response instead of panicking on malformed discovery login requests
 - [core] Corrected discovery retry uptime limit to be 1 minute instead of 1 second
 - [audio] Try the next CDN URL when a fetch returns a non-206 status instead of only retrying on transport errors, fixing playback failures when the first CDN URL is reachable but does not stream audio.
+- [core] Fix dealer websocket reconnect leaving spirc hung on stale subscription channels.
+- [connect] Save and restore playback state across session reconnects.
+- [core] Add a timeout to control-plane HTTP requests so a half-open connection can't hang the spirc event loop.
+- [connect] Add a reconnect watchdog that restarts spirc if the device is not registered after a dealer connection or reconnect, so it can't silently disappear from Spotify Connect.
+- [connect] End the spirc as soon as its session is lost instead of at the next event, which usually lost the next track on the dead session.
+- [connect] End the spirc on shutdown even when disconnecting fails.
+- [connect] Let user actions retry a context marked unavailable, and stop instead of staying stuck when an unresolved context strands a transfer or a track.
+- [core] Time out each address when connecting, so a blackholed address (e.g. a dead IPv6 route) can't starve the others.
+- [core] Treat HTTP 502 as unavailable, like 503.
+- [main] Keep trying to restore the playback when a new session can't be built, for example while the network is down, instead of exiting.
+- [playback] Don't mark the next track unavailable when its preload fails because the session was lost.
 
 ## [0.8.0] - 2025-11-10
 

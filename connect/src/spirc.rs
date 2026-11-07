@@ -11,7 +11,7 @@ use crate::{
         session::UserAttributes,
         spclient::TransferRequest,
     },
-    model::{LoadRequest, PlayingTrack, SpircPlayStatus},
+    model::{LoadRequest, PlayingTrack, SavedPlaybackState, SpircPlayStatus},
     playback::{
         mixer::Mixer,
         player::{Player, PlayerEvent, PlayerEventChannel, QueueTrack},
@@ -27,6 +27,7 @@ use crate::{
         user_attributes::UserAttributesMutation,
     },
     state::{
+        StateError,
         context::{ContextType, ResetContext},
         provider::IsProvider,
         {ConnectConfig, ConnectState},
@@ -37,12 +38,16 @@ use librespot_protocol::context_page::ContextPage;
 use protobuf::MessageField;
 use std::{
     future::Future,
+    mem,
     sync::Arc,
     sync::atomic::{AtomicUsize, Ordering},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use thiserror::Error;
-use tokio::{sync::mpsc, time::sleep};
+use tokio::{
+    sync::mpsc,
+    time::{Instant, sleep, sleep_until},
+};
 
 #[derive(Debug, Error)]
 enum SpircError {
@@ -67,6 +72,41 @@ impl From<SpircError> for Error {
             UnknownEndpoint(_) => Error::unimplemented(err),
         }
     }
+}
+
+fn is_no_context_error(err: &Error) -> bool {
+    matches!(
+        err.error.downcast_ref::<StateError>(),
+        Some(StateError::NoContext(_))
+    )
+}
+
+/// Whether the buffered events show that the load of `play_request_id` ended, as
+/// it started playing or paused. The events may hold a newer id.
+fn load_finished(events: &[PlayerEvent], mut play_request_id: Option<u64>) -> bool {
+    let mut finished = false;
+
+    for event in events {
+        match *event {
+            PlayerEvent::PlayRequestIdChanged {
+                play_request_id: id,
+            } => {
+                play_request_id = Some(id);
+                finished = false;
+            }
+            PlayerEvent::Playing {
+                play_request_id: id,
+                ..
+            }
+            | PlayerEvent::Paused {
+                play_request_id: id,
+                ..
+            } if play_request_id == Some(id) => finished = true,
+            _ => (),
+        }
+    }
+
+    finished
 }
 
 struct SpircTask {
@@ -103,6 +143,10 @@ struct SpircTask {
     /// is set when transferring, and used after resolving the contexts to finish the transfer
     pub transfer_state: Option<TransferState>,
 
+    /// tracks that became unavailable while their context was still resolving,
+    /// handled again once the context is available
+    pending_unavailable_tracks: Vec<SpotifyUri>,
+
     /// when set to true, it will update the volume after [VOLUME_UPDATE_DELAY],
     /// when no other future resolves, otherwise resets the delay
     update_volume: bool,
@@ -110,6 +154,18 @@ struct SpircTask {
     /// when set to true, it will update the volume after [UPDATE_STATE_DELAY],
     /// when no other future resolves, otherwise resets the delay
     update_state: bool,
+
+    /// When set, the dealer connected or reconnected and we're waiting for a
+    /// fresh connection_id to register this device. If the deadline passes before
+    /// registration, we force a spirc restart to recover. Cleared whenever we
+    /// successfully register.
+    reconnect_grace_until: Option<Instant>,
+
+    /// The dealer reconnect generation under which we last successfully put
+    /// our connect state (registered). Compared against the current generation
+    /// when a reconnect signal arrives, to tell whether a connection_id push
+    /// already re-registered us for that reconnect.
+    registered_reconnect_gen: u64,
 
     spirc_id: usize,
 }
@@ -146,6 +202,12 @@ const VOLUME_UPDATE_DELAY: Duration = Duration::from_millis(500);
 // to reduce updates to remote, we group some request by waiting for a set amount of time
 const UPDATE_STATE_DELAY: Duration = Duration::from_millis(200);
 
+// After a dealer connection or reconnect, how long we wait for a fresh
+// connection_id to register this device before forcing a spirc restart to
+// recover. The push normally arrives within ~1-2s; this only fires if it never
+// does.
+const RECONNECT_REREGISTER_GRACE: Duration = Duration::from_secs(30);
+
 /// The spotify connect handle
 pub struct Spirc {
     commands: mpsc::UnboundedSender<SpircCommand>,
@@ -164,7 +226,38 @@ impl Spirc {
         credentials: Credentials,
         player: Arc<Player>,
         mixer: Arc<dyn Mixer>,
-    ) -> Result<(Spirc, impl Future<Output = ()>), Error> {
+    ) -> Result<
+        (
+            Spirc,
+            impl Future<Output = Option<SavedPlaybackState>> + use<>,
+        ),
+        Error,
+    > {
+        Self::with_saved_state(config, session, credentials, player, mixer, &mut None).await
+    }
+
+    /// Like [`Spirc::new`], but restores playback state from a previous session.
+    ///
+    /// When `saved_state` is provided, the new SpircTask picks up where the
+    /// old one left off — same track, position, and connect state — so the
+    /// Player can continue without interruption after a session reconnect.
+    ///
+    /// The state is only taken on success: a failed restore can be tried again
+    /// with a new [`Session`].
+    pub async fn with_saved_state(
+        config: ConnectConfig,
+        session: Session,
+        credentials: Credentials,
+        player: Arc<Player>,
+        mixer: Arc<dyn Mixer>,
+        saved_state: &mut Option<SavedPlaybackState>,
+    ) -> Result<
+        (
+            Spirc,
+            impl Future<Output = Option<SavedPlaybackState>> + use<>,
+        ),
+        Error,
+    > {
         fn extract_connection_id(msg: Message) -> Result<String, Error> {
             let connection_id = msg
                 .headers
@@ -177,7 +270,6 @@ impl Spirc {
         debug!("new Spirc[{spirc_id}]");
 
         let emit_set_queue_events = config.emit_set_queue_events;
-        let connect_state = ConnectState::new(config, &session);
 
         let connection_id_update = session
             .dealer()
@@ -225,9 +317,35 @@ impl Spirc {
         // pre-acquire access_token (we need to be authenticated to retrieve a token)
         let _ = session.login5().auth_token().await?;
 
-        let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
+        // The player events of a restored spirc are the channel of the previous
+        // SpircTask, which holds what the Player emitted since it ended
+        // (EndOfTrack, Unavailable, ...). Without them, it would stay stuck in a
+        // Playing/Loading state that nothing will ever advance. They are handled
+        // as soon as the task loop starts: its player-events select arm is not
+        // gated on connect_established.
+        let (connect_state, play_status, play_request_id, player_events) = match saved_state.take()
+        {
+            Some(saved) => {
+                info!("Spirc[{spirc_id}] restoring saved playback state");
+                let mut connect_state = saved.connect_state;
+                // Update to the new session's ID so Spotify sees us as the same device.
+                connect_state.set_session_id(session.session_id());
+                (
+                    connect_state,
+                    saved.play_status,
+                    saved.play_request_id,
+                    saved.player_events,
+                )
+            }
+            None => (
+                ConnectState::new(config, &session),
+                SpircPlayStatus::Stopped,
+                None,
+                Some(player.get_player_event_channel()),
+            ),
+        };
 
-        let player_events = player.get_player_event_channel();
+        let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
 
         let mut task = SpircTask {
             player,
@@ -236,8 +354,8 @@ impl Spirc {
             connect_state,
             connect_established: false,
 
-            play_request_id: None,
-            play_status: SpircPlayStatus::Stopped,
+            play_request_id,
+            play_status,
 
             connection_id_update,
             connect_state_update,
@@ -249,7 +367,7 @@ impl Spirc {
             user_attributes_update,
             user_attributes_mutation,
             commands: Some(cmd_rx),
-            player_events: Some(player_events),
+            player_events,
 
             context_resolver: ContextResolver::new(session.clone()),
 
@@ -259,8 +377,12 @@ impl Spirc {
             session,
 
             transfer_state: None,
+            pending_unavailable_tracks: Vec::new(),
             update_volume: false,
             update_state: false,
+
+            reconnect_grace_until: None,
+            registered_reconnect_gen: 0,
 
             spirc_id,
         };
@@ -279,6 +401,45 @@ impl Spirc {
             }
             Err(why) => error!("failed to update initial volume: {why}"),
         };
+
+        // If the old session died while a track load was in flight, that load
+        // belongs to the dead session: its audio-key request rode the dead AP
+        // connection and will usually fail. Unless the buffered events show that
+        // it ended, which re-issuing would undo by seeking back to where it
+        // started, don't trust it: drop the stale play_request_id and these
+        // events, which may hold it again, so that the events of the old load are
+        // ignored, and re-issue the load on the new session (the Player cancels
+        // the old loader). Playing and Paused restores are untouched: audio is
+        // running and must not be interrupted.
+        let reload = match task.play_status {
+            SpircPlayStatus::LoadingPlay { position_ms } => Some((true, position_ms)),
+            SpircPlayStatus::LoadingPause { position_ms } => Some((false, position_ms)),
+            _ => None,
+        };
+        if let Some((start_playing, position_ms)) = reload {
+            let mut events = Vec::new();
+            if let Some(player_events) = task.player_events.as_mut() {
+                while let Ok(event) = player_events.try_recv() {
+                    events.push(event);
+                }
+            }
+
+            if load_finished(&events, task.play_request_id) {
+                for event in events {
+                    if let Err(e) = task.handle_player_event(event) {
+                        error!("could not dispatch player event: {e}");
+                    }
+                }
+            } else {
+                info!(
+                    "Spirc[{spirc_id}] restored mid-load state, re-issuing load at {position_ms}ms"
+                );
+                task.play_request_id = None;
+                if let Err(why) = task.load_track(start_playing, position_ms) {
+                    error!("failed to re-issue load after restore: {why}");
+                }
+            }
+        }
 
         Ok((spirc, task.run()))
     }
@@ -455,7 +616,7 @@ impl Spirc {
 }
 
 impl SpircTask {
-    async fn run(mut self) {
+    async fn run(mut self) -> Option<SavedPlaybackState> {
         // simplify unwrapping of received item or parsed result
         macro_rules! unwrap {
             ( $next:expr, |$some:ident| $use_some:expr ) => {
@@ -475,10 +636,27 @@ impl SpircTask {
             };
         }
 
+        // Subscribe before start() so we can't miss a reconnect notification.
+        let mut reconnect_rx = self.session.dealer().reconnect_receiver();
+
         if let Err(why) = self.session.dealer().start().await {
             error!("starting dealer failed: {why}");
-            return;
+            // nothing is registered yet, so there is only the playback to stop
+            if self.has_pending_shutdown() {
+                self.handle_pause();
+                return None;
+            }
+            // Only a restored spirc has playback to hand over at this point.
+            return self.has_playback().then(|| self.take_saved_state());
         }
+
+        // The reconnect signal doesn't cover this first connection, whose
+        // connection_id can go missing just the same.
+        self.reconnect_grace_until = Some(Instant::now() + RECONNECT_REREGISTER_GRACE);
+
+        // Set when the reconnect watchdog decides we must restart to recover our
+        // device registration. Handled after the loop like the session-lost path.
+        let mut force_restart = false;
 
         while !self.session.is_invalid() && !self.shutdown {
             let commands = self.commands.as_mut();
@@ -488,13 +666,31 @@ impl SpircTask {
             // because of that the context resolving has to wait, so that the other tasks can finish
             let allow_context_resolving = !self.update_state && !self.update_volume;
 
+            // Copied out so the watchdog select! branch below doesn't borrow self.
+            let reconnect_grace = self.reconnect_grace_until;
+
             tokio::select! {
                 // startup of the dealer requires a connection_id, which is retrieved at the very beginning
                 connection_id_update = self.connection_id_update.next() => unwrap! {
                     connection_id_update,
                     match |connection_id| if let Err(why) = self.handle_connection_id_update(connection_id).await {
                         error!("failed handling connection id update: {why}");
-                        break;
+                        if !self.connect_established {
+                            // Initial registration failed — can't process
+                            // commands without it, so restart spirc, handing
+                            // over the playback of a restored spirc.
+                            force_restart = self.has_playback();
+                            break;
+                        }
+                        // Re-registration after a dealer reconnect failed. Arm
+                        // the watchdog (if it isn't already): without it,
+                        // nothing would retry unless another connection_id
+                        // push happens to arrive. A later successful
+                        // registration disarms it.
+                        if self.reconnect_grace_until.is_none() {
+                            self.reconnect_grace_until =
+                                Some(Instant::now() + RECONNECT_REREGISTER_GRACE);
+                        }
                     }
                 },
                 // main dealer update of any remote device updates
@@ -602,8 +798,91 @@ impl SpircTask {
                         }
                     }
                 },
+                // Dealer reconnected after a connection loss. Our subscription
+                // streams survive because they're registered on the shared
+                // DealerShared — the new websocket dispatches through the same
+                // handlers. A new connection_id will arrive via
+                // connection_id_update and re-register our device state.
+                Ok(()) = reconnect_rx.changed() => {
+                    let reconnect_gen = *reconnect_rx.borrow_and_update();
+                    if self.registered_reconnect_gen == reconnect_gen {
+                        // The new connection's connection_id push was already
+                        // handled (the dealer bumps the generation before
+                        // dispatching any of its messages), so we're registered
+                        // and there's nothing to recover.
+                        info!("Dealer reconnected; already re-registered.");
+                        self.reconnect_grace_until = None;
+                    } else {
+                        info!("Dealer reconnected; awaiting new connection_id.");
+                        // Arm the watchdog: if no new connection_id re-registers
+                        // us within the grace period, force a spirc restart so
+                        // main.rs rebuilds the session/dealer and we re-appear as
+                        // a device (playback continues from the player buffer).
+                        self.reconnect_grace_until =
+                            Some(Instant::now() + RECONNECT_REREGISTER_GRACE);
+                    }
+                },
+                // Reconnect watchdog: a dealer connection did not result in a
+                // registration within the grace period (e.g. the connection_id
+                // never arrived). Recover by restarting spirc.
+                _ = async {
+                    match reconnect_grace {
+                        Some(deadline) => sleep_until(deadline).await,
+                        None => std::future::pending::<()>().await,
+                    }
+                }, if reconnect_grace.is_some() => {
+                    warn!(
+                        "dealer connected but device was not registered within {}s; \
+                         restarting spirc to refresh dealer subscriptions",
+                        RECONNECT_REREGISTER_GRACE.as_secs()
+                    );
+                    self.reconnect_grace_until = None;
+                    force_restart = true;
+                    break;
+                },
+                // Only wakes the loop, for its condition to see the lost session.
+                // Otherwise an idle device stays parked until the next event, and
+                // a playing one runs that event, usually the preload of the next
+                // track, into the dead session and loses the track.
+                () = self.session.invalidated() => {},
                 else => break
             }
+        }
+
+        // On an account change, main.rs shuts the session down right after asking
+        // us to stop, so the lost session may have ended the loop first. Not
+        // stopping here would leave the previous account's track playing.
+        if !self.shutdown && self.has_pending_shutdown() {
+            if let Err(why) = self.handle_command(SpircCommand::Shutdown).await {
+                error!("error during shutdown: {why}");
+            }
+        }
+
+        if (self.session.is_invalid() || force_restart) && !self.shutdown {
+            // Either the session TCP connection died, or the reconnect watchdog
+            // fired. In both cases skip the server cleanup below (which would
+            // pause/deregister the device) and hand our playback state back to
+            // main.rs. The Player continues playing from its buffer; main.rs
+            // creates a new session and restores this state, re-registering us.
+            if force_restart {
+                warn!(
+                    "forcing spirc restart to recover device registration, saving playback state: {:?}",
+                    self.play_status
+                );
+            } else {
+                warn!(
+                    "session lost, saving playback state for recovery: {:?}",
+                    self.play_status
+                );
+            }
+            // Close the dealer of the session we're abandoning: its run task
+            // would otherwise keep reconnecting — and keep the old Session
+            // alive — forever. Do it in the background, since a graceful close
+            // can take a while on a dead connection and must not delay the
+            // restart.
+            let session = self.session.clone();
+            tokio::spawn(async move { session.dealer().close().await });
+            return Some(self.take_saved_state());
         }
 
         if !self.shutdown && self.connect_state.is_active() {
@@ -619,6 +898,27 @@ impl SpircTask {
         };
 
         self.session.dealer().close().await;
+        None
+    }
+
+    fn has_pending_shutdown(&mut self) -> bool {
+        self.commands.as_mut().is_some_and(|commands| {
+            std::iter::from_fn(|| commands.try_recv().ok())
+                .any(|command| matches!(command, SpircCommand::Shutdown))
+        })
+    }
+
+    fn has_playback(&self) -> bool {
+        !matches!(self.play_status, SpircPlayStatus::Stopped)
+    }
+
+    fn take_saved_state(&mut self) -> SavedPlaybackState {
+        SavedPlaybackState {
+            connect_state: mem::take(&mut self.connect_state),
+            play_status: mem::replace(&mut self.play_status, SpircPlayStatus::Stopped),
+            play_request_id: self.play_request_id.take(),
+            player_events: self.player_events.take(),
+        }
     }
 
     fn handle_next_context(&mut self, next_context: Result<Context, Error>) -> bool {
@@ -626,8 +926,8 @@ impl SpircTask {
             Err(why) => {
                 self.context_resolver.mark_next_unavailable();
                 self.context_resolver.remove_used_and_invalid();
-                error!("{why}");
-                return false;
+                error!("context resolving failed: {why}");
+                return self.handle_resolve_failure();
             }
             Ok(ctx) => ctx,
         };
@@ -653,6 +953,7 @@ impl SpircTask {
             .try_finish(&mut self.connect_state, &mut self.transfer_state)
         {
             self.add_autoplay_resolving_when_required();
+            self.handle_deferred_unavailable_tracks();
             true
         } else {
             false
@@ -665,6 +966,57 @@ impl SpircTask {
 
         self.context_resolver.remove_used_and_invalid();
         update_state
+    }
+
+    fn context_resolution_pending(&self) -> bool {
+        self.transfer_state.is_some() || self.context_resolver.has_next()
+    }
+
+    /// Handles tracks whose unavailability couldn't be processed earlier
+    /// because their context was still resolving.
+    fn handle_deferred_unavailable_tracks(&mut self) {
+        for track_id in mem::take(&mut self.pending_unavailable_tracks) {
+            info!("handling deferred unavailable track <{track_id}>");
+            let res = self.handle_unavailable(&track_id).and_then(|_| {
+                if self.connect_state.current_track(|t| &t.uri) == &track_id.to_uri() {
+                    self.handle_next(None)
+                } else {
+                    Ok(())
+                }
+            });
+            if let Err(why) = res {
+                warn!("failed handling deferred unavailable track: {why}")
+            }
+        }
+    }
+
+    /// A context resolve failed and won't be retried automatically. When a
+    /// transfer or a track that already failed to load was waiting on it, stop
+    /// so that a fresh user action can recover: nothing else would end their
+    /// wait.
+    ///
+    /// Any other failure leaves the playback untouched, whatever its state: a
+    /// track that is loading doesn't need the context to finish, and failing to
+    /// update it in the background (autoplay, which podcasts don't support, or a
+    /// playlist modification) must not interrupt the playback.
+    fn handle_resolve_failure(&mut self) -> bool {
+        // what is still queued can finish the transfer, or skip the failed tracks
+        if self.context_resolver.has_next() {
+            return false;
+        }
+
+        let had_transfer = self.transfer_state.take().is_some();
+        let had_unavailable_tracks = !mem::take(&mut self.pending_unavailable_tracks).is_empty();
+
+        if !had_transfer && !had_unavailable_tracks {
+            return false;
+        }
+
+        warn!("giving up on unresolved context, stopping so a new user action can recover");
+        self.handle_stop();
+        self.play_status = SpircPlayStatus::Stopped;
+
+        true
     }
 
     /// Emit set queue event via PlayerEvent
@@ -719,11 +1071,12 @@ impl SpircTask {
             SpircCommand::Shutdown => {
                 trace!("Received SpircCommand::Shutdown");
                 self.handle_pause();
-                self.handle_disconnect().await?;
+                // first, so that failing to disconnect still ends the spirc
                 self.shutdown = true;
                 if let Some(rx) = self.commands.as_mut() {
                     rx.close()
                 }
+                self.handle_disconnect().await?;
             }
             SpircCommand::Transfer(request) if !self.connect_state.is_active() => {
                 let device_id = self.session.device_id();
@@ -894,9 +1247,22 @@ impl SpircTask {
                 return Ok(());
             }
             PlayerEvent::Unavailable { track_id, .. } => {
-                self.handle_unavailable(&track_id)?;
-                if self.connect_state.current_track(|t| &t.uri) == &track_id.to_uri() {
-                    self.handle_next(None)?
+                match self.handle_unavailable(&track_id) {
+                    Ok(_) => {
+                        if self.connect_state.current_track(|t| &t.uri) == &track_id.to_uri() {
+                            self.handle_next(None)?
+                        }
+                    }
+                    // the track failed before its context was resolved (e.g. it
+                    // raced the resolve during a transfer), so it can't be
+                    // skipped over yet: handle it again when the context arrives
+                    Err(why) if is_no_context_error(&why) && self.context_resolution_pending() => {
+                        warn!(
+                            "track <{track_id}> became unavailable before its context resolved, deferring"
+                        );
+                        self.pending_unavailable_tracks.push(track_id);
+                    }
+                    Err(why) => return Err(why),
                 }
             }
             _ => return Ok(()),
@@ -909,6 +1275,26 @@ impl SpircTask {
     async fn handle_connection_id_update(&mut self, connection_id: String) -> Result<(), Error> {
         trace!("Received connection ID update: {connection_id:?}");
         self.session.set_connection_id(&connection_id);
+
+        // Read before the PUT: a reconnect while it is in flight makes this
+        // registration outdated, and must still arm the watchdog.
+        let reconnect_gen = *self.session.dealer().reconnect_receiver().borrow();
+
+        // If we have active playback (e.g. restored from saved state),
+        // update the position before registering so Spotify sees the
+        // correct track position.
+        if self.has_playback() {
+            info!(
+                "re-registering with active playback state: {:?}",
+                self.play_status
+            );
+            self.connect_state.set_status(&self.play_status);
+            if self.connect_state.is_playing() {
+                self.connect_state
+                    .update_position_in_relation(self.now_ms());
+            }
+            self.connect_state.set_now(self.now_ms() as u64);
+        }
 
         let cluster = match self
             .connect_state
@@ -929,6 +1315,11 @@ impl SpircTask {
         );
 
         self.connect_established = true;
+        // We successfully (re-)registered: record the dealer generation we
+        // registered under and disarm the reconnect watchdog so it won't force
+        // an unnecessary restart.
+        self.registered_reconnect_gen = reconnect_gen;
+        self.reconnect_grace_until = None;
 
         let same_session = cluster.player_state.session_id == self.session.session_id()
             || cluster.player_state.session_id.is_empty();
@@ -1186,6 +1577,8 @@ impl SpircTask {
     }
 
     fn handle_transfer(&mut self, mut transfer: TransferState) -> Result<(), Error> {
+        self.pending_unavailable_tracks.clear();
+
         let mut ctx_uri = match transfer.current_session.context.uri {
             None => Err(SpircError::NoUri("transfer context"))?,
             // can apparently happen when a state is transferred and was started with "uris" via the api
@@ -1218,7 +1611,7 @@ impl SpircTask {
 
         match ctx_uri {
             Some(ref uri) => {
-                self.context_resolver.add(ResolveContext::from_uri(
+                self.context_resolver.add_forced(ResolveContext::from_uri(
                     uri.clone(),
                     &fallback,
                     ContextType::Default,
@@ -1276,7 +1669,7 @@ impl SpircTask {
         if self.connect_state.current_track(|t| t.is_autoplay()) || autoplay {
             if let Some(ctx_uri) = ctx_uri {
                 debug!("currently in autoplay context, async resolving autoplay for {ctx_uri}");
-                self.context_resolver.add(ResolveContext::from_uri(
+                self.context_resolver.add_forced(ResolveContext::from_uri(
                     ctx_uri,
                     fallback,
                     ContextType::Autoplay,
@@ -1309,6 +1702,7 @@ impl SpircTask {
 
     async fn handle_disconnect(&mut self) -> Result<(), Error> {
         self.context_resolver.clear();
+        self.pending_unavailable_tracks.clear();
 
         self.play_status = SpircPlayStatus::Stopped {};
         self.connect_state
@@ -1501,7 +1895,8 @@ impl SpircTask {
         } else {
             debug!("resolving context for load command");
             self.context_resolver.clear();
-            self.context_resolver.add(ResolveContext::from_uri(
+            self.pending_unavailable_tracks.clear();
+            self.context_resolver.add_forced(ResolveContext::from_uri(
                 &context_uri,
                 fallback,
                 update_context,
@@ -1955,5 +2350,75 @@ impl SpircTask {
 impl Drop for SpircTask {
     fn drop(&mut self) {
         debug!("drop Spirc[{}]", self.spirc_id);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const LOAD: u64 = 1;
+    const NEWER_LOAD: u64 = 2;
+
+    fn track() -> SpotifyUri {
+        SpotifyUri::from_uri("spotify:track:4uLU6hMCjMI75M1A2tKUQC").unwrap()
+    }
+
+    fn playing(play_request_id: u64) -> PlayerEvent {
+        PlayerEvent::Playing {
+            play_request_id,
+            track_id: track(),
+            position_ms: 0,
+        }
+    }
+
+    fn paused(play_request_id: u64) -> PlayerEvent {
+        PlayerEvent::Paused {
+            play_request_id,
+            track_id: track(),
+            position_ms: 0,
+        }
+    }
+
+    fn id_changed(play_request_id: u64) -> PlayerEvent {
+        PlayerEvent::PlayRequestIdChanged { play_request_id }
+    }
+
+    #[test]
+    fn load_without_events_has_not_finished() {
+        assert!(!load_finished(&[], Some(LOAD)));
+        assert!(!load_finished(&[], None));
+    }
+
+    #[test]
+    fn load_finishes_by_playing_or_pausing() {
+        assert!(load_finished(&[playing(LOAD)], Some(LOAD)));
+        assert!(load_finished(&[paused(LOAD)], Some(LOAD)));
+    }
+
+    #[test]
+    fn events_of_another_load_are_ignored() {
+        assert!(!load_finished(&[playing(NEWER_LOAD)], Some(LOAD)));
+        assert!(!load_finished(&[playing(LOAD)], None));
+    }
+
+    #[test]
+    fn a_failed_load_has_not_finished() {
+        let unavailable = PlayerEvent::Unavailable {
+            play_request_id: LOAD,
+            track_id: track(),
+        };
+
+        assert!(!load_finished(&[unavailable], Some(LOAD)));
+    }
+
+    #[test]
+    fn buffered_id_changes_are_followed() {
+        let events = [id_changed(NEWER_LOAD), playing(NEWER_LOAD)];
+        assert!(load_finished(&events, Some(LOAD)));
+        assert!(load_finished(&events, None));
+
+        let events = [playing(LOAD), id_changed(NEWER_LOAD)];
+        assert!(!load_finished(&events, Some(LOAD)));
     }
 }

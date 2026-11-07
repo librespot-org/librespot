@@ -1442,14 +1442,18 @@ impl Future for PlayerInternal {
                     Poll::Ready(Err(_)) => {
                         debug!("Unable to preload {track_id:?}");
                         self.preload = PlayerPreload::None;
-                        // Let Spirc know that the track was unavailable.
-                        if let PlayerState::Playing {
+                        if self.session.is_invalid() {
+                            // says nothing about the track, which would load fine
+                            // on the next session
+                            warn!("Preload of {track_id:?} failed with the session");
+                        } else if let PlayerState::Playing {
                             play_request_id, ..
                         }
                         | PlayerState::Paused {
                             play_request_id, ..
                         } = self.state
                         {
+                            // Let Spirc know that the track was unavailable.
                             self.send_event(PlayerEvent::Unavailable {
                                 track_id,
                                 play_request_id,
@@ -2323,7 +2327,15 @@ impl PlayerInternal {
 
             PlayerCommand::Stop => self.handle_player_stop(),
 
-            PlayerCommand::SetSession(session) => self.session = session,
+            PlayerCommand::SetSession(session) => {
+                self.session = session;
+                // A preload in flight rides the previous session, which is usually
+                // lost by now: when it fails, the track gets marked unavailable
+                // although it would load fine on the new session.
+                if matches!(self.preload, PlayerPreload::Loading { .. }) {
+                    self.preload = PlayerPreload::None;
+                }
+            }
 
             PlayerCommand::AddEventSender(sender) => self.event_senders.push(sender),
 

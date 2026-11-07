@@ -155,8 +155,12 @@ impl ContextResolver {
             last_try
         };
 
-        if last_try.is_some() {
-            debug!("tried loading unavailable context: {resolve}");
+        if let Some(last_try) = last_try {
+            info!(
+                "skipped resolving unavailable context ({resolve}): resolving failed {}s ago, retrying in {}s",
+                last_try.as_secs(),
+                RETRY_UNAVAILABLE.saturating_sub(last_try).as_secs()
+            );
             return;
         } else if self.queue.contains(&resolve) {
             debug!("update for {resolve} is already added");
@@ -169,6 +173,16 @@ impl ContextResolver {
         }
 
         self.queue.push_back(resolve)
+    }
+
+    /// Adds a context for resolving even if it recently failed, so that a
+    /// deliberate user action (transfer, load) always gets a fresh attempt
+    /// instead of being dropped while the context is marked unavailable.
+    pub fn add_forced(&mut self, resolve: ResolveContext) {
+        if self.unavailable_contexts.remove(&resolve).is_some() {
+            info!("resolving unavailable context by user request: {resolve}");
+        }
+        self.add(resolve)
     }
 
     pub fn add_list(&mut self, resolve: Vec<ResolveContext>) {
@@ -342,5 +356,70 @@ impl ContextResolver {
         state.update_queue_revision();
 
         true
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::core::SessionConfig;
+
+    fn resolver() -> ContextResolver {
+        ContextResolver::new(Session::new(SessionConfig::default(), None))
+    }
+
+    fn resolve() -> ResolveContext {
+        ResolveContext::from_uri(
+            "spotify:playlist:37i9dQZF1EIhMHNZW8S7ky",
+            "spotify:track:6ek9SiEj5a65WIs2EV7qiM",
+            ContextType::Default,
+            ContextAction::Replace,
+        )
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn add_drops_unavailable_context_until_retry_expires() {
+        let mut resolver = resolver();
+
+        resolver.add(resolve());
+        assert!(resolver.has_next());
+
+        resolver.mark_next_unavailable();
+        resolver.remove_used_and_invalid();
+        assert!(!resolver.has_next());
+
+        resolver.add(resolve());
+        assert!(!resolver.has_next());
+
+        tokio::time::advance(RETRY_UNAVAILABLE + Duration::from_secs(1)).await;
+        resolver.add(resolve());
+        assert!(resolver.has_next());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn add_forced_retries_unavailable_context_immediately() {
+        let mut resolver = resolver();
+
+        resolver.add(resolve());
+        resolver.mark_next_unavailable();
+        resolver.remove_used_and_invalid();
+
+        resolver.add_forced(resolve());
+        assert!(resolver.has_next());
+
+        resolver.remove_used_and_invalid();
+        resolver.add(resolve());
+        assert!(resolver.has_next());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn add_dedups_already_queued_context() {
+        let mut resolver = resolver();
+
+        resolver.add(resolve());
+        resolver.add(resolve());
+
+        resolver.remove_used_and_invalid();
+        assert!(!resolver.has_next());
     }
 }

@@ -1,5 +1,6 @@
 use crate::{
-    core::dealer::protocol::SkipTo, protocol::context_player_options::ContextPlayerOptionOverrides,
+    core::dealer::protocol::SkipTo, playback::player::PlayerEventChannel,
+    protocol::context_player_options::ContextPlayerOptionOverrides, state::ConnectState,
 };
 
 use std::ops::Deref;
@@ -165,6 +166,15 @@ pub(super) enum SpircPlayStatus {
         position_ms: u32,
         preloading_of_next_track_triggered: bool,
     },
+}
+
+/// Playback state saved across session reconnects so the new SpircTask
+/// can resume where the old one left off.
+pub struct SavedPlaybackState {
+    pub(super) connect_state: ConnectState,
+    pub(super) play_status: SpircPlayStatus,
+    pub(super) play_request_id: Option<u64>,
+    pub(super) player_events: Option<PlayerEventChannel>,
 }
 
 #[cfg(test)]
