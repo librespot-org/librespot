@@ -17,7 +17,7 @@ use crate::{
         player::{Player, PlayerEvent, PlayerEventChannel, QueueTrack},
     },
     protocol::{
-        connect::{Cluster, ClusterUpdate, LogoutCommand, SetVolumeCommand},
+        connect::{Cluster, ClusterUpdate, DeviceInfo, LogoutCommand, SetVolumeCommand},
         context::Context,
         explicit_content_pubsub::UserAttributesUpdate,
         player::ProvidedTrack,
@@ -36,6 +36,7 @@ use futures_util::StreamExt;
 use librespot_protocol::context_page::ContextPage;
 use protobuf::MessageField;
 use std::{
+    collections::HashMap,
     future::Future,
     sync::Arc,
     sync::atomic::{AtomicUsize, Ordering},
@@ -102,6 +103,10 @@ struct SpircTask {
 
     /// is set when transferring, and used after resolving the contexts to finish the transfer
     pub transfer_state: Option<TransferState>,
+
+    /// the devices of the last received cluster, by device id, used to look up
+    /// the client that sent a command
+    cluster_devices: HashMap<String, DeviceInfo>,
 
     /// when set to true, it will update the volume after [VOLUME_UPDATE_DELAY],
     /// when no other future resolves, otherwise resets the delay
@@ -259,6 +264,7 @@ impl Spirc {
             session,
 
             transfer_state: None,
+            cluster_devices: HashMap::new(),
             update_volume: false,
             update_state: false,
 
@@ -910,7 +916,7 @@ impl SpircTask {
         trace!("Received connection ID update: {connection_id:?}");
         self.session.set_connection_id(&connection_id);
 
-        let cluster = match self
+        let mut cluster = match self
             .connect_state
             .notify_new_device_appeared(&self.session)
             .await
@@ -929,6 +935,7 @@ impl SpircTask {
         );
 
         self.connect_established = true;
+        self.cluster_devices = std::mem::take(&mut cluster.device);
 
         let same_session = cluster.player_state.session_id == self.session.session_id()
             || cluster.player_state.session_id.is_empty();
@@ -1016,7 +1023,9 @@ impl SpircTask {
             cluster_update.cluster.active_device_id
         );
 
-        if let Some(cluster) = cluster_update.cluster.take() {
+        if let Some(mut cluster) = cluster_update.cluster.take() {
+            self.cluster_devices = std::mem::take(&mut cluster.device);
+
             let became_inactive = self.connect_state.is_active()
                 && cluster.active_device_id != self.session.device_id();
             if became_inactive {
@@ -1047,6 +1056,8 @@ impl SpircTask {
             request.command, request.sent_by_device_id
         );
 
+        self.update_client(&request.sent_by_device_id);
+
         let response = match self.handle_request(request).await {
             Ok(_) => Reply::Success,
             Err(why) => {
@@ -1056,6 +1067,47 @@ impl SpircTask {
         };
 
         sender.send(response).map_err(Into::into)
+    }
+
+    /// Updates the session's client information from the device that sent a
+    /// command and emits a [`PlayerEvent::SessionClientChanged`] when the
+    /// controlling client changed while we are active.
+    fn update_client(&mut self, device_id: &str) {
+        let Some(device) = self.cluster_devices.get(device_id) else {
+            debug!(
+                "device <{device_id}> is not part of the last cluster, can't update client info"
+            );
+            return;
+        };
+
+        let old_client = (
+            self.session.client_id(),
+            self.session.client_name(),
+            self.session.client_brand_name(),
+            self.session.client_model_name(),
+        );
+
+        self.session.set_client_id(&device.client_id);
+        self.session.set_client_name(&device.name);
+        self.session.set_client_brand_name(&device.brand);
+        self.session.set_client_model_name(&device.model);
+
+        let new_client = (
+            self.session.client_id(),
+            self.session.client_name(),
+            self.session.client_brand_name(),
+            self.session.client_model_name(),
+        );
+
+        if self.connect_state.is_active() && new_client != old_client {
+            let (client_id, client_name, client_brand_name, client_model_name) = new_client;
+            self.player.emit_session_client_changed_event(
+                client_id,
+                client_name,
+                client_brand_name,
+                client_model_name,
+            );
+        }
     }
 
     async fn handle_request(&mut self, request: Request) -> Result<(), Error> {
