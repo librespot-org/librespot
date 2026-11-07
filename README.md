@@ -4,6 +4,9 @@
 
 Current maintainers are [listed on GitHub](https://github.com/orgs/librespot-org/people).
 
+«[!WARNING]
+Spotify account compatibility: Spotify has changed its audio DRM/key delivery mechanism. Accounts created after an apparent cutoff date (around 2024/2025) can no longer obtain the audio decryption keys required by librespot. This affects all librespot versions, and playback will fail with "audio key error 0 1". No workaround is currently known. This is a Spotify-side restriction, not a librespot configuration issue. See "issue #1649" (https://github.com/librespot-org/librespot/issues/1649) for details (locked).»
+
 # librespot
 *librespot* is an open source client library for Spotify. It enables applications to use Spotify's service to control and play music via various backends, and to act as a Spotify Connect receiver. It is an alternative to the official and [now deprecated](https://pyspotify.mopidy.com/en/latest/#libspotify-s-deprecation) closed-source `libspotify`. Additionally, it will provide extra features which are not available in the official library.
 
