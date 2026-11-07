@@ -430,10 +430,7 @@ pub(super) async fn audio_file_fetch(
     let (file_data_tx, mut file_data_rx) = mpsc::unbounded_channel();
 
     {
-        let requested_range = Range::new(
-            initial_request.offset,
-            initial_request.offset + initial_request.length,
-        );
+        let requested_range = Range::new(initial_request.offset, initial_request.length);
 
         let mut download_status = shared
             .download_status

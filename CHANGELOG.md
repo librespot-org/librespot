@@ -9,10 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- [core] Ask for audio keys one at a time and at least 200 ms apart, and after Spotify refuses one wait 3, then 5, then 10 seconds before asking for another, so a burst of requests no longer prolongs a run of refusals; `AudioKeyManager::request` asks again for a refused key up to three times
 - [connect] Picking a track in a list plays that track: an empty `track_uri` (or `track_uid`) sent next to the one that identifies the track is ignored, instead of failing to resolve and playing the first track of the context
 
 ### Added
 
+- [core] Add `AudioKeyManager::try_request`, which asks for a key once and not at all while the session waits after a refusal, and `AudioKeyManager::is_backing_off`; `AudioKeyError` gains a `BackingOff` variant (breaking)
 - [docs] Document Android NDK context initialization requirement for Rodio/CPAL audio backend
 - [core] Add `Cache::with_memory_credentials` to keep credentials in memory instead of a file, for applications that store them in their own protected store
 - [connect] Add method `add_to_queue` to `Spirc` to add tracks, episodes, albums and playlists to the queue
@@ -21,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] Add `SetQueue` player event, emitting when the queue changes (context loaded, track added to queue, or queue set via Spotify Connect). Gated behind `ConnectConfig::emit_set_queue_events`
 - [examples] Obtain an access token via OAuth to establish a new session and retrieve the stored credentials
 - [playback] Add track's artists to playback loading verbose logs
+- [playback] Add `Player::prefetch` to fetch the metadata and first 128 KiB of upcoming tracks, and the audio key of the next one, so loading one of them starts playing without waiting for those in turn; `Spirc` prefetches the next two tracks. The key is not prefetched while the session backs off after a refused key
+- [audio] Add `AudioFileHead` and `AudioFile::open_with_head` to open a file from its first bytes fetched ahead of time
 
 ### Changed
 
@@ -29,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- [audio] Mark a download's first request as requested by its length rather than its end offset
 - [core] Reject an access-point handshake packet whose size is under four bytes or over 64 KiB, instead of panicking or allocating whatever size it names
 - [core] Pass on dealer messages that carry plain JSON, such as collection updates, instead of dropping them with a base64 warning
 - [core] Fixed AP login on Windows on ARM by using the supported desktop platform identifier
