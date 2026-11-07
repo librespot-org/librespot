@@ -1118,6 +1118,7 @@ impl PlayerTrackLoader {
                 }
             };
 
+            let has_key = key.is_some();
             let mut decrypted_file = AudioDecrypt::new(key, encrypted_file);
 
             let is_ogg_vorbis = AudioFiles::is_ogg_vorbis(format);
@@ -1175,7 +1176,9 @@ impl PlayerTrackLoader {
 
             let mut decoder = match decoder_type {
                 Ok(decoder) => decoder,
-                Err(e) if is_cached => {
+                // Without a key, an encrypted file fails to decode however it was
+                // fetched, so don't throw away a good cached file and fetch it again.
+                Err(e) if is_cached && has_key => {
                     warn!("Unable to read cached audio file: {e}. Trying to download it.");
 
                     match self.session.cache() {

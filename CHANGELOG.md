@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- [playback] Keep a cached audio file when its audio key is refused, instead of deleting it, downloading it again and asking again for the key at once
 - [connect] Picking a track in a list plays that track: an empty `track_uri` (or `track_uid`) sent next to the one that identifies the track is ignored, instead of failing to resolve and playing the first track of the context
 
 ### Added
