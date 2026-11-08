@@ -51,6 +51,10 @@ component! {
 
 pub type SpClientResult = Result<Bytes, Error>;
 
+fn endpoint_path_for_log(endpoint: &str) -> &str {
+    endpoint.split_once('?').map_or(endpoint, |(path, _)| path)
+}
+
 #[allow(clippy::declare_interior_mutable_const)]
 pub const CLIENT_TOKEN: HeaderName = HeaderName::from_static("client-token");
 #[allow(clippy::declare_interior_mutable_const)]
@@ -546,6 +550,14 @@ impl SpClient {
             debug!("Error was: {last_response:?}");
         }
 
+        if let Err(ref error) = last_response {
+            let endpoint_path = endpoint_path_for_log(endpoint);
+            warn!(
+                "spclient request {method} {endpoint_path} failed after {tries} attempt(s): {}",
+                error.kind
+            );
+        }
+
         last_response
     }
 
@@ -956,5 +968,22 @@ impl SpClient {
             &NO_METRICS_AND_SALT,
         )
         .await
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::endpoint_path_for_log;
+
+    #[test]
+    fn diagnostic_endpoint_omits_query() {
+        assert_eq!(
+            endpoint_path_for_log("/playlist/v2/rootlist?token=secret&from=0"),
+            "/playlist/v2/rootlist"
+        );
+        assert_eq!(
+            endpoint_path_for_log("/context-resolve/v1/autoplay"),
+            "/context-resolve/v1/autoplay"
+        );
     }
 }
