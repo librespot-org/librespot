@@ -74,3 +74,30 @@ pub struct Line {
     pub words: String,
     // TODO: 'syllables' array
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn v2_json_remains_compatible() {
+        let bytes = Bytes::from_static(
+            br#"{
+            "colors":{"background":-1,"highlightText":-2,"text":-3},
+            "hasVocalRemoval":false,
+            "lyrics":{
+                "isDenseTypeface":false,"isRtlLanguage":false,"language":"en",
+                "lines":[{"startTimeMs":"1000","endTimeMs":"2500","words":"Synthetic v2 text"}],
+                "provider":"SyntheticProvider","providerDisplayName":"Synthetic Provider",
+                "providerLyricsId":"synthetic-id","syncLyricsUri":"",
+                "syncType":"LINE_SYNCED"
+            }
+        }"#,
+        );
+        let parsed = Lyrics::try_from(&bytes).unwrap();
+        assert_eq!(parsed.lyrics.sync_type, SyncType::LineSynced);
+        assert_eq!(parsed.lyrics.lines[0].start_time_ms, "1000");
+        assert_eq!(parsed.lyrics.lines[0].words, "Synthetic v2 text");
+        assert_eq!(parsed.colors.background, -1);
+    }
+}

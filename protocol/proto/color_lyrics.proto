@@ -1,0 +1,62 @@
+// Wire fields recovered from Spotify Android 9.1.94.1929.
+// This is a partial schema: unknown fields are retained by the protobuf runtime.
+syntax = "proto3";
+
+package spotify.lyrics.v3;
+
+message LyricsWrapperResponse {
+    LyricsV3Response lyrics = 1;
+    bool has_vocal_removal = 2;
+}
+
+message LyricsV3Response {
+    enum SyncType {
+        UNSYNCED = 0;
+        LINE_SYNCED = 1;
+        RICH_SYNCED = 2;
+    }
+
+    enum CapStatus {
+        NONE = 0;
+        UNCAPPED = 1;
+        reserved 2;
+        CAPPED = 3;
+    }
+
+    message LyricsLine {
+        message SyncData {
+            int64 start_time_ms = 1;
+            int64 end_time_ms = 2;
+            int64 num_chars = 3;
+        }
+
+        int64 start_time_ms = 1;
+        int64 end_time_ms = 2;
+        string words = 3;
+        repeated SyncData sync_data = 4;
+    }
+
+    message Provider {
+        string name = 1;
+        string lyrics_id = 2;
+        string display_name = 3;
+    }
+
+    message Language {
+        string code = 1;
+        bool is_rtl = 2;
+    }
+
+    message Translation {
+        Language language = 1;
+        repeated string lines = 2;
+    }
+
+    SyncType sync_type = 1;
+    repeated LyricsLine lines = 2;
+    repeated LyricsLine preview_lines = 3;
+    Provider provider = 4;
+    Translation translation = 5;
+    Language language = 6;
+    CapStatus cap_status = 7;
+}
