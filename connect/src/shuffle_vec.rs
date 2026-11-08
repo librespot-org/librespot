@@ -1,4 +1,4 @@
-use rand::{Rng, SeedableRng, rngs::SmallRng};
+use rand::{RngExt, SeedableRng, rngs::SmallRng};
 use std::{
     ops::{Deref, DerefMut},
     vec::IntoIter,
@@ -60,7 +60,7 @@ impl<T> ShuffleVec<T> {
         self.shuffle_with_rng(SmallRng::seed_from_u64(seed), is_first)
     }
 
-    pub fn shuffle_with_rng<F: Fn(&T) -> bool>(&mut self, mut rng: impl Rng, is_first: F) {
+    pub fn shuffle_with_rng<F: Fn(&T) -> bool>(&mut self, mut rng: impl RngExt, is_first: F) {
         if self.vec.len() <= 1 {
             info!("skipped shuffling for less or equal one item");
             return;
@@ -112,7 +112,7 @@ impl<T> ShuffleVec<T> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use rand::Rng;
+    use rand::RngExt;
     use std::ops::Range;
 
     fn base(range: Range<usize>) -> (ShuffleVec<usize>, u64) {

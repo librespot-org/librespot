@@ -5,6 +5,15 @@ pre-build = [
     "apt-get --assume-yes install libssl-dev:$CROSS_DEB_ARCH libasound2-dev:$CROSS_DEB_ARCH",
 ]
 
+# The default cross images for these targets are based on an old Ubuntu release
+# whose libssl-dev is OpenSSL 1.0.2, which openssl-sys no longer supports.
+# Use the current cross image (Ubuntu 24.04, OpenSSL 3.x) instead.
+[target.aarch64-unknown-linux-gnu]
+image = "ghcr.io/cross-rs/aarch64-unknown-linux-gnu:main"
+
+[target.armv7-unknown-linux-gnueabihf]
+image = "ghcr.io/cross-rs/armv7-unknown-linux-gnueabihf:main"
+
 [target.riscv64gc-unknown-linux-gnu]
 # RISC-V: Uses rustls-tls (no system dependencies needed)
 # Building with --no-default-features --features rustls-tls

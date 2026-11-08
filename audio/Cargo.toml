@@ -20,12 +20,12 @@ rustls-tls-webpki-roots = ["librespot-core/rustls-tls-webpki-roots"]
 [dependencies]
 librespot-core = { version = "0.8.0", path = "../core", default-features = false }
 
-aes = "0.8"
+aes = "0.9"
 bytes = "1"
-ctr = "0.9"
+ctr = "0.10"
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
 http-body-util = "0.1"
-hyper = { version = "1.6", features = ["http1", "http2"] }
+hyper = { version = "1.12", features = ["http1", "http2"] }
 hyper-util = { version = "0.1", features = ["client", "http2"] }
 log = "0.4"
 tempfile = "3"

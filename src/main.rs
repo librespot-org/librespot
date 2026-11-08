@@ -1303,10 +1303,10 @@ async fn get_setup() -> Setup {
         Some(5588)
     };
 
-    if let Some(reason) = no_discovery_reason.as_deref() {
-        if opt_present(ZEROCONF_PORT) {
-            warn!("With {reason} `--{ZEROCONF_PORT}` / `-{ZEROCONF_PORT_SHORT}` has no effect.");
-        }
+    if let Some(reason) = no_discovery_reason.as_deref()
+        && opt_present(ZEROCONF_PORT)
+    {
+        warn!("With {reason} `--{ZEROCONF_PORT}` / `-{ZEROCONF_PORT_SHORT}` has no effect.");
     }
 
     let zeroconf_port = if no_discovery_reason.is_none() {
@@ -1345,14 +1345,14 @@ async fn get_setup() -> Setup {
         None => SessionConfig::default().autoplay,
     };
 
-    if let Some(reason) = no_discovery_reason.as_deref() {
-        if opt_present(ZEROCONF_INTERFACE) {
-            warn!(
-                "With {} {} has no effect.",
-                reason,
-                format_flag(ZEROCONF_INTERFACE, ZEROCONF_INTERFACE_SHORT),
-            );
-        }
+    if let Some(reason) = no_discovery_reason.as_deref()
+        && opt_present(ZEROCONF_INTERFACE)
+    {
+        warn!(
+            "With {} {} has no effect.",
+            reason,
+            format_flag(ZEROCONF_INTERFACE, ZEROCONF_INTERFACE_SHORT),
+        );
     }
 
     let zeroconf_ip: Vec<std::net::IpAddr> = if opt_present(ZEROCONF_INTERFACE) {
@@ -1380,12 +1380,10 @@ async fn get_setup() -> Setup {
         vec![]
     };
 
-    if let Some(reason) = no_discovery_reason.as_deref() {
-        if opt_present(ZEROCONF_BACKEND) {
-            warn!(
-                "With {reason} `--{ZEROCONF_BACKEND}` / `-{ZEROCONF_BACKEND_SHORT}` has no effect."
-            );
-        }
+    if let Some(reason) = no_discovery_reason.as_deref()
+        && opt_present(ZEROCONF_BACKEND)
+    {
+        warn!("With {reason} `--{ZEROCONF_BACKEND}` / `-{ZEROCONF_BACKEND_SHORT}` has no effect.");
     }
 
     let zeroconf_backend_name = opt_str(ZEROCONF_BACKEND);
@@ -2068,11 +2066,10 @@ async fn main() {
                         last_credentials = Some(credentials.clone());
                         auto_connect_times.clear();
 
-                        if let Some(spirc) = spirc.take() {
-                            if let Err(e) = spirc.shutdown() {
+                        if let Some(spirc) = spirc.take()
+                            && let Err(e) = spirc.shutdown() {
                                 error!("error sending spirc shutdown message: {e}");
                             }
-                        }
                         if let Some(spirc_task) = spirc_task.take() {
                             // Continue shutdown in its own task
                             tokio::spawn(spirc_task);

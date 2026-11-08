@@ -29,7 +29,7 @@ include = [
 ]
 
 [workspace.package]
-rust-version = "1.85"
+rust-version = "1.96"
 authors = ["Librespot Org"]
 license = "MIT"
 repository = "https://github.com/librespot-org/librespot"
@@ -161,8 +161,8 @@ librespot-oauth.workspace = true
 librespot-playback.workspace = true
 librespot-protocol.workspace = true
 
-data-encoding = "2.5"
-env_logger = { version = "0.11.2", default-features = false, features = [
+data-encoding = "2.11"
+env_logger = { version = "0.11.11", default-features = false, features = [
     "color",
     "humantime",
     "auto-color",
@@ -171,16 +171,10 @@ futures-util = { version = "0.3", default-features = false }
 getopts = "0.2"
 log = "0.4"
 sha1 = "0.10"
-sysinfo = { version = "0.36", default-features = false, features = ["system"] }
+sysinfo = { version = "0.39", default-features = false, features = ["system"] }
 thiserror = "2"
-tokio = { version = "1", features = [
-    "rt",
-    "macros",
-    "signal",
-    "sync",
-    "process",
-] }
-url = "2.2"
+tokio = { version = "1", features = ["rt", "macros", "signal", "sync"] }
+url = "2.5"
 
 [package.metadata.deb]
 maintainer = "Librespot Organization <noreply@github.com>"

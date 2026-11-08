@@ -141,12 +141,12 @@ impl<T> SubscriberMap<T> {
             fun(x)
         });
 
-        if let Some(next) = path.next() {
-            if let Some(y) = self.children.get_mut(next) {
-                handled_by_any = handled_by_any || y.retain(path, fun);
-                if y.is_empty() {
-                    self.children.remove(next);
-                }
+        if let Some(next) = path.next()
+            && let Some(y) = self.children.get_mut(next)
+        {
+            handled_by_any = handled_by_any || y.retain(path, fun);
+            if y.is_empty() {
+                self.children.remove(next);
             }
         }
 

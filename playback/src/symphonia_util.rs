@@ -6,10 +6,10 @@ pub fn get_latest_metadata(probe_result: &mut ProbeResult) -> Option<Metadata<'_
 
     // If we can't get metadata from the container, fall back to other tags found by probing.
     // Note that this is only relevant for local files.
-    if metadata.current().is_none() {
-        if let Some(inner_probe_metadata) = probe_result.metadata.get() {
-            metadata = inner_probe_metadata;
-        }
+    if metadata.current().is_none()
+        && let Some(inner_probe_metadata) = probe_result.metadata.get()
+    {
+        metadata = inner_probe_metadata;
     }
 
     _ = metadata.skip_to_latest();

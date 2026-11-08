@@ -426,10 +426,10 @@ impl Cache {
         let path = self.file_path(file)?;
         match File::open(&path) {
             Ok(file) => {
-                if let Some(limiter) = self.size_limiter.as_deref() {
-                    if !limiter.touch(&path) {
-                        error!("limiter could not touch {path:?}");
-                    }
+                if let Some(limiter) = self.size_limiter.as_deref()
+                    && !limiter.touch(&path)
+                {
+                    error!("limiter could not touch {path:?}");
                 }
                 Some(file)
             }
@@ -443,19 +443,17 @@ impl Cache {
     }
 
     pub fn save_file<F: Read>(&self, file: FileId, contents: &mut F) -> Result<PathBuf, Error> {
-        if let Some(path) = self.file_path(file) {
-            if let Some(parent) = path.parent() {
-                if let Ok(size) = fs::create_dir_all(parent)
-                    .and_then(|_| File::create(&path))
-                    .and_then(|mut file| io::copy(contents, &mut file))
-                {
-                    if let Some(limiter) = self.size_limiter.as_deref() {
-                        limiter.add(&path, size);
-                        limiter.prune()?;
-                    }
-                    return Ok(path);
-                }
+        if let Some(path) = self.file_path(file)
+            && let Some(parent) = path.parent()
+            && let Ok(size) = fs::create_dir_all(parent)
+                .and_then(|_| File::create(&path))
+                .and_then(|mut file| io::copy(contents, &mut file))
+        {
+            if let Some(limiter) = self.size_limiter.as_deref() {
+                limiter.add(&path, size);
+                limiter.prune()?;
             }
+            return Ok(path);
         }
         Err(CacheError::Path.into())
     }

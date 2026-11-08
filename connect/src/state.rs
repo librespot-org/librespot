@@ -294,12 +294,12 @@ impl ConnectState {
     pub fn set_now(&mut self, now: u64) {
         self.request.client_side_timestamp = now;
 
-        if let Some(active_since) = self.active_since {
-            if let Ok(active_since_duration) = active_since.duration_since(UNIX_EPOCH) {
-                match active_since_duration.as_millis().try_into() {
-                    Ok(active_since_ms) => self.request.started_playing_at = active_since_ms,
-                    Err(why) => warn!("couldn't update active since because {why}"),
-                }
+        if let Some(active_since) = self.active_since
+            && let Ok(active_since_duration) = active_since.duration_since(UNIX_EPOCH)
+        {
+            match active_since_duration.as_millis().try_into() {
+                Ok(active_since_ms) => self.request.started_playing_at = active_since_ms,
+                Err(why) => warn!("couldn't update active since because {why}"),
             }
         }
     }
