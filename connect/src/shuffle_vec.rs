@@ -1,4 +1,4 @@
-use rand::{Rng, SeedableRng, rngs::SmallRng};
+use rand::{Rng, RngExt, SeedableRng, rngs::SmallRng};
 use std::{
     ops::{Deref, DerefMut},
     vec::IntoIter,
@@ -112,7 +112,7 @@ impl<T> ShuffleVec<T> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use rand::Rng;
+    use rand::RngExt;
     use std::ops::Range;
 
     fn base(range: Range<usize>) -> (ShuffleVec<usize>, u64) {

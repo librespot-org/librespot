@@ -1,10 +1,9 @@
 # syntax=docker/dockerfile:1
-ARG debian_version=slim-bookworm
-ARG rust_version=1.85.0
+ARG debian_version=slim-trixie
+ARG rust_version=1.96.0
 FROM rust:${rust_version}-${debian_version}
 
 ARG DEBIAN_FRONTEND=noninteractive
-ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL="sparse"
 ENV RUST_BACKTRACE=1
 ENV RUSTFLAGS="-D warnings"
 

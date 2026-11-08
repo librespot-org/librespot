@@ -45,7 +45,7 @@ jobs:
             target: riscv64gc-unknown-linux-gnu
 
         toolchain:
-          - "1.85" # MSRV (Minimum Supported Rust Version)
+          - "1.96" # MSRV (Minimum Supported Rust Version)
           - stable
 
     steps:
@@ -59,6 +59,9 @@ jobs:
           command: build
           target: ${{ matrix.platform.target }}
           toolchain: ${{ matrix.toolchain }}
+          # latest released cross 0.2.5 images is outdated and ship OpenSSL 1.0.2 which breaks modern builds
+          # a9301e91f72bba3850460512685f6b16062015ff corresponds to main branch on 2026-11-01
+          cross-version: a9301e91f72bba3850460512685f6b16062015ff
           args: --locked --verbose
 
       - name: Build binary without system dependencies
@@ -68,6 +71,9 @@ jobs:
           command: build
           target: ${{ matrix.platform.target }}
           toolchain: ${{ matrix.toolchain }}
+          # latest released cross 0.2.5 images is outdated and ship OpenSSL 1.0.2 which breaks modern builds
+          # a9301e91f72bba3850460512685f6b16062015ff corresponds to main branch on 2026-11-01
+          cross-version: a9301e91f72bba3850460512685f6b16062015ff
           args: --locked --verbose --no-default-features --features rustls-tls-webpki-roots
 
       - name: Upload debug artifacts

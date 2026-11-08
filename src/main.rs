@@ -1303,10 +1303,10 @@ async fn get_setup() -> Setup {
         Some(5588)
     };
 
-    if let Some(reason) = no_discovery_reason.as_deref() {
-        if opt_present(ZEROCONF_PORT) {
-            warn!("With {reason} `--{ZEROCONF_PORT}` / `-{ZEROCONF_PORT_SHORT}` has no effect.");
-        }
+    if let Some(reason) = no_discovery_reason.as_deref()
+        && opt_present(ZEROCONF_PORT)
+    {
+        warn!("With {reason} `--{ZEROCONF_PORT}` / `-{ZEROCONF_PORT_SHORT}` has no effect.");
     }
 
     let zeroconf_port = if no_discovery_reason.is_none() {
@@ -1345,14 +1345,14 @@ async fn get_setup() -> Setup {
         None => SessionConfig::default().autoplay,
     };
 
-    if let Some(reason) = no_discovery_reason.as_deref() {
-        if opt_present(ZEROCONF_INTERFACE) {
-            warn!(
-                "With {} {} has no effect.",
-                reason,
-                format_flag(ZEROCONF_INTERFACE, ZEROCONF_INTERFACE_SHORT),
-            );
-        }
+    if let Some(reason) = no_discovery_reason.as_deref()
+        && opt_present(ZEROCONF_INTERFACE)
+    {
+        warn!(
+            "With {} {} has no effect.",
+            reason,
+            format_flag(ZEROCONF_INTERFACE, ZEROCONF_INTERFACE_SHORT),
+        );
     }
 
     let zeroconf_ip: Vec<std::net::IpAddr> = if opt_present(ZEROCONF_INTERFACE) {
@@ -1380,12 +1380,10 @@ async fn get_setup() -> Setup {
         vec![]
     };
 
-    if let Some(reason) = no_discovery_reason.as_deref() {
-        if opt_present(ZEROCONF_BACKEND) {
-            warn!(
-                "With {reason} `--{ZEROCONF_BACKEND}` / `-{ZEROCONF_BACKEND_SHORT}` has no effect."
-            );
-        }
+    if let Some(reason) = no_discovery_reason.as_deref()
+        && opt_present(ZEROCONF_BACKEND)
+    {
+        warn!("With {reason} `--{ZEROCONF_BACKEND}` / `-{ZEROCONF_BACKEND_SHORT}` has no effect.");
     }
 
     let zeroconf_backend_name = opt_str(ZEROCONF_BACKEND);
@@ -1931,7 +1929,7 @@ async fn main() {
 
     let mut session = Session::new(setup.session_config.clone(), setup.cache.clone());
 
-    let mut sys = System::new();
+    let mut sys = System::new().ok();
 
     if let Some(zeroconf_backend) = setup.zeroconf_backend {
         // When started at boot as a service discovery may fail due to it
@@ -1958,9 +1956,13 @@ async fn main() {
             {
                 Ok(d) => break Some(d),
                 Err(e) => {
-                    sys.refresh_processes(ProcessesToUpdate::All, true);
+                    if let Some(sys) = sys.as_mut() {
+                        sys.refresh_processes(ProcessesToUpdate::All, true);
+                    }
 
-                    if Duration::from_secs(System::uptime()) <= DISCOVERY_RETRY_UPTIME_LIMIT {
+                    // If the uptime is unavailable, assume the system has been up long enough to not retry.
+                    let uptime = System::uptime().unwrap_or(u64::MAX);
+                    if Duration::from_secs(uptime) <= DISCOVERY_RETRY_UPTIME_LIMIT {
                         debug!("Retrying to initialise discovery: {e}");
                         tokio::time::sleep(DISCOVERY_RETRY_TIMEOUT).await;
                     } else {
@@ -2068,11 +2070,10 @@ async fn main() {
                         last_credentials = Some(credentials.clone());
                         auto_connect_times.clear();
 
-                        if let Some(spirc) = spirc.take() {
-                            if let Err(e) = spirc.shutdown() {
+                        if let Some(spirc) = spirc.take()
+                            && let Err(e) = spirc.shutdown() {
                                 error!("error sending spirc shutdown message: {e}");
                             }
-                        }
                         if let Some(spirc_task) = spirc_task.take() {
                             // Continue shutdown in its own task
                             tokio::spawn(spirc_task);

@@ -1,15 +1,15 @@
 # syntax=docker/dockerfile:1
-ARG alpine_version=alpine3.20
-ARG rust_version=1.85.0
+ARG alpine_version=alpine3.23
+ARG rust_version=1.96.0
 FROM rust:${rust_version}-${alpine_version}
 
-ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL="sparse"
 ENV RUST_BACKTRACE=1
 ENV RUSTFLAGS="-D warnings -C target-feature=-crt-static"
 
 RUN apk add --no-cache \
+        bash \
         git \
-        nano\
+        nano \
         openssh-server  \
         # for rust-analyzer vscode plugin
         pkgconf \

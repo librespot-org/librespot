@@ -60,23 +60,23 @@ tokio = { version = "1", features = ["rt-multi-thread", "sync"] }
 zerocopy = { version = "0.8", features = ["derive"] }
 
 # Backends
-alsa = { version = "0.10", optional = true }
+alsa = { version = "0.11", optional = true }
 jack = { version = "0.13", optional = true }
 portaudio-rs = { version = "0.3", optional = true }
 sdl2 = { version = "0.38", optional = true }
 
 # GStreamer dependencies
-gstreamer = { version = "0.24", optional = true }
-gstreamer-app = { version = "0.24", optional = true }
-gstreamer-audio = { version = "0.24", optional = true }
+gstreamer = { version = "0.25", optional = true }
+gstreamer-app = { version = "0.25", optional = true }
+gstreamer-audio = { version = "0.25", optional = true }
 
 # PulseAudio dependencies
 libpulse-binding = { version = "2", optional = true, default-features = false }
 libpulse-simple-binding = { version = "2", optional = true, default-features = false }
 
 # Rodio dependencies
-cpal = { version = "0.16", optional = true }
-rodio = { version = "0.21", optional = true, default-features = false, features = [
+cpal = { version = "0.18", optional = true }
+rodio = { version = "0.23", optional = true, default-features = false, features = [
     "playback",
 ] }
 
@@ -92,8 +92,8 @@ symphonia = { version = "0.5", default-features = false, features = [
 ogg = { version = "0.9", optional = true }
 
 # Dithering
-rand = { version = "0.9", default-features = false, features = ["small_rng"] }
-rand_distr = "0.5"
+rand = { version = "0.10", default-features = false, features = ["thread_rng"] }
+rand_distr = "0.6"
 
 # Local file handling
 form_urlencoded = "1.2.2"

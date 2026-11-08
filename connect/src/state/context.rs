@@ -233,22 +233,21 @@ impl ConnectState {
                 // otherwise we might load the entire context twice, unless it's the search context
                 if !self.context_uri().starts_with(SEARCH_IDENTIFIER)
                     && matches!(context.uri, Some(ref uri) if uri == self.context_uri())
+                    && let Some(new_index) = self.find_last_index_in_new_context(&new_context)
                 {
-                    if let Some(new_index) = self.find_last_index_in_new_context(&new_context) {
-                        new_context.index.track = match new_index {
-                            Ok(i) => i,
-                            Err(i) => {
-                                self.player_mut().index = MessageField::none();
-                                i
-                            }
-                        };
-
-                        // enforce reloading the context
-                        if let Ok(autoplay_ctx) = self.get_context_mut(ContextType::Autoplay) {
-                            autoplay_ctx.index.track = 0
+                    new_context.index.track = match new_index {
+                        Ok(i) => i,
+                        Err(i) => {
+                            self.player_mut().index = MessageField::none();
+                            i
                         }
-                        self.clear_next_tracks();
+                    };
+
+                    // enforce reloading the context
+                    if let Ok(autoplay_ctx) = self.get_context_mut(ContextType::Autoplay) {
+                        autoplay_ctx.index.track = 0
                     }
+                    self.clear_next_tracks();
                 }
 
                 self.context = Some(new_context);

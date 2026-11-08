@@ -73,37 +73,37 @@ impl Decoder for ApCodec {
     type Error = io::Error;
 
     fn decode(&mut self, buf: &mut BytesMut) -> io::Result<Option<(u8, Bytes)>> {
-        if let DecodeState::Header = self.decode_state {
-            if buf.len() >= HEADER_SIZE {
-                let mut header = [0u8; HEADER_SIZE];
-                header.copy_from_slice(buf.split_to(HEADER_SIZE).as_ref());
+        if let DecodeState::Header = self.decode_state
+            && buf.len() >= HEADER_SIZE
+        {
+            let mut header = [0u8; HEADER_SIZE];
+            header.copy_from_slice(buf.split_to(HEADER_SIZE).as_ref());
 
-                self.decode_cipher.nonce_u32(self.decode_nonce);
-                self.decode_nonce += 1;
+            self.decode_cipher.nonce_u32(self.decode_nonce);
+            self.decode_nonce += 1;
 
-                self.decode_cipher.decrypt(&mut header);
+            self.decode_cipher.decrypt(&mut header);
 
-                let cmd = header[0];
-                let size = BigEndian::read_u16(&header[1..]) as usize;
-                self.decode_state = DecodeState::Payload(cmd, size);
-            }
+            let cmd = header[0];
+            let size = BigEndian::read_u16(&header[1..]) as usize;
+            self.decode_state = DecodeState::Payload(cmd, size);
         }
 
-        if let DecodeState::Payload(cmd, size) = self.decode_state {
-            if buf.len() >= size + MAC_SIZE {
-                self.decode_state = DecodeState::Header;
+        if let DecodeState::Payload(cmd, size) = self.decode_state
+            && buf.len() >= size + MAC_SIZE
+        {
+            self.decode_state = DecodeState::Header;
 
-                let mut payload = buf.split_to(size + MAC_SIZE);
+            let mut payload = buf.split_to(size + MAC_SIZE);
 
-                self.decode_cipher
-                    .decrypt(payload.get_mut(..size).ok_or_else(|| {
-                        io::Error::new(io::ErrorKind::InvalidData, ApCodecError::Payload)
-                    })?);
-                let mac = payload.split_off(size);
-                self.decode_cipher.check_mac(mac.as_ref())?;
+            self.decode_cipher
+                .decrypt(payload.get_mut(..size).ok_or_else(|| {
+                    io::Error::new(io::ErrorKind::InvalidData, ApCodecError::Payload)
+                })?);
+            let mac = payload.split_off(size);
+            self.decode_cipher.check_mac(mac.as_ref())?;
 
-                return Ok(Some((cmd, payload.freeze())));
-            }
+            return Ok(Some((cmd, payload.freeze())));
         }
 
         Ok(None)
