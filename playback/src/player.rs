@@ -5,7 +5,7 @@ use std::{
     future::Future,
     io::{self, Read, Seek, SeekFrom},
     mem,
-    pin::Pin,
+    pin::{Pin, pin},
     process::exit,
     sync::Mutex,
     sync::{
@@ -928,6 +928,21 @@ impl PlayerState {
                 exit(1);
             }
         }
+    }
+}
+
+/// Runs `work` until it finishes or until nobody waits for its result on
+/// `result_tx` any more, such as a load the player has moved on from.
+/// Dropping an abandoned load stops it asking for anything else, which
+/// matters most for audio keys: they are asked for one at a time, so a
+/// skipped track's request would hold back the one being played.
+async fn unless_abandoned<T, F: Future>(
+    result_tx: &mut oneshot::Sender<T>,
+    work: F,
+) -> Option<F::Output> {
+    match future::select(pin!(work), pin!(result_tx.closed())).await {
+        future::Either::Left((output, _)) => Some(output),
+        future::Either::Right(_) => None,
     }
 }
 
@@ -2453,8 +2468,10 @@ impl PlayerInternal {
         let handle = tokio::runtime::Handle::current();
 
         let load_handle = thread::spawn(move || {
-            let data = handle.block_on(loader.load_track(spotify_uri, position_ms));
-            if let Some(data) = data {
+            let mut result_tx = result_tx;
+            let load = loader.load_track(spotify_uri, position_ms);
+            let data = handle.block_on(unless_abandoned(&mut result_tx, load));
+            if let Some(data) = data.flatten() {
                 let _ = result_tx.send(data);
             }
 
@@ -2707,5 +2724,36 @@ where
 
     fn byte_len(&self) -> Option<u64> {
         Some(self.length)
+    }
+}
+
+#[cfg(test)]
+mod abandoned_load_tests {
+    use super::unless_abandoned;
+    use tokio::sync::oneshot;
+
+    fn block_on<F: std::future::Future>(future: F) -> F::Output {
+        tokio::runtime::Builder::new_current_thread()
+            .build()
+            .expect("a runtime should build")
+            .block_on(future)
+    }
+
+    #[test]
+    fn a_load_still_waited_for_runs_to_the_end() {
+        let (mut result_tx, _result_rx) = oneshot::channel::<u32>();
+        let output = block_on(unless_abandoned(&mut result_tx, async { 7 }));
+        assert_eq!(output, Some(7));
+    }
+
+    #[test]
+    fn an_abandoned_load_stops() {
+        let (mut result_tx, result_rx) = oneshot::channel::<u32>();
+        drop(result_rx);
+        let output = block_on(unless_abandoned(
+            &mut result_tx,
+            std::future::pending::<u32>(),
+        ));
+        assert_eq!(output, None);
     }
 }
