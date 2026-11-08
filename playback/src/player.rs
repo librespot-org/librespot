@@ -1093,7 +1093,8 @@ impl PlayerTrackLoader {
         // This is only a loop to be able to reload the file if an error occurred
         // while opening a cached file.
         loop {
-            let encrypted_file = AudioFile::open(&self.session, file_id, bytes_per_second);
+            let encrypted_file =
+                AudioFile::open(&self.session, file_id, format.into(), bytes_per_second);
 
             let encrypted_file = match encrypted_file.await {
                 Ok(encrypted_file) => encrypted_file,
