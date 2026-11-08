@@ -651,6 +651,28 @@ impl SpClient {
             .await
     }
 
+    /// Fetch the color-lyrics v3 protobuf response.
+    ///
+    /// `client_language` is a language tag such as `en` or `pt-BR`. It is
+    /// encoded as a query value. This uses the session's normal authentication
+    /// and country, and requests full lyrics without vocal removal. Availability
+    /// still depends on the account, track and market.
+    ///
+    /// The existing `get_lyrics` and `get_lyrics_for_image` methods continue to
+    /// return v2 JSON.
+    pub async fn get_lyrics_v3(
+        &self,
+        track_id: &SpotifyId,
+        client_language: &str,
+    ) -> SpClientResult {
+        let endpoint = lyrics_v3_endpoint(track_id, client_language);
+        let mut headers = HeaderMap::new();
+        headers.insert(ACCEPT, HeaderValue::from_static("application/protobuf"));
+
+        self.request(&Method::GET, &endpoint, Some(headers), None)
+            .await
+    }
+
     pub async fn get_lyrics_for_image(
         &self,
         track_id: &SpotifyId,
@@ -956,5 +978,40 @@ impl SpClient {
             &NO_METRICS_AND_SALT,
         )
         .await
+    }
+}
+
+fn lyrics_v3_endpoint(track_id: &SpotifyId, client_language: &str) -> String {
+    let query = form_urlencoded::Serializer::new(String::new())
+        .append_pair("clientLanguage", client_language)
+        .append_pair("vocalRemoval", "false")
+        .append_pair("preview", "false")
+        .finish();
+    format!("/color-lyrics/v3/track/{}?{query}", track_id.to_base62())
+}
+
+#[cfg(test)]
+mod lyrics_v3_tests {
+    use super::*;
+
+    #[test]
+    fn full_lyrics_request_preserves_language_tag() {
+        let id = SpotifyId::from_base62("0000000000000000000001").unwrap();
+        assert_eq!(
+            lyrics_v3_endpoint(&id, "pt-BR"),
+            "/color-lyrics/v3/track/0000000000000000000001?clientLanguage=pt-BR&vocalRemoval=false&preview=false"
+        );
+    }
+
+    #[test]
+    fn language_cannot_inject_query_options() {
+        let id = SpotifyId::from_base62("0000000000000000000001").unwrap();
+        let endpoint = lyrics_v3_endpoint(&id, "en&preview=true#fragment");
+        let uri: Uri = endpoint.parse().unwrap();
+        let pairs: Vec<_> = form_urlencoded::parse(uri.query().unwrap().as_bytes()).collect();
+        assert_eq!(pairs.len(), 3);
+        assert_eq!(pairs[0].1, "en&preview=true#fragment");
+        assert_eq!(pairs[1].1, "false");
+        assert_eq!(pairs[2].1, "false");
     }
 }

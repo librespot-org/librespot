@@ -16,6 +16,7 @@ fn compile() {
     let proto_dir = Path::new(&env::var("CARGO_MANIFEST_DIR").expect("env")).join("proto");
 
     let files = &[
+        proto_dir.join("color_lyrics.proto"),
         proto_dir.join("connect.proto"),
         proto_dir.join("media.proto"),
         proto_dir.join("connectivity.proto"),
