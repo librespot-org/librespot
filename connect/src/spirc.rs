@@ -42,7 +42,10 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use thiserror::Error;
-use tokio::{sync::mpsc, time::sleep};
+use tokio::{
+    sync::{mpsc, watch},
+    time::sleep,
+};
 
 #[derive(Debug, Error)]
 enum SpircError {
@@ -72,6 +75,8 @@ impl From<SpircError> for Error {
 struct SpircTask {
     player: Arc<Player>,
     mixer: Arc<dyn Mixer>,
+    /// volume changes made outside librespot, if the mixer can see them
+    mixer_volume_changes: Option<watch::Receiver<u16>>,
 
     /// the state management object
     connect_state: ConnectState,
@@ -177,6 +182,8 @@ impl Spirc {
         debug!("new Spirc[{spirc_id}]");
 
         let emit_set_queue_events = config.emit_set_queue_events;
+        // with the volume fixed there is no volume to report
+        let report_mixer_volume = !config.disable_volume;
         let connect_state = ConnectState::new(config, &session);
 
         let connection_id_update = session
@@ -228,10 +235,14 @@ impl Spirc {
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
 
         let player_events = player.get_player_event_channel();
+        let mixer_volume_changes = report_mixer_volume
+            .then(|| mixer.volume_changes())
+            .flatten();
 
         let mut task = SpircTask {
             player,
             mixer,
+            mixer_volume_changes,
 
             connect_state,
             connect_established: false,
@@ -483,6 +494,7 @@ impl SpircTask {
         while !self.session.is_invalid() && !self.shutdown {
             let commands = self.commands.as_mut();
             let player_events = self.player_events.as_mut();
+            let mixer_volume_changes = self.mixer_volume_changes.as_mut();
 
             // when state and volume update have a higher priority than context resolving
             // because of that the context resolving has to wait, so that the other tasks can finish
@@ -518,6 +530,15 @@ impl SpircTask {
                         Ok(volume) => self.set_volume(volume),
                         Err(why) => error!("can't update volume, failed to parse i32 to u16: {why}")
                     }
+                },
+                // the mixer's volume was changed outside librespot
+                mixer_volume = async {
+                    let changes = mixer_volume_changes?;
+                    changes.changed().await.ok()?;
+                    Some(*changes.borrow_and_update())
+                }, if mixer_volume_changes.is_some() && self.connect_established => match mixer_volume {
+                    Some(volume) => self.handle_mixer_volume_changed(volume),
+                    None => self.mixer_volume_changes = None,
                 },
                 logout_request = self.connect_state_logout_request.next() => unwrap! {
                     logout_request,
@@ -1938,16 +1959,34 @@ impl SpircTask {
         let old_volume = self.connect_state.device_info().volume;
         let new_volume = volume as u32;
         if old_volume != new_volume || self.mixer.volume() != volume {
-            self.update_volume = true;
-
-            self.connect_state.set_volume(new_volume);
             self.mixer.set_volume(volume);
-            if let Some(cache) = self.session.cache() {
-                cache.save_volume(volume)
-            }
-            if self.connect_state.is_active() {
-                self.player.emit_volume_changed_event(volume);
-            }
+            self.record_volume(volume);
+        }
+    }
+
+    /// The mixer's volume was changed outside librespot: report the new volume,
+    /// without setting the mixer to it again.
+    fn handle_mixer_volume_changed(&mut self, volume: u16) {
+        // A write made since, by librespot or from outside, makes this one
+        // out of date; one from outside is on its way here too.
+        if self.mixer.volume() != volume {
+            return;
+        }
+        if self.connect_state.device_info().volume != volume as u32 {
+            debug!("SpircTask::handle_mixer_volume_changed({volume})");
+            self.record_volume(volume);
+        }
+    }
+
+    fn record_volume(&mut self, volume: u16) {
+        self.update_volume = true;
+
+        self.connect_state.set_volume(volume as u32);
+        if let Some(cache) = self.session.cache() {
+            cache.save_volume(volume)
+        }
+        if self.connect_state.is_active() {
+            self.player.emit_volume_changed_event(volume);
         }
     }
 }

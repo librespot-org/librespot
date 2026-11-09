@@ -1,6 +1,7 @@
 use crate::config::VolumeCtrl;
 use librespot_core::Error;
 use std::sync::Arc;
+use tokio::sync::watch;
 
 pub mod mappings;
 use self::mappings::MappedCtrl;
@@ -17,6 +18,13 @@ pub trait Mixer: Send + Sync {
 
     fn get_soft_volume(&self) -> Box<dyn VolumeGetter + Send> {
         Box::new(NoOpVolume)
+    }
+
+    /// Changes to the volume made outside librespot, for a mixer that can see
+    /// them, such as another program setting the same control. The receiver
+    /// holds the latest volume; Spirc reports it to Spotify.
+    fn volume_changes(&self) -> Option<watch::Receiver<u16>> {
+        None
     }
 }
 
