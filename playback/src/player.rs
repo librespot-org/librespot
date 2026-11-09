@@ -42,6 +42,9 @@ use tokio::sync::{mpsc, oneshot};
 
 use crate::SAMPLES_PER_SECOND;
 
+#[cfg(test)]
+mod tests;
+
 const PRELOAD_NEXT_TRACK_BEFORE_END_DURATION_MS: u32 = 30000;
 pub const DB_VOLTAGE_RATIO: f64 = 20.0;
 pub const PCM_AT_0DBFS: f64 = 1.0;
@@ -1623,6 +1626,11 @@ impl Future for PlayerInternal {
             if (!self.state.is_playing()) && all_futures_completed_or_not_ready {
                 return Poll::Pending;
             }
+
+            // `mpsc::poll_recv` returns `Pending` once Tokio's cooperative budget
+            // is spent, even with commands queued. Yield as well; continuing to
+            // decode would hold back seeks and pauses until the end of the track.
+            std::task::ready!(tokio::task::coop::poll_proceed(cx)).made_progress();
         }
     }
 }
