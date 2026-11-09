@@ -240,6 +240,16 @@ impl Sink for RodioSink {
         Ok(())
     }
 
+    fn flush(&mut self) -> SinkResult<()> {
+        // `clear` drops the queued audio but also pauses; keep playing if we were.
+        let paused = self.rodio_sink.is_paused();
+        self.rodio_sink.clear();
+        if !paused {
+            self.rodio_sink.play();
+        }
+        Ok(())
+    }
+
     fn write(&mut self, packet: AudioPacket, converter: &mut Converter) -> SinkResult<()> {
         let samples = packet
             .samples()
