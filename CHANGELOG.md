@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - [connect] Picking a track in a list plays that track: an empty `track_uri` (or `track_uid`) sent next to the one that identifies the track is ignored, instead of failing to resolve and playing the first track of the context
+- [audio] A failed or stalled download no longer skips the track: `read` requests a range again when its download failed (as `fetch_blocking` already did), and a download that makes no progress counts as failed (#1593)
+- [audio] A range whose download failed is requested again from the file's next CDN URL rather than the same one
 
 ### Added
 
