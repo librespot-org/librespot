@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- [discovery] Report ZeroConf version 2.12.0 in `getInfo`; current Spotify clients sent `addUser` with an empty `blob` to devices reporting 2.9.0, so every discovery login failed
 - [connect] Picking a track in a list plays that track: an empty `track_uri` (or `track_uid`) sent next to the one that identifies the track is ignored, instead of failing to resolve and playing the first track of the context
 
 ### Added
