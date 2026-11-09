@@ -141,6 +141,10 @@ enum SpircCommand {
 
 const CONTEXT_FETCH_THRESHOLD: usize = 2;
 
+/// How many pending pages a load resolves at most to find the picked track, so a track that
+/// is not in the context at all cannot hold the load for long.
+const MAX_PAGES_FOR_PLAYING_TRACK: usize = 100;
+
 // delay to update volume after a certain amount of time, instead on each update request
 const VOLUME_UPDATE_DELAY: Duration = Duration::from_millis(500);
 // to reduce updates to remote, we group some request by waiting for a set amount of time
@@ -1394,6 +1398,14 @@ impl SpircTask {
         // tracks with uri and uid, so we merge the new context with the resolved/existing context
         self.connect_state.merge_context(page);
 
+        // only the first page of a context is loaded here, the others are resolved later in the
+        // main loop. A track picked further down a long context (Liked Songs, a big playlist) is
+        // not found yet and the load would fall back to the first track, so resolve the pending
+        // pages until it is loaded.
+        if let Some(ref playing_track) = cmd_options.playing_track {
+            self.resolve_pages_until_loaded(playing_track).await;
+        }
+
         // load here, so that we clear the queue only after we definitely retrieved a new context
         self.connect_state.clear_next_tracks();
         self.connect_state.clear_restrictions();
@@ -1464,6 +1476,40 @@ impl SpircTask {
         }
 
         Ok(())
+    }
+
+    /// Resolves the pending pages of the default context, one at a time, until
+    /// `playing_track` (by uri or uid) is part of it, at most [`MAX_PAGES_FOR_PLAYING_TRACK`]
+    /// pages. An index, a missing context or no pending page ends it at once; a failed page
+    /// is logged by [`Self::handle_next_context`] and ends it, so the load falls back as before.
+    async fn resolve_pages_until_loaded(&mut self, playing_track: &PlayingTrack) {
+        for _ in 0..MAX_PAGES_FOR_PLAYING_TRACK {
+            let Ok(ctx) = self.connect_state.get_context(ContextType::Default) else {
+                return;
+            };
+            let loaded = match playing_track {
+                PlayingTrack::Index(_) => return,
+                PlayingTrack::Uri(uri) => {
+                    ConnectState::find_index_in_context(ctx, |t| &t.uri == uri).is_ok()
+                }
+                PlayingTrack::Uid(uid) => {
+                    ConnectState::find_index_in_context(ctx, |t| &t.uid == uid).is_ok()
+                }
+            };
+            if loaded || !self.context_resolver.next_is_default_page() {
+                return;
+            }
+            debug!("playing track <{playing_track:?}> not loaded yet, resolving the next page");
+            let context = self.context_resolver.get_next_context(Vec::new).await;
+            let failed = context.is_err();
+            self.handle_next_context(context);
+            if failed {
+                return;
+            }
+        }
+        warn!(
+            "playing track <{playing_track:?}> not found in the first {MAX_PAGES_FOR_PLAYING_TRACK} pages"
+        );
     }
 
     async fn load_context_from_uri(
