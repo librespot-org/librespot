@@ -1,3 +1,5 @@
+use std::sync::{Arc, atomic::AtomicBool};
+
 use librespot::{
     connect::{ConnectConfig, LoadRequest, LoadRequestOptions, Spirc},
     core::{
@@ -59,8 +61,16 @@ async fn main() -> Result<(), Error> {
         move || sink_builder(None, audio_format),
     );
 
-    let (spirc, spirc_task) =
-        Spirc::new(connect_config, session.clone(), credentials, player, mixer).await?;
+    let was_playing = Arc::new(AtomicBool::new(false));
+    let (spirc, spirc_task) = Spirc::new(
+        connect_config,
+        session.clone(),
+        credentials,
+        player,
+        mixer,
+        was_playing,
+    )
+    .await?;
 
     // these calls can be seen as "queued"
     spirc.activate()?;

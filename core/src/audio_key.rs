@@ -20,6 +20,8 @@ pub enum AudioKeyError {
     Packet(u8),
     #[error("sequence {0} not pending")]
     Sequence(u32),
+    #[error("session is invalid")]
+    SessionInvalid,
     #[error("audio key response timeout")]
     Timeout,
 }
@@ -31,6 +33,7 @@ impl From<AudioKeyError> for Error {
             AudioKeyError::Channel => Error::aborted(err),
             AudioKeyError::Sequence(_) => Error::aborted(err),
             AudioKeyError::Packet(_) => Error::unimplemented(err),
+            AudioKeyError::SessionInvalid => Error::aborted(err),
             AudioKeyError::Timeout => Error::aborted(err),
         }
     }
@@ -79,6 +82,12 @@ impl AudioKeyManager {
     }
 
     pub async fn request(&self, track: SpotifyId, file: FileId) -> Result<AudioKey, Error> {
+        // Fast-fail if session is already invalid to avoid waiting for timeout
+        if self.session().is_invalid() {
+            error!("Audio key request rejected: session is invalid");
+            return Err(AudioKeyError::SessionInvalid.into());
+        }
+
         let (tx, rx) = oneshot::channel();
 
         let seq = self.lock(move |inner| {

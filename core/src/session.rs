@@ -276,7 +276,7 @@ impl Session {
                 error!("{e}");
                 if let Some(session) = session_weak.try_upgrade() {
                     if !session.is_invalid() {
-                        session.shutdown();
+                        session.shutdown("packet sender task failed");
                     }
                 }
             }
@@ -635,8 +635,8 @@ impl Session {
         SessionWeak(Arc::downgrade(&self.0))
     }
 
-    pub fn shutdown(&self) {
-        debug!("Shutdown: Invalidating session");
+    pub fn shutdown(&self, reason: &str) {
+        debug!("Shutdown: Invalidating session: {reason}");
         self.0.data.write().expect(SESSION_DATA_POISON_MSG).invalid = true;
         self.mercury().shutdown();
         self.channel().shutdown();
@@ -893,12 +893,12 @@ where
                 }
                 Poll::Ready(None) => {
                     warn!("Connection to server closed.");
-                    session.shutdown();
+                    session.shutdown("connection closed by server");
                     return Poll::Ready(Ok(()));
                 }
                 Poll::Ready(Some(Err(e))) => {
                     error!("Connection to server closed.");
-                    session.shutdown();
+                    session.shutdown("connection error");
                     return Poll::Ready(Err(e));
                 }
                 Poll::Pending => break,
@@ -927,7 +927,7 @@ where
             match this.keep_alive_state {
                 ExpectingPing | ExpectingPongAck => {
                     if !session.is_invalid() {
-                        session.shutdown();
+                        session.shutdown("keep-alive timeout");
                     }
                     // TODO: Optionally reconnect (with cached/last credentials?)
                     return Poll::Ready(Err(io::Error::new(
