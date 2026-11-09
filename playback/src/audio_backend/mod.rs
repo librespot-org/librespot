@@ -24,16 +24,16 @@ pub trait Open {
 }
 
 pub trait Sink {
-    /// Drop audio that has been written but not played yet. The player calls
-    /// this right before seeking, so audio from the old position is not heard
-    /// after the seek. Sinks that do not queue audio ahead can ignore it.
-    fn flush(&mut self) -> SinkResult<()> {
-        Ok(())
-    }
     fn start(&mut self) -> SinkResult<()> {
         Ok(())
     }
     fn stop(&mut self) -> SinkResult<()> {
+        Ok(())
+    }
+    /// Drop audio that has been written but not played yet. The player calls
+    /// this right before seeking, so audio from the old position is not heard
+    /// after the seek. Sinks that do not queue audio ahead can ignore it.
+    fn flush(&mut self) -> SinkResult<()> {
         Ok(())
     }
     fn write(&mut self, packet: AudioPacket, converter: &mut Converter) -> SinkResult<()>;
