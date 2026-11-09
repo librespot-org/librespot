@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- [playback] Add `Sink::flush`, which the player calls right before seeking so a sink can drop audio it has queued from the old position. The rodio sink implements it, so a seek no longer plays up to half a second of the old position first
 - [docs] Document Android NDK context initialization requirement for Rodio/CPAL audio backend
 - [core] Add `Cache::with_memory_credentials` to keep credentials in memory instead of a file, for applications that store them in their own protected store
 - [connect] Add method `add_to_queue` to `Spirc` to add tracks, episodes, albums and playlists to the queue

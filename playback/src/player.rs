@@ -42,6 +42,9 @@ use tokio::sync::{mpsc, oneshot};
 
 use crate::SAMPLES_PER_SECOND;
 
+#[cfg(test)]
+mod tests;
+
 const PRELOAD_NEXT_TRACK_BEFORE_END_DURATION_MS: u32 = 30000;
 pub const DB_VOLTAGE_RATIO: f64 = 20.0;
 pub const PCM_AT_0DBFS: f64 = 1.0;
@@ -2259,6 +2262,8 @@ impl PlayerInternal {
         }
 
         if let Some(decoder) = self.state.decoder() {
+            // Drop audio the sink still holds from the old position.
+            self.sink.flush().map_err(Error::unavailable)?;
             match decoder.seek(position_ms) {
                 Ok(new_position_ms) => {
                     if let PlayerState::Playing {
