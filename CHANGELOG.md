@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - [core] Reject an access-point handshake packet whose size is under four bytes or over 64 KiB, instead of panicking or allocating whatever size it names
+- [main] Keep the volume across a reconnect instead of resetting it to the initial volume
 - [core] Pass on dealer messages that carry plain JSON, such as collection updates, instead of dropping them with a base64 warning
 - [core] Fixed AP login on Windows on ARM by using the supported desktop platform identifier
 - [audio] Fixed integer overflow in throughput calculation
