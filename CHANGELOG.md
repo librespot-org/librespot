@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [discovery] Return an HTTP error response instead of panicking on malformed discovery login requests
 - [core] Corrected discovery retry uptime limit to be 1 minute instead of 1 second
 - [audio] Try the next CDN URL when a fetch returns a non-206 status instead of only retrying on transport errors, fixing playback failures when the first CDN URL is reachable but does not stream audio.
+- [playback] Fixed the Rodio backend panicking in the player thread when the output device cannot be opened (e.g. no sound card present); the device is now opened on the first `start()`, like the ALSA backend, and a failure is reported as a sink error
 
 ## [0.8.0] - 2025-11-10
 

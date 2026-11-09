@@ -45,6 +45,8 @@ pub enum RodioError {
     DevicesError(#[from] cpal::DevicesError),
     #[error("<RodioSink> {0}")]
     Samples(String),
+    #[error("<RodioSink> Not Connected")]
+    NotConnected,
 }
 
 impl From<RodioError> for SinkError {
@@ -55,6 +57,7 @@ impl From<RodioError> for SinkError {
             StreamError(_) | PlayError(_) | Samples(_) => SinkError::OnWrite(es),
             NoDeviceAvailable | DeviceNotAvailable(_) => SinkError::ConnectionRefused(es),
             DevicesError(_) => SinkError::InvalidParams(es),
+            NotConnected => SinkError::NotConnected(es),
         }
     }
 }
@@ -72,8 +75,12 @@ impl From<cpal::SupportedStreamConfigsError> for RodioError {
 }
 
 pub struct RodioSink {
-    rodio_sink: rodio::Sink,
-    _stream: rodio::OutputStream,
+    host: cpal::Host,
+    device: Option<String>,
+    format: AudioFormat,
+    // Created on the first `start()`, like the ALSA backend opens its device, so that a
+    // missing or unusable device is a sink error the player handles instead of a panic.
+    stream: Option<(rodio::Sink, rodio::OutputStream)>,
 }
 
 fn list_formats(device: &cpal::Device) {
@@ -144,17 +151,10 @@ fn list_outputs(host: &cpal::Host) -> Result<(), cpal::DevicesError> {
 
 fn create_sink(
     host: &cpal::Host,
-    device: Option<String>,
+    device: Option<&str>,
     format: AudioFormat,
 ) -> Result<(rodio::Sink, rodio::OutputStream), RodioError> {
-    let cpal_device = match device.as_deref() {
-        Some("?") => match list_outputs(host) {
-            Ok(()) => exit(0),
-            Err(e) => {
-                error!("{e}");
-                exit(1);
-            }
-        },
+    let cpal_device = match device {
         Some(device_name) => {
             // Ignore devices for which getting name fails, or format doesn't match
             host.output_devices()?
@@ -219,28 +219,49 @@ pub fn open(host: cpal::Host, device: Option<String>, format: AudioFormat) -> Ro
         host.id().name()
     );
 
-    let (sink, stream) = create_sink(&host, device, format).unwrap();
+    if device.as_deref() == Some("?") {
+        match list_outputs(&host) {
+            Ok(()) => exit(0),
+            Err(e) => {
+                error!("{e}");
+                exit(1);
+            }
+        }
+    }
 
-    debug!("Rodio sink was created");
     RodioSink {
-        rodio_sink: sink,
-        _stream: stream,
+        host,
+        device,
+        format,
+        stream: None,
     }
 }
 
 impl Sink for RodioSink {
     fn start(&mut self) -> SinkResult<()> {
-        self.rodio_sink.play();
+        if self.stream.is_none() {
+            let (sink, stream) = create_sink(&self.host, self.device.as_deref(), self.format)?;
+            debug!("Rodio sink was created");
+            self.stream = Some((sink, stream));
+        }
+
+        if let Some((sink, _)) = &self.stream {
+            sink.play();
+        }
         Ok(())
     }
 
     fn stop(&mut self) -> SinkResult<()> {
-        self.rodio_sink.sleep_until_end();
-        self.rodio_sink.pause();
+        if let Some((sink, _)) = &self.stream {
+            sink.sleep_until_end();
+            sink.pause();
+        }
         Ok(())
     }
 
     fn write(&mut self, packet: AudioPacket, converter: &mut Converter) -> SinkResult<()> {
+        let (rodio_sink, _) = self.stream.as_ref().ok_or(RodioError::NotConnected)?;
+
         let samples = packet
             .samples()
             .map_err(|e| RodioError::Samples(e.to_string()))?;
@@ -250,12 +271,12 @@ impl Sink for RodioSink {
             SAMPLE_RATE,
             samples_f32,
         );
-        self.rodio_sink.append(source);
+        rodio_sink.append(source);
 
         // Chunk sizes seem to be about 256 to 3000 ish items long.
         // Assuming they're on average 1628 then a half second buffer is:
         // 44100 elements --> about 27 chunks
-        while self.rodio_sink.len() > 26 {
+        while rodio_sink.len() > 26 {
             // sleep and wait for rodio to drain a bit
             thread::sleep(Duration::from_millis(10));
         }
@@ -266,4 +287,18 @@ impl Sink for RodioSink {
 impl RodioSink {
     #[allow(dead_code)]
     pub const NAME: &'static str = "rodio";
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Opening the sink must not panic on a host without an output device (a container
+    // without a sound card, a CI runner): the failure belongs to `start`, as a sink error.
+    #[test]
+    fn open_and_start_do_not_panic_without_an_output_device() {
+        let mut sink = open(cpal::default_host(), None, AudioFormat::S16);
+        let _ = sink.start();
+        assert!(sink.stop().is_ok());
+    }
 }
