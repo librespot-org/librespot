@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- [playback] Emit `PlayerEvent::Paused` before stopping the sink, as `PlayerEvent::Playing` is emitted before starting it, so a sink that takes time to stop no longer delays the event (#1835)
 - [connect] Picking a track in a list plays that track: an empty `track_uri` (or `track_uid`) sent next to the one that identifies the track is ignored, instead of failing to resolve and playing the first track of the context
 
 ### Added

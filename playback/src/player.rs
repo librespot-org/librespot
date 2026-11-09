@@ -42,6 +42,9 @@ use tokio::sync::{mpsc, oneshot};
 
 use crate::SAMPLES_PER_SECOND;
 
+#[cfg(test)]
+mod tests;
+
 const PRELOAD_NEXT_TRACK_BEFORE_END_DURATION_MS: u32 = 30000;
 pub const DB_VOLTAGE_RATIO: f64 = 20.0;
 pub const PCM_AT_0DBFS: f64 = 1.0;
@@ -1757,12 +1760,15 @@ impl PlayerInternal {
 
                 self.state.playing_to_paused();
 
-                self.ensure_sink_stopped(false);
+                // Report the pause before stopping the sink, as `handle_play`
+                // reports playing before starting it: a sink that takes time to
+                // stop must not delay the event.
                 self.send_event(PlayerEvent::Paused {
                     track_id,
                     play_request_id,
                     position_ms: stream_position_ms,
                 });
+                self.ensure_sink_stopped(false);
             }
             PlayerState::Loading {
                 ref mut start_playback,
