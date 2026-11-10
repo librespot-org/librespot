@@ -703,13 +703,23 @@ where
                         break
                     },
                     e = get_url() => e
-                }?;
+                };
 
-                match connect(&url, proxy.as_ref(), &shared).await {
+                // Failing to get the url (for example a token while the network is down) must
+                // not end this task, or nothing would reconnect the dealer anymore.
+                let result = match url {
+                    Ok(url) => connect(&url, proxy.as_ref(), &shared).await,
+                    Err(e) => Err(e),
+                };
+
+                match result {
                     Ok((s, r)) => tasks = (init_task(s), init_task(r)),
                     Err(e) => {
                         error!("Error while connecting: {e}");
-                        tokio::time::sleep(RECONNECT_INTERVAL).await;
+                        select! {
+                            () = shared.closed() => break,
+                            () = tokio::time::sleep(RECONNECT_INTERVAL) => (),
+                        }
                     }
                 }
             }
