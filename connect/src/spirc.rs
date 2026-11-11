@@ -1761,7 +1761,14 @@ impl SpircTask {
             self.add_autoplay_resolving_when_required();
             self.load_track(continue_playing, 0)
         } else {
-            info!("Not playing next track because there are no more tracks left in queue.");
+            // As Spotify's own clients do: rewind to the start of the context and
+            // stay loaded, paused, so play starts it again. Stopping unloads the
+            // track, which leaves play with nothing to resume.
+            info!("Reached the end of the queue; rewinding to its start, paused");
+            match self.connect_state.reset_playback_to_position(None) {
+                Ok(()) => return self.load_track(false, 0),
+                Err(why) => warn!("cannot rewind to the start of the context: {why}"),
+            }
             self.handle_stop();
             Ok(())
         }
@@ -1955,5 +1962,114 @@ impl SpircTask {
 impl Drop for SpircTask {
     fn drop(&mut self) {
         debug!("drop Spirc[{}]", self.spirc_id);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::playback::{
+        audio_backend::{Sink, SinkResult},
+        config::PlayerConfig,
+        convert::Converter,
+        decoder::AudioPacket,
+        mixer::MixerConfig,
+    };
+
+    const TRACKS: [&str; 3] = [
+        "spotify:track:4uLU6hMCjMI75M1A2tKUQC",
+        "spotify:track:6rqhFgbbKwnb9MLmUQDhG6",
+        "spotify:track:2gkzJU3hVJn9UziHtNYsZd",
+    ];
+
+    struct TestMixer;
+
+    impl Mixer for TestMixer {
+        fn open(_: MixerConfig) -> Result<Self, Error> {
+            Ok(Self)
+        }
+
+        fn volume(&self) -> u16 {
+            u16::MAX
+        }
+
+        fn set_volume(&self, _: u16) {}
+    }
+
+    struct TestSink;
+
+    impl Sink for TestSink {
+        fn write(&mut self, _: AudioPacket, _: &mut Converter) -> SinkResult<()> {
+            Ok(())
+        }
+    }
+
+    /// An active device playing the last track of a three-track context.
+    fn task_at_last_track() -> SpircTask {
+        let session = Session::new(Default::default(), None);
+        let mixer: Arc<dyn Mixer> = Arc::new(TestMixer);
+        let player = Player::new(
+            PlayerConfig::default(),
+            session.clone(),
+            mixer.get_soft_volume(),
+            || Box::new(TestSink),
+        );
+        let mut task = SpircTask {
+            player,
+            mixer,
+            connect_state: ConnectState::new(ConnectConfig::default(), &session),
+            connect_established: true,
+            play_request_id: None,
+            play_status: SpircPlayStatus::Playing {
+                nominal_start_time: 0,
+                preloading_of_next_track_triggered: false,
+            },
+            connection_id_update: futures_util::stream::pending().boxed(),
+            connect_state_update: futures_util::stream::pending().boxed(),
+            connect_state_volume_update: futures_util::stream::pending().boxed(),
+            connect_state_logout_request: futures_util::stream::pending().boxed(),
+            playlist_update: futures_util::stream::pending().boxed(),
+            session_update: futures_util::stream::pending().boxed(),
+            connect_state_command: futures_util::stream::pending().boxed(),
+            user_attributes_update: futures_util::stream::pending().boxed(),
+            user_attributes_mutation: futures_util::stream::pending().boxed(),
+            commands: None,
+            player_events: None,
+            context_resolver: ContextResolver::new(session.clone()),
+            emit_set_queue_events: false,
+            shutdown: false,
+            session,
+            transfer_state: None,
+            update_volume: false,
+            update_state: false,
+            spirc_id: 0,
+        };
+        task.connect_state.set_active(true);
+        task.load_context_from_tracks(TRACKS.map(String::from).to_vec())
+            .unwrap();
+        task.connect_state
+            .reset_playback_to_position(Some(TRACKS.len() - 1))
+            .unwrap();
+        task
+    }
+
+    fn current_uri(task: &SpircTask) -> String {
+        task.connect_state.current_track(|track| track.uri.clone())
+    }
+
+    #[tokio::test]
+    async fn end_of_queue_rewinds_to_the_first_track_paused() {
+        let mut task = task_at_last_track();
+        assert_eq!(current_uri(&task), TRACKS[2]);
+        assert!(!task.connect_state.has_next_tracks(None), "at the end");
+
+        task.handle_next(None).unwrap();
+
+        assert_eq!(current_uri(&task), TRACKS[0]);
+        assert!(matches!(
+            task.play_status,
+            SpircPlayStatus::LoadingPause { position_ms: 0 }
+        ));
+        assert!(task.connect_state.has_next_tracks(None), "queue refilled");
     }
 }
