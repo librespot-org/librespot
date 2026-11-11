@@ -208,7 +208,7 @@ impl Mixer for AlsaMixer {
             let raw_volume = simple_element
                 .get_playback_volume(SelemChannelId::mono())
                 .expect("Could not get raw Alsa volume");
-            raw_volume as f64 / self.range as f64 - self.min as f64
+            raw_to_mapped(raw_volume, self.min, self.range)
         } else {
             let db_volume = simple_element
                 .get_playback_vol_db(SelemChannelId::mono())
@@ -267,7 +267,7 @@ impl Mixer for AlsaMixer {
         }
 
         if self.is_softvol {
-            let scaled_volume = (self.min as f64 + mapped_volume * self.range as f64) as i64;
+            let scaled_volume = mapped_to_raw(mapped_volume, self.min, self.range);
             debug!("Setting Alsa raw volume to {}", scaled_volume);
             simple_element
                 .set_playback_volume_all(scaled_volume)
@@ -313,5 +313,52 @@ impl AlsaMixer {
 
     fn is_some_linear(&self) -> bool {
         self.is_softvol || self.use_linear_in_db
+    }
+}
+
+// Converts a raw Alsa volume in [min..min + range] to a value in [0.0..1.0].
+// This is the inverse of `mapped_to_raw`.
+fn raw_to_mapped(raw: i64, min: i64, range: i64) -> f64 {
+    if range == 0 {
+        return 0.0;
+    }
+    (raw - min) as f64 / range as f64
+}
+
+// Converts a value in [0.0..1.0] to a raw Alsa volume in [min..min + range].
+fn mapped_to_raw(mapped: f64, min: i64, range: i64) -> i64 {
+    (min as f64 + mapped * range as f64) as i64
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn raw_to_mapped_with_non_zero_min() {
+        // A control with raw volume range 10..110.
+        let min = 10;
+        let range = 100;
+
+        assert_eq!(raw_to_mapped(10, min, range), 0.0);
+        assert_eq!(raw_to_mapped(60, min, range), 0.5);
+        assert_eq!(raw_to_mapped(110, min, range), 1.0);
+    }
+
+    #[test]
+    fn raw_to_mapped_with_zero_range() {
+        assert_eq!(raw_to_mapped(10, 10, 0), 0.0);
+    }
+
+    #[test]
+    fn mapped_to_raw_and_back() {
+        // A control with raw volume range 10..110.
+        let min = 10;
+        let range = 100;
+
+        for mapped in [0.0, 0.25, 0.5, 0.75, 1.0] {
+            let raw = mapped_to_raw(mapped, min, range);
+            assert_eq!(raw_to_mapped(raw, min, range), mapped);
+        }
     }
 }
