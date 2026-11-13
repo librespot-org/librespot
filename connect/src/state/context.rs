@@ -20,6 +20,9 @@ use uuid::Uuid;
 
 const LOCAL_FILES_IDENTIFIER: &str = "spotify:local-files";
 const SEARCH_IDENTIFIER: &str = "spotify:search";
+/// The context of tracks played by their uris, as the Web API plays them;
+/// spotify uses it too, and it cannot be resolved.
+pub(crate) const WEB_API_IDENTIFIER: &str = "spotify:webapi";
 
 #[derive(Debug)]
 pub struct StateContext {
@@ -138,7 +141,7 @@ impl ConnectState {
     }
 
     pub fn valid_resolve_uri(uri: &str) -> Option<&str> {
-        if uri.is_empty() || uri.starts_with(SEARCH_IDENTIFIER) {
+        if uri.is_empty() || uri == WEB_API_IDENTIFIER || uri.starts_with(SEARCH_IDENTIFIER) {
             None
         } else {
             Some(uri)

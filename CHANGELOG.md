@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- [connect] A Web API play of track `uris` plays those tracks: Spotify sends them under the context uri `spotify:webapi`, which now counts as no context uri instead of failing to resolve
+- [connect] Autoplay after tracks played by their uris starts from the current track, instead of failing to resolve librespot's `spotify:web-api` placeholder, which is now `spotify:webapi`
 - [connect] Picking a track in a list plays that track: an empty `track_uri` (or `track_uid`) sent next to the one that identifies the track is ignored, instead of failing to resolve and playing the first track of the context
 
 ### Added

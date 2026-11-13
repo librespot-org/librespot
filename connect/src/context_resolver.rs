@@ -344,3 +344,21 @@ impl ContextResolver {
         true
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state::context::WEB_API_IDENTIFIER;
+
+    #[test]
+    fn autoplay_after_tracks_played_by_uri_starts_from_the_current_track() {
+        const TRACK: &str = "spotify:track:2gkzJU3hVJn9UziHtNYsZd";
+        let autoplay = ResolveContext::from_uri(
+            WEB_API_IDENTIFIER,
+            TRACK,
+            ContextType::Autoplay,
+            ContextAction::Replace,
+        );
+        assert_eq!(autoplay.resolve_uri(), Some(TRACK));
+    }
+}
