@@ -1095,7 +1095,7 @@ impl PlayerTrackLoader {
         loop {
             let encrypted_file = AudioFile::open(&self.session, file_id, bytes_per_second);
 
-            let encrypted_file = match encrypted_file.await {
+            let mut encrypted_file = match encrypted_file.await {
                 Ok(encrypted_file) => encrypted_file,
                 Err(e) => {
                     error!("Unable to load encrypted file: {e:?}");
@@ -1110,9 +1110,20 @@ impl PlayerTrackLoader {
             // Not all audio files are encrypted. If we can't get a key, try loading the track
             // without decryption. If the file was encrypted after all, the decoder will fail
             // parsing and bail out, so we should be safe from outputting ear-piercing noise.
+            //
+            // The decoder only bails out after reading the whole file, though. So when the
+            // first bytes already show that the file is encrypted, give up right away rather
+            // than downloading it all for nothing.
             let key = match self.session.audio_key().request(track_id, file_id).await {
                 Ok(key) => Some(key),
                 Err(e) => {
+                    if is_encrypted(&mut encrypted_file, format) {
+                        error!(
+                            "Unable to play <{}>: no audio key ({e}) and the file is encrypted",
+                            audio_item.name
+                        );
+                        return None;
+                    }
                     warn!("Unable to load key, continuing without decryption: {e}");
                     None
                 }
@@ -2707,5 +2718,104 @@ where
 
     fn byte_len(&self) -> Option<u64> {
         Some(self.length)
+    }
+}
+
+/// Whether `head`, the first bytes of an audio file, rule out an unencrypted file of `format`.
+///
+/// Returns `false` when the format has no known signature or `head` is too short to tell,
+/// so that the caller falls back to trying the file without decryption.
+fn head_is_encrypted(format: AudioFileFormat, head: &[u8]) -> bool {
+    if AudioFiles::is_ogg_vorbis(format) {
+        // Spotify's Ogg files start with an Ogg page holding its own header.
+        head.len() >= 4 && !head.starts_with(b"OggS")
+    } else if AudioFiles::is_mp3(format) {
+        // Either an ID3v2 tag or an MPEG frame sync.
+        let id3 = head.starts_with(b"ID3");
+        let frame_sync = head.len() >= 2 && head[0] == 0xff && head[1] & 0xe0 == 0xe0;
+        head.len() >= 3 && !id3 && !frame_sync
+    } else if AudioFiles::is_flac(format) {
+        head.len() >= 4 && !head.starts_with(b"fLaC")
+    } else {
+        false
+    }
+}
+
+/// Reads the first bytes of `file` and checks them with [`head_is_encrypted`].
+///
+/// Leaves `file` at the start. Any read error counts as "can't tell" and returns `false`.
+fn is_encrypted<T: Read + Seek>(file: &mut T, format: AudioFileFormat) -> bool {
+    let mut head = [0u8; 4];
+    let read = file
+        .seek(SeekFrom::Start(0))
+        .and_then(|_| file.read_exact(&mut head))
+        .is_ok();
+    let encrypted = read && head_is_encrypted(format, &head);
+
+    if file.seek(SeekFrom::Start(0)).is_err() {
+        // Can't rewind, so let the decoder deal with it as before.
+        return false;
+    }
+
+    encrypted
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    const OGG: AudioFileFormat = AudioFileFormat::OGG_VORBIS_160;
+    const MP3: AudioFileFormat = AudioFileFormat::MP3_320;
+    const FLAC: AudioFileFormat = AudioFileFormat::FLAC_FLAC;
+
+    // First bytes of real files whose audio key Spotify refused.
+    const CIPHERTEXT: [&[u8]; 3] = [
+        &[0x39, 0x3b, 0xbd, 0x46],
+        &[0x81, 0xba, 0xd7, 0x43],
+        &[0x7f, 0x47, 0x2c, 0xf1],
+    ];
+
+    #[test]
+    fn plain_headers_are_not_encrypted() {
+        assert!(!head_is_encrypted(OGG, b"OggS"));
+        assert!(!head_is_encrypted(MP3, b"ID3\x04"));
+        assert!(!head_is_encrypted(MP3, &[0xff, 0xfb, 0x90, 0x00]));
+        assert!(!head_is_encrypted(FLAC, b"fLaC"));
+    }
+
+    #[test]
+    fn ciphertext_is_encrypted() {
+        for head in CIPHERTEXT {
+            assert!(head_is_encrypted(OGG, head));
+            assert!(head_is_encrypted(MP3, head));
+            assert!(head_is_encrypted(FLAC, head));
+        }
+    }
+
+    #[test]
+    fn unknown_or_short_input_falls_back() {
+        assert!(!head_is_encrypted(AudioFileFormat::AAC_160, CIPHERTEXT[0]));
+        assert!(!head_is_encrypted(OGG, b"Og"));
+        assert!(!head_is_encrypted(MP3, b""));
+    }
+
+    #[test]
+    fn is_encrypted_rewinds() {
+        let mut file = Cursor::new(b"OggS rest of file".to_vec());
+        file.set_position(7);
+        assert!(!is_encrypted(&mut file, OGG));
+        assert_eq!(file.position(), 0);
+
+        let mut file = Cursor::new(CIPHERTEXT[0].to_vec());
+        assert!(is_encrypted(&mut file, OGG));
+        assert_eq!(file.position(), 0);
+    }
+
+    #[test]
+    fn is_encrypted_falls_back_on_short_file() {
+        let mut file = Cursor::new(b"Og".to_vec());
+        assert!(!is_encrypted(&mut file, OGG));
+        assert_eq!(file.position(), 0);
     }
 }
