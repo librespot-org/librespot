@@ -27,7 +27,7 @@ use crate::{
         user_attributes::UserAttributesMutation,
     },
     state::{
-        context::{ContextType, ResetContext},
+        context::{ContextType, ResetContext, WEB_API_IDENTIFIER},
         provider::IsProvider,
         {ConnectConfig, ConnectState},
     },
@@ -1096,19 +1096,8 @@ impl SpircTask {
                     self.handle_activate()
                 }
 
-                let context = match play.context.uri {
-                    Some(s) => PlayContext::Uri(s),
-                    None if !play.context.pages.is_empty() => PlayContext::Tracks(
-                        play.context
-                            .pages
-                            .iter()
-                            .cloned()
-                            .flat_map(|p| p.tracks)
-                            .flat_map(|t| t.uri)
-                            .collect(),
-                    ),
-                    None => Err(SpircError::NoUri("context"))?,
-                };
+                let context = PlayContext::try_from(&play.context)
+                    .map_err(|()| SpircError::NoUri("context"))?;
 
                 let context_options = play
                     .options
@@ -1515,11 +1504,10 @@ impl SpircTask {
     }
 
     fn load_context_from_tracks(&mut self, tracks: impl Into<ContextPage>) -> Result<(), Error> {
-        const WEB_API_URI: &str = "spotify:web-api";
         let ctx = Context {
             // by providing values for uri/url the player in the official client's isn't frozen
-            uri: Some(WEB_API_URI.into()),
-            url: Some(format!("context://{WEB_API_URI}")),
+            uri: Some(WEB_API_IDENTIFIER.into()),
+            url: Some(format!("context://{WEB_API_IDENTIFIER}")),
             pages: vec![tracks.into()],
             ..Default::default()
         };
