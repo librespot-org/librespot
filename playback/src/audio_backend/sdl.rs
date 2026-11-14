@@ -82,6 +82,15 @@ impl Sink for SdlSink {
         Ok(())
     }
 
+    fn clear(&mut self) -> SinkResult<()> {
+        match self {
+            Self::F32(queue) => queue.clear(),
+            Self::S32(queue) => queue.clear(),
+            Self::S16(queue) => queue.clear(),
+        }
+        Ok(())
+    }
+
     fn write(&mut self, packet: AudioPacket, converter: &mut Converter) -> SinkResult<()> {
         macro_rules! drain_sink {
             ($queue: expr, $size: expr) => {{

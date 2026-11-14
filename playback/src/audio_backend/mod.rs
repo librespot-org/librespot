@@ -30,6 +30,13 @@ pub trait Sink {
     fn stop(&mut self) -> SinkResult<()> {
         Ok(())
     }
+    /// Drop audio that has been written but not played yet, and keep playing
+    /// what is written next. The player calls this right after a seek, and
+    /// only while the sink is started, so audio from the old position is not
+    /// heard after the seek. Sinks that do not queue audio ahead can ignore it.
+    fn clear(&mut self) -> SinkResult<()> {
+        Ok(())
+    }
     fn write(&mut self, packet: AudioPacket, converter: &mut Converter) -> SinkResult<()>;
 }
 
