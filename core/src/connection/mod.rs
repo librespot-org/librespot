@@ -62,8 +62,11 @@ impl From<APLoginFailed> for AuthenticationError {
     }
 }
 
+/// How long the server may take to accept a connection and finish the handshake,
+/// and to answer the login.
+const TIMEOUT: Duration = Duration::from_secs(5);
+
 pub async fn connect(host: &str, port: u16, proxy: Option<&Url>) -> io::Result<Transport> {
-    const TIMEOUT: Duration = Duration::from_secs(5);
     tokio::time::timeout(TIMEOUT, {
         let socket = crate::socket::connect(host, port, proxy).await?;
         debug!("Connection to AP established.");
@@ -164,9 +167,9 @@ pub async fn authenticate(
 
     debug!("Authenticating with AP using {:?}", credentials.auth_type);
     transport.send((cmd as u8, data)).await?;
-    let (cmd, data) = transport
-        .next()
+    let (cmd, data) = tokio::time::timeout(TIMEOUT, transport.next())
         .await
+        .map_err(Error::deadline_exceeded)?
         .ok_or(AuthenticationError::Transport)??;
     let packet_type = FromPrimitive::from_u8(cmd);
     let result = match packet_type {
@@ -191,4 +194,36 @@ pub async fn authenticate(
         }
     };
     Ok(result?)
+}
+
+#[cfg(test)]
+mod tests {
+    use tokio::net::TcpListener;
+
+    use super::*;
+    use crate::error::ErrorKind;
+
+    #[tokio::test(start_paused = true)]
+    async fn a_login_without_an_answer_times_out() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("a port");
+        let address = listener.local_addr().expect("an address");
+        let client = TcpStream::connect(address).await.expect("a connection");
+        // the server accepts and stays silent
+        let _server = listener.accept().await.expect("an accepted connection");
+        let mut transport = Framed::new(client, ApCodec::new(&[1; 32], &[2; 32]));
+
+        let login = authenticate(
+            &mut transport,
+            Credentials::with_password("user", "password"),
+            "device",
+        );
+        let result = tokio::time::timeout(Duration::from_secs(60), login)
+            .await
+            .expect("the login ended");
+
+        assert_eq!(
+            result.expect_err("no answer came").kind,
+            ErrorKind::DeadlineExceeded
+        );
+    }
 }
