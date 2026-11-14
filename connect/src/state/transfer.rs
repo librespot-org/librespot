@@ -138,9 +138,12 @@ impl ConnectState {
         let ctx = self.get_context(self.active_context)?;
 
         let current_index = match transfer.current_session.current_uid.as_ref() {
-            Some(uid) if track.is_queue() => Self::find_index_in_context(ctx, |c| &c.uid == uid)
-                .map(|i| if i > 0 { i - 1 } else { i }),
-            _ => Self::find_index_in_context(ctx, |c| c.uri == track.uri || c.uid == track.uid),
+            // a queued track plays before the context's track with that uid
+            Some(uid) if track.is_queue() => {
+                Self::find_index_in_context(ctx, |c| &c.uid == uid).map(|i| i.checked_sub(1))
+            }
+            _ => Self::find_index_in_context(ctx, |c| c.uri == track.uri || c.uid == track.uid)
+                .map(Some),
         };
 
         debug!(
@@ -154,9 +157,11 @@ impl ConnectState {
             self.set_track(track.clone());
         }
 
-        let current_index = current_index.ok();
-        if let Some(current_index) = current_index {
-            self.update_current_index(|i| i.track = current_index as u32);
+        let current_index = current_index.ok().flatten();
+        match current_index {
+            Some(current_index) => self.update_current_index(|i| i.track = current_index as u32),
+            // as for a queued track, the context has no index for a track outside it
+            None => self.player_mut().index.clear(),
         }
 
         debug!(
@@ -183,7 +188,9 @@ impl ConnectState {
         }
 
         let set_up = if self.shuffling_context() {
-            self.set_current_track(current_index.unwrap_or_default())
+            // the shuffle leaves the context's track at the index out of the next ones
+            current_index
+                .map_or(Ok(()), |index| self.set_current_track(index))
                 .and_then(|()| {
                     self.set_shuffle(true);
 
@@ -192,12 +199,19 @@ impl ConnectState {
                         Some(state) => self.shuffle_restore(state),
                     }
                 })
-        } else {
+        } else if current_index.is_some() {
             self.reset_playback_to_position(current_index)
+        } else {
+            // the context follows a track outside it from its start
+            self.clear_prev_track();
+            self.clear_next_tracks();
+            self.update_context_index(self.active_context, 0)
+                .map_err(Into::into)
+                .and_then(|()| self.fill_up_next_tracks())
         };
 
-        // setting up makes the context's track at the index current, but the
-        // transferred track plays already, and a queued or autoplay one isn't in it
+        // setting up from an index makes the context's track there current, but the
+        // transferred track plays already, as a queued one does after that track
         if self.current_track(|t| t.uri != track.uri) {
             self.set_track(track);
         }

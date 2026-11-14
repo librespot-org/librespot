@@ -2021,6 +2021,7 @@ mod tests {
     fn context_track(uri: &str) -> ContextTrack {
         ContextTrack {
             uri: Some(uri.into()),
+            uid: Some(format!("uid-{uri}")),
             ..Default::default()
         }
     }
@@ -2044,6 +2045,11 @@ mod tests {
 
     fn current_uri(task: &SpircTask) -> String {
         task.connect_state.current_track(|t| t.uri.clone())
+    }
+
+    fn next_uris(task: &SpircTask) -> Vec<&str> {
+        let next = &task.connect_state.player().next_tracks;
+        next.iter().map(|t| t.uri.as_str()).collect()
     }
 
     #[tokio::test]
@@ -2071,6 +2077,7 @@ mod tests {
             current,
             "the state shows the track heard"
         );
+        assert_eq!(next_uris(&task), TRACKS, "the tracks follow from the first");
     }
 
     #[tokio::test]
@@ -2087,6 +2094,25 @@ mod tests {
 
         assert!(task.connect_state.shuffling_context());
         assert_eq!(current_uri(&task), queued);
+        let next = next_uris(&task);
+        assert!(next.len() == TRACKS.len() && TRACKS.iter().all(|t| next.contains(t)));
+    }
+
+    #[tokio::test]
+    async fn a_track_queued_before_the_first_one_leaves_it_next() {
+        let mut task = task();
+        let queued = "spotify:local:Artist:Album:Queued:180";
+        let mut transfer = web_api_transfer(context_track(queued));
+        // the context track the queue plays before
+        transfer.current_session.mut_or_insert_default().current_uid = context_track(TRACKS[0]).uid;
+        let queue = transfer.queue.mut_or_insert_default();
+        queue.tracks = vec![context_track(queued)];
+        queue.is_playing_queue = Some(true);
+
+        task.handle_transfer(transfer).unwrap();
+
+        assert_eq!(current_uri(&task), queued);
+        assert_eq!(next_uris(&task), TRACKS);
     }
 
     #[tokio::test]
@@ -2113,8 +2139,9 @@ mod tests {
         assert!(task.handle_next_context(Ok(autoplay)));
         assert!(task.transfer_state.is_none());
         assert_eq!(current_uri(&task), current);
+        assert_eq!(next_uris(&task), TRACKS);
         let next = &task.connect_state.player().next_tracks;
-        assert!(!next.is_empty() && next.iter().all(IsProvider::is_autoplay));
+        assert!(next.iter().all(IsProvider::is_autoplay));
     }
 
     #[tokio::test]
