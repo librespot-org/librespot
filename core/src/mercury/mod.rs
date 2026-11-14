@@ -25,6 +25,8 @@ component! {
         pending: HashMap<Vec<u8>, MercuryPending> = HashMap::new(),
         subscriptions: Vec<(String, mpsc::UnboundedSender<MercuryResponse>)> = Vec::new(),
         invalid: bool = false,
+        // Counts the closed connections, which numbers the open one.
+        lost_connections: u32 = 0,
     }
 }
 
@@ -54,6 +56,14 @@ impl MercuryManager {
     }
 
     fn request(&self, req: MercuryRequest) -> Result<MercuryFuture<MercuryResponse>, Error> {
+        Ok(self.request_on_connection(req)?.1)
+    }
+
+    /// Like `request`, and also numbers the connection that carries it.
+    fn request_on_connection(
+        &self,
+        req: MercuryRequest,
+    ) -> Result<(u32, MercuryFuture<MercuryResponse>), Error> {
         let (tx, rx) = oneshot::channel();
 
         let pending = MercuryPending {
@@ -63,17 +73,18 @@ impl MercuryManager {
         };
 
         let seq = self.next_seq();
-        self.lock(|inner| {
+        let connection = self.lock(|inner| {
             if !inner.invalid {
                 inner.pending.insert(seq.clone(), pending);
             }
+            inner.lost_connections
         });
 
         let cmd = req.method.command();
         let data = req.encode(&seq)?;
 
         self.session().send_packet(cmd, data)?;
-        Ok(MercuryFuture { receiver: rx })
+        Ok((connection, MercuryFuture { receiver: rx }))
     }
 
     pub fn get<T: Into<String>>(&self, uri: T) -> Result<MercuryFuture<MercuryResponse>, Error> {
@@ -108,7 +119,7 @@ impl MercuryManager {
     ) -> impl Future<Output = Result<mpsc::UnboundedReceiver<MercuryResponse>, Error>> + 'static
     {
         let uri = uri.into();
-        let request = self.request(MercuryRequest {
+        let request = self.request_on_connection(MercuryRequest {
             method: MercuryMethod::Sub,
             uri: uri.clone(),
             content_type: None,
@@ -117,12 +128,14 @@ impl MercuryManager {
 
         let manager = self.clone();
         async move {
-            let response = request?.await?;
+            let (connection, request) = request?;
+            let response = request.await?;
 
             let (tx, rx) = mpsc::unbounded_channel();
 
             manager.lock(move |inner| {
-                if !inner.invalid {
+                // the server forgot the subscription if its connection closed since
+                if !inner.invalid && inner.lost_connections == connection {
                     debug!("subscribed uri={} count={}", uri, response.payload.len());
                     if !response.payload.is_empty() {
                         // Old subscription protocol, watch the provided list of URIs
@@ -300,12 +313,50 @@ impl MercuryManager {
         self.connection_lost();
     }
 
-    /// Ends the requests and subscriptions of a closed connection, which the server forgets.
+    /// Ends the requests, subscriptions and listeners of a closed connection, as a
+    /// shutdown does, so that their callers can make them again on the new one.
     pub(crate) fn connection_lost(&self) {
         self.lock(|inner| {
+            inner.lost_connections = inner.lost_connections.wrapping_add(1);
             // destroy the sending halves of the channels to signal everyone who is waiting for something.
             inner.pending.clear();
             inner.subscriptions.clear();
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tokio::sync::mpsc::error::TryRecvError;
+
+    use super::*;
+    use crate::Session;
+
+    #[tokio::test]
+    async fn a_subscription_answered_on_a_closed_connection_ends() {
+        let (session, mut packets) = Session::with_test_connection();
+        let mercury = session.mercury();
+        let subscription = mercury.subscribe("hm://test/");
+        let (cmd, request) = packets.recv().await.expect("a subscribe request");
+        assert_eq!(cmd, PacketType::MercurySub as u8);
+        let seq_len = BigEndian::read_u16(&request) as usize;
+        let seq = &request[2..2 + seq_len];
+
+        // the server answers, then closes the connection before the subscriber runs
+        let reply = MercuryRequest {
+            method: MercuryMethod::Sub,
+            uri: "hm://test/".to_string(),
+            content_type: None,
+            payload: Vec::new(),
+        }
+        .encode(seq)
+        .expect("a reply");
+        mercury
+            .dispatch(PacketType::MercurySub, reply.into())
+            .expect("the request is pending");
+        mercury.connection_lost();
+
+        let mut events = subscription.await.expect("the server answered");
+        assert_eq!(events.try_recv().unwrap_err(), TryRecvError::Disconnected);
     }
 }

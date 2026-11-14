@@ -30,7 +30,7 @@ use crate::{
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
 use futures_core::TryStream;
-use futures_util::{SinkExt, StreamExt};
+use futures_util::StreamExt;
 use librespot_protocol::authentication::AuthenticationType;
 use num_traits::FromPrimitive;
 use pin_project_lite::pin_project;
@@ -40,6 +40,7 @@ use tokio::{
     sync::mpsc,
     time::{Duration as TokioDuration, Instant as TokioInstant, Sleep, sleep},
 };
+use tokio_stream::wrappers::UnboundedReceiverStream;
 use uuid::Uuid;
 
 const SESSION_DATA_POISON_MSG: &str = "session data rwlock should not be poisoned";
@@ -123,9 +124,10 @@ struct SessionInternal {
 /// this structs interface directly or hand it to a
 /// `Player`.
 ///
-/// When the server closes the access-point connection, the session logs in again
-/// on a new one and stays valid. It is only invalidated when that fails, and
-/// [Session] instances cannot be reused once invalidated: create a new one.
+/// When the access-point connection is lost, the session logs in again on a new
+/// one and stays valid. If that fails, or the connection keeps closing right after
+/// it opens, the session is invalidated, and an invalidated [Session] cannot be
+/// reused: create a new one.
 #[derive(Clone)]
 pub struct Session(Arc<SessionInternal>);
 
@@ -208,9 +210,8 @@ impl Session {
         credentials: Credentials,
         store_credentials: bool,
     ) -> Result<(), Error> {
-        let (reusable_credentials, transport) = self
-            .connect_to_access_point(credentials, store_credentials)
-            .await?;
+        let (reusable_credentials, transport) = self.connect_to_access_point(credentials).await?;
+        self.logged_in(&reusable_credentials, store_credentials);
 
         // This channel serves as a buffer for packets and serializes access to the TcpStream, such
         // that `self.send_packet` can return immediately and needs no additional synchronization.
@@ -235,16 +236,15 @@ impl Session {
     async fn connect_to_access_point(
         &self,
         credentials: Credentials,
-        store_credentials: bool,
     ) -> Result<(Credentials, Transport), Error> {
         // There currently happen to be 6 APs but anything will do to avoid an infinite loop.
         const MAX_AP_TRIES: u8 = 6;
         let mut num_ap_tries = 0;
-        let (reusable_credentials, transport) = loop {
+        loop {
             let ap = self.apresolver().resolve("accesspoint").await?;
             info!("Connecting to AP \"{}:{}\"", ap.0, ap.1);
             match self.connect_inner(&ap, credentials.clone()).await {
-                Ok(ct) => break ct,
+                Ok(ct) => return Ok(ct),
                 Err(e) => {
                     num_ap_tries += 1;
                     if MAX_AP_TRIES == num_ap_tries {
@@ -266,8 +266,10 @@ impl Session {
                     }
                 }
             }
-        };
+        }
+    }
 
+    fn logged_in(&self, reusable_credentials: &Credentials, store_credentials: bool) {
         let username = reusable_credentials
             .username
             .as_ref()
@@ -279,15 +281,13 @@ impl Session {
             if store_credentials {
                 let cred_changed = cache
                     .credentials()
-                    .map(|c| c != reusable_credentials)
+                    .map(|c| c != *reusable_credentials)
                     .unwrap_or(true);
                 if cred_changed {
-                    cache.save_credentials(&reusable_credentials);
+                    cache.save_credentials(reusable_credentials);
                 }
             }
         }
-
-        Ok((reusable_credentials, transport))
     }
 
     pub fn apresolver(&self) -> &ApResolver {
@@ -643,6 +643,7 @@ impl Session {
         self.0.data.write().expect(SESSION_DATA_POISON_MSG).invalid = true;
         self.mercury().shutdown();
         self.channel().shutdown();
+        self.audio_key().shutdown();
     }
 
     pub fn is_invalid(&self) -> bool {
@@ -670,37 +671,37 @@ impl Drop for SessionInternal {
     }
 }
 
-/// A connection that closes sooner is not reconnected in place, so a server that
-/// keeps closing new connections cannot cause a reconnect loop.
+/// A connection that closes within this time of connecting invalidates the
+/// session instead of reconnecting, so reconnects are at least this far apart.
 const MIN_LIFETIME_TO_RECONNECT: TokioDuration = TokioDuration::from_secs(30);
 
+/// Bounds a reconnect as a whole, including looking up access points over HTTP,
+/// so a session does not stay valid for long without a connection.
+const RECONNECT_TIMEOUT: TokioDuration = TokioDuration::from_secs(30);
+
 /// Carries the session's packets over its access-point connection. When the
-/// server closes the connection, this logs in again on a new one, so whatever
-/// runs on the session (the dealer, Connect, playback) is unaffected. Only a
-/// failed reconnect invalidates the session.
+/// connection is lost (the server closes it, a write fails or the keep-alive times
+/// out), this logs in again on a new one and the session stays valid: the dealer,
+/// Connect and playback carry on. The session is invalidated when that fails.
 async fn run_connection(
-    session: SessionWeak,
+    session_weak: SessionWeak,
     mut transport: Transport,
-    mut packets: mpsc::UnboundedReceiver<(u8, Vec<u8>)>,
+    packets: mpsc::UnboundedReceiver<(u8, Vec<u8>)>,
     mut credentials: Credentials,
     store_credentials: bool,
 ) {
+    let mut packets = UnboundedReceiverStream::new(packets);
     loop {
         let connected_at = TokioInstant::now();
-        let (mut sink, stream) = transport.split();
-        let send = async {
-            while let Some(packet) = packets.recv().await {
-                sink.send(packet).await?;
-            }
-            // every sender is gone with the session
-            Ok(())
-        };
+        let (sink, stream) = transport.split();
+        // The connection closes when select! drops these futures, before any reconnect.
         let lost = tokio::select! {
-            result = DispatchTask::new(session.clone(), stream) => result,
-            result = send => result,
+            result = DispatchTask::new(session_weak.clone(), stream) => result,
+            // ends without error once every sender is gone with the session
+            result = packets.by_ref().map(Ok).forward(sink) => result,
         };
 
-        let (Err(error), Some(session)) = (lost, session.try_upgrade()) else {
+        let (Err(error), Some(session)) = (lost, session_weak.try_upgrade()) else {
             return;
         };
         if session.is_invalid() {
@@ -713,17 +714,23 @@ async fn run_connection(
         }
 
         warn!("Connection to server closed ({error}); reconnecting");
-        // the server forgets what it was asked on the closed connection
         session.mercury().connection_lost();
         session.channel().connection_lost();
-        match session
-            .connect_to_access_point(credentials.clone(), store_credentials)
-            .await
-        {
+        session.audio_key().connection_lost();
+        let reconnect = tokio::time::timeout(
+            RECONNECT_TIMEOUT,
+            session.connect_to_access_point(credentials.clone()),
+        )
+        .await
+        .unwrap_or_else(|elapsed| Err(Error::deadline_exceeded(elapsed)));
+        match reconnect {
+            // shut down while reconnecting
+            Ok(_) if session.is_invalid() => return,
             Ok((reusable_credentials, new_transport)) => {
+                session.logged_in(&reusable_credentials, store_credentials);
                 credentials = reusable_credentials;
                 transport = new_transport;
-                session.audio_key().resend_pending();
+                session.audio_key().reconnected();
             }
             Err(e) => {
                 error!("Reconnecting to server failed: {e}");
@@ -731,6 +738,21 @@ async fn run_connection(
                 return;
             }
         }
+    }
+}
+
+#[cfg(test)]
+impl Session {
+    /// A session whose packets go to the returned receiver instead of to a server.
+    pub(crate) fn with_test_connection() -> (Self, mpsc::UnboundedReceiver<(u8, Vec<u8>)>) {
+        let session = Self::new(SessionConfig::default(), None);
+        let (tx_connection, rx_connection) = mpsc::unbounded_channel();
+        session
+            .0
+            .tx_connection
+            .set(tx_connection)
+            .expect("a new session has no connection");
+        (session, rx_connection)
     }
 }
 
