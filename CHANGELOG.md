@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- [playback] Player commands such as seeks and pauses, and preloading of the next track, are no longer held back until the end of the track once Tokio's cooperative scheduling budget runs out, which happened after 128 commands in one uninterrupted stretch of playback
 - [connect] Picking a track in a list plays that track: an empty `track_uri` (or `track_uid`) sent next to the one that identifies the track is ignored, instead of failing to resolve and playing the first track of the context
 
 ### Added
