@@ -119,7 +119,7 @@ vergen-gitcl = { version = "1.0.8", default-features = false, features = [
 vergen = "=9.0.6"
 
 [dev-dependencies]
-tokio = { version = "1", features = ["macros"] }
+tokio = { version = "1", features = ["macros", "test-util"] }
 
 [lints]
 workspace = true
