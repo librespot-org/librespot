@@ -39,8 +39,14 @@ impl From<AudioKeyError> for Error {
 component! {
     AudioKeyManager : AudioKeyManagerInner {
         sequence: SeqGenerator<u32> = SeqGenerator::new(0),
-        pending: HashMap<u32, oneshot::Sender<Result<AudioKey, Error>>> = HashMap::new(),
+        pending: HashMap<u32, PendingKey> = HashMap::new(),
     }
+}
+
+struct PendingKey {
+    track: SpotifyId,
+    file: FileId,
+    sender: oneshot::Sender<Result<AudioKey, Error>>,
 }
 
 impl AudioKeyManager {
@@ -49,7 +55,8 @@ impl AudioKeyManager {
 
         let sender = self
             .lock(|inner| inner.pending.remove(&seq))
-            .ok_or(AudioKeyError::Sequence(seq))?;
+            .ok_or(AudioKeyError::Sequence(seq))?
+            .sender;
 
         match cmd {
             PacketType::AesKey => {
@@ -83,7 +90,12 @@ impl AudioKeyManager {
 
         let seq = self.lock(move |inner| {
             let seq = inner.sequence.get();
-            inner.pending.insert(seq, tx);
+            let key = PendingKey {
+                track,
+                file,
+                sender: tx,
+            };
+            inner.pending.insert(seq, key);
             seq
         });
 
@@ -92,9 +104,27 @@ impl AudioKeyManager {
         match tokio::time::timeout(KEY_RESPONSE_TIMEOUT, rx).await {
             Err(_) => {
                 error!("Audio key response timeout");
+                self.lock(|inner| inner.pending.remove(&seq));
                 Err(AudioKeyError::Timeout.into())
             }
             Ok(k) => k?,
+        }
+    }
+
+    /// Requests the pending keys again on a new connection: the closed one lost
+    /// their requests or their replies.
+    pub(crate) fn resend_pending(&self) {
+        let requests: Vec<_> = self.lock(|inner| {
+            inner
+                .pending
+                .iter()
+                .map(|(&seq, key)| (seq, key.track, key.file))
+                .collect()
+        });
+        for (seq, track, file) in requests {
+            if let Err(e) = self.send_key_request(seq, track, file) {
+                warn!("Unable to request audio key again: {e}");
+            }
         }
     }
 

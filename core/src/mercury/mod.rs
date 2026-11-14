@@ -296,8 +296,13 @@ impl MercuryManager {
     }
 
     pub(crate) fn shutdown(&self) {
+        self.lock(|inner| inner.invalid = true);
+        self.connection_lost();
+    }
+
+    /// Ends the requests and subscriptions of a closed connection, which the server forgets.
+    pub(crate) fn connection_lost(&self) {
         self.lock(|inner| {
-            inner.invalid = true;
             // destroy the sending halves of the channels to signal everyone who is waiting for something.
             inner.pending.clear();
             inner.subscriptions.clear();

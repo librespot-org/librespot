@@ -30,7 +30,7 @@ use crate::{
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
 use futures_core::TryStream;
-use futures_util::StreamExt;
+use futures_util::{SinkExt, StreamExt};
 use librespot_protocol::authentication::AuthenticationType;
 use num_traits::FromPrimitive;
 use pin_project_lite::pin_project;
@@ -40,7 +40,6 @@ use tokio::{
     sync::mpsc,
     time::{Duration as TokioDuration, Instant as TokioInstant, Sleep, sleep},
 };
-use tokio_stream::wrappers::UnboundedReceiverStream;
 use uuid::Uuid;
 
 const SESSION_DATA_POISON_MSG: &str = "session data rwlock should not be poisoned";
@@ -124,8 +123,9 @@ struct SessionInternal {
 /// this structs interface directly or hand it to a
 /// `Player`.
 ///
-/// *Note*: [Session] instances cannot yet be reused once invalidated. After
-/// an unexpectedly closed connection, you'll need to create a new [Session].
+/// When the server closes the access-point connection, the session logs in again
+/// on a new one and stays valid. It is only invalidated when that fails, and
+/// [Session] instances cannot be reused once invalidated: create a new one.
 #[derive(Clone)]
 pub struct Session(Arc<SessionInternal>);
 
@@ -208,6 +208,35 @@ impl Session {
         credentials: Credentials,
         store_credentials: bool,
     ) -> Result<(), Error> {
+        let (reusable_credentials, transport) = self
+            .connect_to_access_point(credentials, store_credentials)
+            .await?;
+
+        // This channel serves as a buffer for packets and serializes access to the TcpStream, such
+        // that `self.send_packet` can return immediately and needs no additional synchronization.
+        // It outlives each connection, so packets sent while reconnecting go out on the next one.
+        let (tx_connection, rx_connection) = mpsc::unbounded_channel();
+        self.0
+            .tx_connection
+            .set(tx_connection)
+            .map_err(|_| SessionError::NotConnected)?;
+
+        tokio::spawn(run_connection(
+            self.weak(),
+            transport,
+            rx_connection,
+            reusable_credentials,
+            store_credentials,
+        ));
+
+        Ok(())
+    }
+
+    async fn connect_to_access_point(
+        &self,
+        credentials: Credentials,
+        store_credentials: bool,
+    ) -> Result<(Credentials, Transport), Error> {
         // There currently happen to be 6 APs but anything will do to avoid an infinite loop.
         const MAX_AP_TRIES: u8 = 6;
         let mut num_ap_tries = 0;
@@ -258,33 +287,7 @@ impl Session {
             }
         }
 
-        // This channel serves as a buffer for packets and serializes access to the TcpStream, such
-        // that `self.send_packet` can return immediately and needs no additional synchronization.
-        let (tx_connection, rx_connection) = mpsc::unbounded_channel();
-        self.0
-            .tx_connection
-            .set(tx_connection)
-            .map_err(|_| SessionError::NotConnected)?;
-
-        let (sink, stream) = transport.split();
-        let sender_task = UnboundedReceiverStream::new(rx_connection)
-            .map(Ok)
-            .forward(sink);
-        let session_weak = self.weak();
-        tokio::spawn(async move {
-            if let Err(e) = sender_task.await {
-                error!("{e}");
-                if let Some(session) = session_weak.try_upgrade() {
-                    if !session.is_invalid() {
-                        session.shutdown();
-                    }
-                }
-            }
-        });
-
-        tokio::spawn(DispatchTask::new(self.weak(), stream));
-
-        Ok(())
+        Ok((reusable_credentials, transport))
     }
 
     pub fn apresolver(&self) -> &ApResolver {
@@ -667,6 +670,70 @@ impl Drop for SessionInternal {
     }
 }
 
+/// A connection that closes sooner is not reconnected in place, so a server that
+/// keeps closing new connections cannot cause a reconnect loop.
+const MIN_LIFETIME_TO_RECONNECT: TokioDuration = TokioDuration::from_secs(30);
+
+/// Carries the session's packets over its access-point connection. When the
+/// server closes the connection, this logs in again on a new one, so whatever
+/// runs on the session (the dealer, Connect, playback) is unaffected. Only a
+/// failed reconnect invalidates the session.
+async fn run_connection(
+    session: SessionWeak,
+    mut transport: Transport,
+    mut packets: mpsc::UnboundedReceiver<(u8, Vec<u8>)>,
+    mut credentials: Credentials,
+    store_credentials: bool,
+) {
+    loop {
+        let connected_at = TokioInstant::now();
+        let (mut sink, stream) = transport.split();
+        let send = async {
+            while let Some(packet) = packets.recv().await {
+                sink.send(packet).await?;
+            }
+            // every sender is gone with the session
+            Ok(())
+        };
+        let lost = tokio::select! {
+            result = DispatchTask::new(session.clone(), stream) => result,
+            result = send => result,
+        };
+
+        let (Err(error), Some(session)) = (lost, session.try_upgrade()) else {
+            return;
+        };
+        if session.is_invalid() {
+            return;
+        }
+        if connected_at.elapsed() < MIN_LIFETIME_TO_RECONNECT {
+            error!("Connection to server closed ({error}) right after connecting");
+            session.shutdown();
+            return;
+        }
+
+        warn!("Connection to server closed ({error}); reconnecting");
+        // the server forgets what it was asked on the closed connection
+        session.mercury().connection_lost();
+        session.channel().connection_lost();
+        match session
+            .connect_to_access_point(credentials.clone(), store_credentials)
+            .await
+        {
+            Ok((reusable_credentials, new_transport)) => {
+                credentials = reusable_credentials;
+                transport = new_transport;
+                session.audio_key().resend_pending();
+            }
+            Err(e) => {
+                error!("Reconnecting to server failed: {e}");
+                session.shutdown();
+                return;
+            }
+        }
+    }
+}
+
 #[derive(Clone, Copy, Default, Debug, PartialEq)]
 enum KeepAliveState {
     #[default]
@@ -892,15 +959,9 @@ where
                     }
                 }
                 Poll::Ready(None) => {
-                    warn!("Connection to server closed.");
-                    session.shutdown();
-                    return Poll::Ready(Ok(()));
+                    return Poll::Ready(Err(io::ErrorKind::UnexpectedEof.into()));
                 }
-                Poll::Ready(Some(Err(e))) => {
-                    error!("Connection to server closed.");
-                    session.shutdown();
-                    return Poll::Ready(Err(e));
-                }
+                Poll::Ready(Some(Err(e))) => return Poll::Ready(Err(e)),
                 Poll::Pending => break,
             }
         }
@@ -926,10 +987,6 @@ where
         if let Poll::Ready(()) = this.timeout.as_mut().poll(cx) {
             match this.keep_alive_state {
                 ExpectingPing | ExpectingPongAck => {
-                    if !session.is_invalid() {
-                        session.shutdown();
-                    }
-                    // TODO: Optionally reconnect (with cached/last credentials?)
                     return Poll::Ready(Err(io::Error::new(
                         io::ErrorKind::TimedOut,
                         format!(
