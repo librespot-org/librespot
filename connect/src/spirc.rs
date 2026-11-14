@@ -2116,6 +2116,41 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_queued_track_also_in_the_context_stays_the_queued_one() {
+        let mut task = task();
+        let mut queued = context_track(TRACKS[0]);
+        queued.uid = Some("q0".into());
+        let mut transfer = web_api_transfer(queued.clone());
+        transfer.options.mut_or_insert_default().shuffling_context = Some(true);
+        transfer.current_session.mut_or_insert_default().current_uid = context_track(TRACKS[1]).uid;
+        let queue = transfer.queue.mut_or_insert_default();
+        queue.tracks = vec![queued];
+        queue.is_playing_queue = Some(true);
+
+        task.handle_transfer(transfer).unwrap();
+
+        assert!(task.connect_state.current_track(|t| t.is_queue()));
+    }
+
+    #[tokio::test]
+    async fn a_transfer_replaces_the_queue_left_from_before() {
+        let mut task = task();
+        let queued = "spotify:local:Artist:Album:Queued:180";
+        let left = ProvidedTrack {
+            uri: queued.into(),
+            ..Default::default()
+        };
+        task.connect_state.add_to_queue(left, false);
+        let mut transfer = web_api_transfer(context_track(TRACKS[0]));
+        transfer.queue.mut_or_insert_default().tracks = vec![context_track(queued)];
+
+        task.handle_transfer(transfer).unwrap();
+
+        let next = next_uris(&task);
+        assert_eq!(next.iter().filter(|&&uri| uri == queued).count(), 1);
+    }
+
+    #[tokio::test]
     async fn a_transfer_from_autoplay_is_finished_once_autoplay_resolves() {
         let mut task = task();
         let current = "spotify:local:Artist:Album:Recommended:180";

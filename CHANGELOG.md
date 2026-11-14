@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [connect] Autoplay after tracks played by their uris is based on the track playing when librespot queues the request for it, instead of on librespot's `spotify:web-api` placeholder, which isn't a Spotify uri; the placeholder is now `spotify:webapi`
 - [connect] A transfer under the context uri `spotify:webapi`, or the `spotify:web-api` and `spotify:unknown` that older librespot versions published, plays the tracks it carries, as one under `-` or an empty uri did; it continues under `spotify:webapi` and is finished like a transfer of a resolved context
 - [connect] A transferred track stays the current one when it isn't among the tracks of its context, as a queued or autoplay track isn't, instead of being shown as another of them while it plays, and the context then follows it from its first track, which was passed over
+- [connect] A transfer replaces the queue, instead of adding its queued tracks to any queued before
 - [connect] A transfer during autoplay is finished once the autoplay context resolves, instead of failing without it and dropping the transferred queue: a transferred autoplay track now counts as one, as librespot's own do
 - [connect] Picking a track in a list plays that track: an empty `track_uri` (or `track_uid`) sent next to the one that identifies the track is ignored, instead of failing to resolve and playing the first track of the context
 

@@ -115,7 +115,8 @@ impl ConnectState {
         };
 
         self.clear_prev_track();
-        self.clear_next_tracks();
+        // the transfer brings its queue, which replaces any queued before
+        self.player_mut().next_tracks.clear();
         self.update_queue_revision()
     }
 
@@ -212,7 +213,7 @@ impl ConnectState {
 
         // setting up from an index makes the context's track there current, but the
         // transferred track plays already, as a queued one does after that track
-        if self.current_track(|t| t.uri != track.uri) {
+        if self.current_track(|t| t.uri != track.uri || t.provider != track.provider) {
             self.set_track(track);
         }
         set_up?;
