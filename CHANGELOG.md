@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- [playback] Emit `PlayerEvent::Paused` and `PlayerEvent::Stopped` before stopping the sink, so a sink that first plays out its buffer, such as rodio, no longer delays them (#1835). With `--disable-gapless`, a load still stops the sink before its `Paused`
 - [connect] Picking a track in a list plays that track: an empty `track_uri` (or `track_uid`) sent next to the one that identifies the track is ignored, instead of failing to resolve and playing the first track of the context
 
 ### Added
@@ -26,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [core] Made `SpotifyId::to_base62`, `SpotifyId::to_base16`, `FileId::to_base16`, `SpotifyUri::to_id`, `SpotifyUri::to_uri` infallible (breaking)
 - [oauth] Made the URLs clickable in a terminal
+- [main] The `--onevent` program can now run for `paused` and `stopped` before the sink has stopped, such as while ALSA or PulseAudio still plays out its buffer; to act once the sink has stopped, use `--emit-sink-events` and its `sink` event with `SINK_STATUS=closed`
 
 ### Fixed
 

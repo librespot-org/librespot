@@ -1677,6 +1677,13 @@ impl PlayerInternal {
         }
     }
 
+    /// Sends `event`, then stops the sink, so that a sink that blocks in `stop` until
+    /// it has played out its buffer does not delay the event.
+    fn send_event_and_stop_sink(&mut self, event: PlayerEvent) {
+        self.send_event(event);
+        self.ensure_sink_stopped(false);
+    }
+
     fn handle_player_stop(&mut self) {
         match self.state {
             PlayerState::Playing {
@@ -1701,12 +1708,11 @@ impl PlayerInternal {
             } => {
                 let track_id = track_id.clone();
 
-                self.ensure_sink_stopped(false);
-                self.send_event(PlayerEvent::Stopped {
+                self.state = PlayerState::Stopped;
+                self.send_event_and_stop_sink(PlayerEvent::Stopped {
                     track_id,
                     play_request_id,
                 });
-                self.state = PlayerState::Stopped;
             }
             PlayerState::Stopped => (),
             PlayerState::Invalid => {
@@ -1757,8 +1763,7 @@ impl PlayerInternal {
 
                 self.state.playing_to_paused();
 
-                self.ensure_sink_stopped(false);
-                self.send_event(PlayerEvent::Paused {
+                self.send_event_and_stop_sink(PlayerEvent::Paused {
                     track_id,
                     play_request_id,
                     position_ms: stream_position_ms,
@@ -1951,8 +1956,6 @@ impl PlayerInternal {
                 is_explicit: loaded_track.is_explicit,
             };
         } else {
-            self.ensure_sink_stopped(false);
-
             self.state = PlayerState::Paused {
                 track_id: track_id.clone(),
                 play_request_id,
@@ -1968,7 +1971,7 @@ impl PlayerInternal {
                 is_explicit: loaded_track.is_explicit,
             };
 
-            self.send_event(PlayerEvent::Paused {
+            self.send_event_and_stop_sink(PlayerEvent::Paused {
                 track_id,
                 play_request_id,
                 position_ms,
@@ -2707,5 +2710,207 @@ where
 
     fn byte_len(&self) -> Option<u64> {
         Some(self.length)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        audio_backend::SinkResult,
+        decoder::{DecoderError, DecoderResult},
+        mixer::NoOpVolume,
+    };
+
+    struct TestDecoder {
+        seeks: Arc<Mutex<Vec<u32>>>,
+        packets: Arc<AtomicUsize>,
+    }
+
+    impl AudioDecoder for TestDecoder {
+        fn seek(&mut self, position_ms: u32) -> Result<u32, DecoderError> {
+            self.seeks.lock().unwrap().push(position_ms);
+            Ok(position_ms)
+        }
+
+        fn next_packet(&mut self) -> DecoderResult<Option<(AudioPacketPosition, AudioPacket)>> {
+            let packet = self.packets.fetch_add(1, Ordering::Relaxed);
+            // A finite track makes stalled commands fail the test instead of hanging it.
+            if packet >= 2_000 {
+                return Ok(None);
+            }
+            Ok(Some((
+                AudioPacketPosition {
+                    position_ms: packet as u32,
+                    skipped: false,
+                },
+                AudioPacket::Samples(vec![0.0; 2]),
+            )))
+        }
+    }
+
+    struct TestSink;
+
+    impl Sink for TestSink {
+        fn write(&mut self, _: AudioPacket, _: &mut Converter) -> SinkResult<()> {
+            Ok(())
+        }
+    }
+
+    fn playing_player(
+        commands: mpsc::UnboundedReceiver<PlayerCommand>,
+        decoder: TestDecoder,
+    ) -> PlayerInternal {
+        let track_id = SpotifyUri::Local {
+            artist: String::new(),
+            album_title: String::new(),
+            track_title: "test track".into(),
+            duration: Duration::from_secs(180),
+        };
+        let audio_item = AudioItem {
+            track_id: track_id.clone(),
+            uri: track_id.to_uri(),
+            files: Default::default(),
+            name: "test track".into(),
+            covers: vec![],
+            language: vec![],
+            duration_ms: 180_000,
+            is_explicit: false,
+            availability: Ok(()),
+            alternatives: None,
+            unique_fields: UniqueFields::Local {
+                artists: None,
+                album: None,
+                album_artists: None,
+                number: None,
+                disc_number: None,
+                path: Default::default(),
+            },
+        };
+        let config = PlayerConfig::default();
+        PlayerInternal {
+            session: Session::new(Default::default(), None),
+            converter: Converter::new(config.ditherer),
+            normalisation_knee_factor: 1.0 / (8.0 * config.normalisation_knee_db),
+            config,
+            commands,
+            load_handles: Arc::new(Mutex::new(HashMap::new())),
+            state: PlayerState::Playing {
+                track_id,
+                play_request_id: 0,
+                decoder: Box::new(decoder),
+                normalisation_data: NormalisationData::default(),
+                audio_item,
+                normalisation_factor: 1.0,
+                stream_loader_controller: StreamLoaderController::from_local_file(1_000_000),
+                bytes_per_second: 176_400,
+                duration_ms: 180_000,
+                stream_position_ms: 0,
+                reported_nominal_start_time: None,
+                suggested_to_preload_next_track: true,
+                is_explicit: false,
+            },
+            preload: PlayerPreload::None,
+            sink: Box::new(TestSink),
+            sink_status: SinkStatus::Running,
+            sink_event_callback: None,
+            volume_getter: Box::new(NoOpVolume),
+            event_senders: vec![],
+            normalisation_peaks: [0.0; 2],
+            normalisation_integrators: [0.0; 2],
+            normalisation_channel: 0,
+            auto_normalise_as_album: false,
+            player_id: 0,
+            play_request_id_generator: SeqGenerator::new(0),
+            last_progress_update: Instant::now(),
+            local_file_lookup: Arc::new(create_local_file_lookup(&[])),
+        }
+    }
+
+    /// Records the events the player had sent when it stopped the sink.
+    struct StopProbe {
+        events: mpsc::UnboundedReceiver<PlayerEvent>,
+        sent_before_stop: Arc<Mutex<Option<Vec<PlayerEvent>>>>,
+    }
+
+    impl Sink for StopProbe {
+        fn stop(&mut self) -> SinkResult<()> {
+            let mut sent = vec![];
+            while let Ok(event) = self.events.try_recv() {
+                sent.push(event);
+            }
+            *self.sent_before_stop.lock().unwrap() = Some(sent);
+            Ok(())
+        }
+
+        fn write(&mut self, _: AudioPacket, _: &mut Converter) -> SinkResult<()> {
+            Ok(())
+        }
+    }
+
+    /// Returns the events a playing player had sent when `act` made it stop the sink.
+    fn sent_before_sink_stop(act: impl FnOnce(&mut PlayerInternal)) -> Vec<PlayerEvent> {
+        let (_commands, rx) = mpsc::unbounded_channel();
+        let mut player = playing_player(
+            rx,
+            TestDecoder {
+                seeks: Default::default(),
+                packets: Default::default(),
+            },
+        );
+        let (events_tx, events) = mpsc::unbounded_channel();
+        player.event_senders.push(events_tx);
+        let sent_before_stop = Arc::new(Mutex::new(None));
+        player.sink = Box::new(StopProbe {
+            events,
+            sent_before_stop: sent_before_stop.clone(),
+        });
+        act(&mut player);
+        sent_before_stop
+            .lock()
+            .unwrap()
+            .take()
+            .expect("the sink was not stopped")
+    }
+
+    #[tokio::test]
+    async fn pause_is_reported_before_the_sink_stops() {
+        let sent = sent_before_sink_stop(PlayerInternal::handle_pause);
+        assert!(
+            sent.iter()
+                .any(|event| matches!(event, PlayerEvent::Paused { .. })),
+            "a sink that is slow to stop must not delay the Paused event"
+        );
+    }
+
+    #[tokio::test]
+    async fn paused_load_is_reported_before_the_sink_stops() {
+        let sent = sent_before_sink_stop(|player| {
+            // Loading the playing track reuses its decoder, so the load completes at once.
+            let PlayerState::Playing { track_id, .. } = &player.state else {
+                unreachable!()
+            };
+            let load = PlayerCommand::Load {
+                track_id: track_id.clone(),
+                play: false,
+                position_ms: 0,
+            };
+            player.handle_command(load).unwrap();
+        });
+        assert!(
+            sent.iter()
+                .any(|event| matches!(event, PlayerEvent::Paused { .. })),
+            "a sink that is slow to stop must not delay the Paused event"
+        );
+    }
+
+    #[tokio::test]
+    async fn stop_is_reported_before_the_sink_stops() {
+        let sent = sent_before_sink_stop(PlayerInternal::handle_player_stop);
+        assert!(
+            sent.iter()
+                .any(|event| matches!(event, PlayerEvent::Stopped { .. })),
+            "a sink that is slow to stop must not delay the Stopped event"
+        );
     }
 }
