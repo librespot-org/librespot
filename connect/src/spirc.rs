@@ -2180,6 +2180,52 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_shuffled_transfer_from_autoplay_continues_with_autoplay() {
+        let mut task = task();
+        let current = "spotify:local:Artist:Album:Recommended:180";
+        let mut track = context_track(current);
+        track
+            .metadata
+            .insert("autoplay.is_autoplay".into(), "true".into());
+        let mut transfer = web_api_transfer(track);
+        transfer.options.mut_or_insert_default().shuffling_context = Some(true);
+        task.handle_transfer(transfer).unwrap();
+
+        let suggested = ["spotify:local:Artist:Album:Suggested:180"];
+        let autoplay = Context {
+            uri: Some(current.into()),
+            pages: vec![ContextPage {
+                tracks: suggested.map(context_track).to_vec(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        assert!(task.handle_next_context(Ok(autoplay)));
+        assert_eq!(next_uris(&task), suggested);
+    }
+
+    #[tokio::test]
+    async fn a_saved_shuffle_resumes_after_the_transferred_track() {
+        let mut task = task();
+        let current = TRACKS[1];
+        let mut transfer = web_api_transfer(context_track(current));
+        transfer.options.mut_or_insert_default().shuffling_context = Some(true);
+        // as librespot saves a shuffle in its context
+        let context = &mut transfer.current_session.mut_or_insert_default().context;
+        let metadata = &mut context.mut_or_insert_default().metadata;
+        metadata.insert("shuffle_seed".into(), "123456789012".into());
+        metadata.insert("initial_track".into(), TRACKS[0].into());
+
+        task.handle_transfer(transfer).unwrap();
+
+        let next = next_uris(&task);
+        assert!(
+            !next.contains(&current) && !next.contains(&TRACKS[0]),
+            "{next:?}"
+        );
+    }
+
+    #[tokio::test]
     async fn tracks_played_by_uri_drop_what_resolves_for_the_previous_context() {
         let mut task = task();
         task.context_resolver.add(ResolveContext::from_uri(
