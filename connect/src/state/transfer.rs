@@ -25,16 +25,18 @@ impl ConnectState {
         }
         .ok_or(StateError::CouldNotResolveTrackFromTransfer)?;
 
+        let provider = if transfer.queue.is_playing_queue.unwrap_or_default() {
+            Some(Provider::Queue)
+        } else {
+            track.is_from_autoplay().then_some(Provider::Autoplay)
+        };
+
         self.context_to_provided_track(
             track,
             transfer.current_session.context.uri.as_deref(),
             None,
             None,
-            transfer
-                .queue
-                .is_playing_queue
-                .unwrap_or_default()
-                .then_some(Provider::Queue),
+            provider,
         )
     }
 
@@ -149,7 +151,7 @@ impl ConnectState {
         );
 
         if self.player().track.is_none() {
-            self.set_track(track);
+            self.set_track(track.clone());
         }
 
         let current_index = current_index.ok();
@@ -180,17 +182,26 @@ impl ConnectState {
             }
         }
 
-        if self.shuffling_context() {
-            self.set_current_track(current_index.unwrap_or_default())?;
-            self.set_shuffle(true);
+        let set_up = if self.shuffling_context() {
+            self.set_current_track(current_index.unwrap_or_default())
+                .and_then(|()| {
+                    self.set_shuffle(true);
 
-            match self.transfer_shuffle.take() {
-                None => self.shuffle_new(),
-                Some(state) => self.shuffle_restore(state),
-            }?
+                    match self.transfer_shuffle.take() {
+                        None => self.shuffle_new(),
+                        Some(state) => self.shuffle_restore(state),
+                    }
+                })
         } else {
-            self.reset_playback_to_position(current_index)?;
+            self.reset_playback_to_position(current_index)
+        };
+
+        // setting up makes the context's track at the index current, but the
+        // transferred track plays already, and a queued or autoplay one isn't in it
+        if self.current_track(|t| t.uri != track.uri) {
+            self.set_track(track);
         }
+        set_up?;
 
         self.update_restrictions();
 
