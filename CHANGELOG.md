@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- [connect] `Spirc::play` and `Spirc::play_pause` start the current track again once playback has stopped, as a Connect client's resume already does, instead of doing nothing. At the end of the queue that is its first track
 - [connect] Picking a track in a list plays that track: an empty `track_uri` (or `track_uid`) sent next to the one that identifies the track is ignored, instead of failing to resolve and playing the first track of the context
 
 ### Added

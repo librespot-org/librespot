@@ -291,9 +291,10 @@ impl Spirc {
         Ok(self.commands.send(SpircCommand::Shutdown)?)
     }
 
-    /// Resumes the playback
+    /// Resumes the playback, or starts the current track again if playback has
+    /// stopped, as at the end of the queue
     ///
-    /// Does nothing if we are not the active device, or it isn't paused.
+    /// Does nothing if we are not the active device, or it is already playing.
     pub fn play(&self) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::Play)?)
     }
@@ -750,8 +751,8 @@ impl SpircTask {
                 }
                 return self.handle_disconnect().await;
             }
-            SpircCommand::Play => self.handle_play(),
-            SpircCommand::PlayPause => self.handle_play_pause(),
+            SpircCommand::Play => self.handle_play()?,
+            SpircCommand::PlayPause => self.handle_play_pause()?,
             SpircCommand::Pause => self.handle_pause(),
             SpircCommand::Prev => self.handle_prev()?,
             SpircCommand::Next => self.handle_next(None)?,
@@ -1175,10 +1176,7 @@ impl SpircTask {
             }
             SkipNext(skip_next) => self.handle_next(skip_next.track.map(|t| t.uri))?,
             SkipPrev(_) => self.handle_prev()?,
-            Resume(_) if matches!(self.play_status, SpircPlayStatus::Stopped) => {
-                self.load_track(true, 0)?
-            }
-            Resume(_) => self.handle_play(),
+            Resume(_) => self.handle_play()?,
         }
 
         self.update_state = true;
@@ -1533,8 +1531,10 @@ impl SpircTask {
         Ok(())
     }
 
-    fn handle_play(&mut self) {
+    fn handle_play(&mut self) -> Result<(), Error> {
         match self.play_status {
+            // the player holds nothing to resume, so start the current track again
+            SpircPlayStatus::Stopped => return self.load_track(true, 0),
             SpircPlayStatus::Paused {
                 position_ms,
                 preloading_of_next_track_triggered,
@@ -1551,24 +1551,23 @@ impl SpircTask {
                 self.player.play();
                 self.play_status = SpircPlayStatus::LoadingPlay { position_ms };
             }
-            _ => return,
+            _ => return Ok(()),
         }
 
         // Synchronize the volume from the mixer. This is useful on
         // systems that can switch sources from and back to librespot.
         let current_volume = self.mixer.volume();
         self.set_volume(current_volume);
+        Ok(())
     }
 
-    fn handle_play_pause(&mut self) {
+    fn handle_play_pause(&mut self) -> Result<(), Error> {
         match self.play_status {
-            SpircPlayStatus::Paused { .. } | SpircPlayStatus::LoadingPause { .. } => {
-                self.handle_play()
-            }
             SpircPlayStatus::Playing { .. } | SpircPlayStatus::LoadingPlay { .. } => {
-                self.handle_pause()
+                self.handle_pause();
+                Ok(())
             }
-            _ => (),
+            _ => self.handle_play(),
         }
     }
 
@@ -1955,5 +1954,117 @@ impl SpircTask {
 impl Drop for SpircTask {
     fn drop(&mut self) {
         debug!("drop Spirc[{}]", self.spirc_id);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::playback::{
+        audio_backend::{Sink, SinkResult},
+        config::PlayerConfig,
+        convert::Converter,
+        decoder::AudioPacket,
+        mixer::MixerConfig,
+    };
+
+    // local files that aren't on disk, so the player fails to load them without going online
+    const TRACKS: [&str; 3] = [
+        "spotify:local:Artist:Album:One:180",
+        "spotify:local:Artist:Album:Two:180",
+        "spotify:local:Artist:Album:Three:180",
+    ];
+
+    struct TestMixer;
+
+    impl Mixer for TestMixer {
+        fn open(_: MixerConfig) -> Result<Self, Error> {
+            Ok(Self)
+        }
+
+        fn volume(&self) -> u16 {
+            u16::MAX
+        }
+
+        fn set_volume(&self, _: u16) {}
+    }
+
+    struct TestSink;
+
+    impl Sink for TestSink {
+        fn write(&mut self, _: AudioPacket, _: &mut Converter) -> SinkResult<()> {
+            Ok(())
+        }
+    }
+
+    /// A Spirc task with a real player, which needs no connection to Spotify.
+    fn task() -> SpircTask {
+        let session = Session::new(Default::default(), None);
+        let mixer: Arc<dyn Mixer> = Arc::new(TestMixer);
+        let player = Player::new(
+            PlayerConfig::default(),
+            session.clone(),
+            mixer.get_soft_volume(),
+            || Box::new(TestSink),
+        );
+        SpircTask {
+            player,
+            mixer,
+            connect_state: ConnectState::new(ConnectConfig::default(), &session),
+            connect_established: true,
+            play_request_id: None,
+            play_status: SpircPlayStatus::Stopped,
+            connection_id_update: futures_util::stream::pending().boxed(),
+            connect_state_update: futures_util::stream::pending().boxed(),
+            connect_state_volume_update: futures_util::stream::pending().boxed(),
+            connect_state_logout_request: futures_util::stream::pending().boxed(),
+            playlist_update: futures_util::stream::pending().boxed(),
+            session_update: futures_util::stream::pending().boxed(),
+            connect_state_command: futures_util::stream::pending().boxed(),
+            user_attributes_update: futures_util::stream::pending().boxed(),
+            user_attributes_mutation: futures_util::stream::pending().boxed(),
+            commands: None,
+            player_events: None,
+            context_resolver: ContextResolver::new(session.clone()),
+            emit_set_queue_events: false,
+            shutdown: false,
+            session,
+            transfer_state: None,
+            update_volume: false,
+            update_state: false,
+            spirc_id: 0,
+        }
+    }
+
+    /// An active device whose playback stopped when the last of three tracks ended.
+    fn task_stopped_at_the_end_of_the_queue() -> SpircTask {
+        let mut task = task();
+        task.connect_state.set_active(true);
+        task.load_context_from_tracks(TRACKS.map(String::from).to_vec())
+            .unwrap();
+        task.connect_state
+            .reset_playback_to_position(Some(TRACKS.len() - 1))
+            .unwrap();
+        task.handle_next(None).unwrap();
+        task
+    }
+
+    #[tokio::test]
+    async fn play_starts_the_queue_again_once_it_has_ended() {
+        let mut task = task_stopped_at_the_end_of_the_queue();
+        task.handle_play().unwrap();
+        assert_eq!(task.connect_state.current_track(|t| &t.uri), TRACKS[0]);
+        assert!(matches!(
+            task.play_status,
+            SpircPlayStatus::LoadingPlay { position_ms: 0 }
+        ));
+
+        let mut task = task_stopped_at_the_end_of_the_queue();
+        task.handle_play_pause().unwrap();
+        assert_eq!(task.connect_state.current_track(|t| &t.uri), TRACKS[0]);
+        assert!(matches!(
+            task.play_status,
+            SpircPlayStatus::LoadingPlay { position_ms: 0 }
+        ));
     }
 }
