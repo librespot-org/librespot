@@ -16,6 +16,7 @@ use super::{
 
 use librespot_core::{Error, Session, SpotifyUri, date::Date, spotify_id::SpotifyId};
 use librespot_protocol as protocol;
+use protobuf::Message as _;
 use protocol::playlist4_external::GeoblockBlockingType as Geoblock;
 
 #[derive(Debug, Clone, Default)]
@@ -81,6 +82,33 @@ impl Playlist {
 
     pub fn name(&self) -> &str {
         &self.attributes.name
+    }
+
+    /// `length` items starting at `from`, with the list's header.
+    ///
+    /// Unlike [`Metadata::get`], this does not download the whole list:
+    /// `contents.items` holds only the requested window and
+    /// `contents.position` says where it starts, while `length` still counts
+    /// the whole list. A `length` of zero fetches the header alone.
+    pub async fn get_range(
+        session: &Session,
+        playlist_uri: &SpotifyUri,
+        from: usize,
+        length: usize,
+    ) -> Result<Self, Error> {
+        let SpotifyUri::Playlist {
+            id: playlist_id, ..
+        } = playlist_uri
+        else {
+            return Err(Error::invalid_argument("playlist_uri"));
+        };
+
+        let response = session
+            .spclient()
+            .get_playlist_range(playlist_id, from, length)
+            .await?;
+        let msg = <Self as Metadata>::Message::parse_from_bytes(&response)?;
+        Self::parse(&msg, playlist_uri)
     }
 }
 
@@ -192,3 +220,42 @@ impl TryFrom<&<Playlist as Metadata>::Message> for SelectedListContent {
 
 impl_from_repeated_copy!(Geoblock, Geoblocks);
 impl_try_from_repeated!(Vec<u8>, Playlists);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A windowed answer parses like a whole one: the rows are the window,
+    /// `position` says where it starts, and `length` still counts the list.
+    #[test]
+    fn a_window_keeps_its_place_in_the_whole_list() {
+        let mut msg = protocol::playlist4_external::SelectedListContent::new();
+        msg.set_revision(vec![0, 0, 0, 7]);
+        msg.set_length(500);
+        msg.set_owner_username("someone".into());
+        let contents = msg.contents.mut_or_insert_default();
+        contents.set_pos(100);
+        contents.set_truncated(true);
+        for track in ["4uLU6hMCjMI75M1A2tKUQC", "7GhIk7Il098yCjg4BQjzvb"] {
+            let mut item = protocol::playlist4_external::Item::new();
+            item.set_uri(format!("spotify:track:{track}"));
+            contents.items.push(item);
+        }
+
+        let uri = SpotifyUri::Playlist {
+            id: SpotifyId::from_base62("37i9dQZF1DXbIbVYph0Zr5").unwrap(),
+            user: None,
+        };
+        let playlist = Playlist::parse(&msg, &uri).unwrap();
+
+        assert_eq!(playlist.contents.position, 100);
+        assert_eq!(playlist.contents.items.len(), 2);
+        assert!(playlist.contents.is_truncated);
+        assert_eq!(playlist.length, 500, "the whole list, not the window");
+        assert_eq!(playlist.revision, vec![0, 0, 0, 7]);
+        assert!(
+            matches!(&playlist.id, SpotifyUri::Playlist { user: Some(owner), .. } if owner == "someone"),
+            "the owner rides on the id"
+        );
+    }
+}
