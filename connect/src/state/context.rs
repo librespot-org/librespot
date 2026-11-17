@@ -141,14 +141,17 @@ impl ConnectState {
     }
 
     /// Whether `uri` stands for no context, which leaves the tracks to come with it.
-    /// A Web API play of `uris` comes under `spotify:webapi`. Transfers have also come
-    /// with `-` or an empty uri, and from older librespot versions with the
-    /// `spotify:web-api` or `spotify:unknown` they published for such sessions.
+    /// A Web API play of `uris` comes under `spotify:webapi`, or `spotify:webapi:<id>`;
+    /// neither can be resolved. Transfers have also come with `-` or an empty uri, and
+    /// from older librespot versions with the `spotify:web-api` or `spotify:unknown`
+    /// they published for such sessions.
     pub fn is_placeholder_uri(uri: &str) -> bool {
         matches!(
             uri,
             "" | "-" | WEB_API_IDENTIFIER | "spotify:web-api" | "spotify:unknown"
-        )
+        ) || uri
+            .strip_prefix(WEB_API_IDENTIFIER)
+            .is_some_and(|id| id.starts_with(':'))
     }
 
     pub fn valid_resolve_uri(uri: &str) -> Option<&str> {

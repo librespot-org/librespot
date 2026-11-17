@@ -248,8 +248,13 @@ mod tests {
     #[test]
     fn web_api_play_of_uris_plays_its_tracks() {
         // what spotify sends for `PUT /me/player/play` with `uris`
-        let c = play_context(Some("spotify:webapi"), &TRACKS);
-        assert!(matches!(c, Ok(PlayContext::Tracks(t)) if t == TRACKS));
+        for uri in ["spotify:webapi", "spotify:webapi:2aXd9suNTEFnjREEhPhIjP"] {
+            let c = play_context(Some(uri), &TRACKS);
+            assert!(
+                matches!(c, Ok(PlayContext::Tracks(t)) if t == TRACKS),
+                "{uri}"
+            );
+        }
     }
 
     #[test]
@@ -266,6 +271,14 @@ mod tests {
                 matches!(c, Ok(PlayContext::Tracks(t)) if t == TRACKS),
                 "{uri:?}"
             );
+        }
+    }
+
+    #[test]
+    fn similar_context_uris_are_resolved() {
+        for uri in ["spotify:webapiplaylist", "spotify:playlist:webapi"] {
+            let c = play_context(Some(uri), &TRACKS);
+            assert!(matches!(c, Ok(PlayContext::Uri(u)) if u == uri), "{uri}");
         }
     }
 
