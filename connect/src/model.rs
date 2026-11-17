@@ -1,5 +1,7 @@
 use crate::{
-    core::dealer::protocol::SkipTo, protocol::context_player_options::ContextPlayerOptionOverrides,
+    core::dealer::protocol::SkipTo,
+    protocol::{context::Context, context_player_options::ContextPlayerOptionOverrides},
+    state::ConnectState,
 };
 
 use std::ops::Deref;
@@ -23,6 +25,30 @@ impl Deref for LoadRequest {
 pub(super) enum PlayContext {
     Uri(String),
     Tracks(Vec<String>),
+}
+
+impl TryFrom<&Context> for PlayContext {
+    type Error = ();
+
+    fn try_from(context: &Context) -> Result<Self, Self::Error> {
+        // without a context uri, the tracks come inline, as for a Web API play of `uris`
+        match context
+            .uri
+            .as_deref()
+            .filter(|uri| !ConnectState::is_placeholder_uri(uri))
+        {
+            Some(uri) => Ok(PlayContext::Uri(uri.to_string())),
+            None if !context.pages.is_empty() => Ok(PlayContext::Tracks(
+                context
+                    .pages
+                    .iter()
+                    .flat_map(|page| &page.tracks)
+                    .filter_map(|track| track.uri.clone())
+                    .collect(),
+            )),
+            None => Err(()),
+        }
+    }
 }
 
 /// The parameters for creating a load request
@@ -197,5 +223,77 @@ mod tests {
     #[test]
     fn nothing_usable_is_an_error() {
         assert!(skip_to(r#"{"track_uri":"","track_uid":""}"#).is_err());
+    }
+
+    fn play_context(uri: Option<&str>, tracks: &[&str]) -> Result<PlayContext, ()> {
+        use crate::protocol::{context_page::ContextPage, context_track::ContextTrack};
+
+        let tracks = tracks.iter().map(|uri| ContextTrack {
+            uri: Some(uri.to_string()),
+            ..Default::default()
+        });
+        let context = Context {
+            uri: uri.map(str::to_string),
+            pages: vec![ContextPage {
+                tracks: tracks.collect(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        PlayContext::try_from(&context)
+    }
+
+    const TRACKS: [&str; 2] = ["spotify:track:abc", "spotify:track:def"];
+
+    #[test]
+    fn web_api_play_of_uris_plays_its_tracks() {
+        // what spotify sends for `PUT /me/player/play` with `uris`
+        for uri in ["spotify:webapi", "spotify:webapi:2aXd9suNTEFnjREEhPhIjP"] {
+            let c = play_context(Some(uri), &TRACKS);
+            assert!(
+                matches!(c, Ok(PlayContext::Tracks(t)) if t == TRACKS),
+                "{uri}"
+            );
+        }
+    }
+
+    #[test]
+    fn no_context_uri_plays_the_tracks() {
+        for uri in [
+            None,
+            Some(""),
+            Some("-"),
+            Some("spotify:web-api"),
+            Some("spotify:unknown"),
+        ] {
+            let c = play_context(uri, &TRACKS);
+            assert!(
+                matches!(c, Ok(PlayContext::Tracks(t)) if t == TRACKS),
+                "{uri:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn similar_context_uris_are_resolved() {
+        for uri in ["spotify:webapiplaylist", "spotify:playlist:webapi"] {
+            let c = play_context(Some(uri), &TRACKS);
+            assert!(matches!(c, Ok(PlayContext::Uri(u)) if u == uri), "{uri}");
+        }
+    }
+
+    #[test]
+    fn context_uri_wins_when_given() {
+        let c = play_context(Some("spotify:album:xyz"), &TRACKS);
+        assert!(matches!(c, Ok(PlayContext::Uri(uri)) if uri == "spotify:album:xyz"));
+    }
+
+    #[test]
+    fn web_api_play_without_pages_is_an_error() {
+        let context = Context {
+            uri: Some("spotify:webapi".to_string()),
+            ..Default::default()
+        };
+        assert!(PlayContext::try_from(&context).is_err());
     }
 }

@@ -344,3 +344,44 @@ impl ContextResolver {
         true
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{core::SessionConfig, state::ConnectConfig};
+
+    const TRACK: &str = "spotify:track:2gkzJU3hVJn9UziHtNYsZd";
+
+    fn connect_state() -> ConnectState {
+        let session = Session::new(SessionConfig::default(), None);
+        ConnectState::new(ConnectConfig::default(), &session)
+    }
+
+    /// what autoplay resolves while `TRACK` plays in the context of `state`
+    fn autoplay_resolve_uri(state: &ConnectState) -> Option<String> {
+        ResolveContext::from_uri(
+            state.context_uri(),
+            TRACK,
+            ContextType::Autoplay,
+            ContextAction::Replace,
+        )
+        .resolve_uri()
+        .map(str::to_string)
+    }
+
+    #[tokio::test]
+    async fn autoplay_after_tracks_played_by_uri_resolves_the_current_track() {
+        let mut state = connect_state();
+        state
+            .update_context_from_tracks(vec![TRACK.to_string()])
+            .unwrap();
+        assert_eq!(autoplay_resolve_uri(&state).as_deref(), Some(TRACK));
+    }
+
+    #[tokio::test]
+    async fn autoplay_after_a_transfer_of_tracks_resolves_the_current_track() {
+        let mut state = connect_state();
+        state.handle_initial_transfer(&mut TransferState::default(), None);
+        assert_eq!(autoplay_resolve_uri(&state).as_deref(), Some(TRACK));
+    }
+}

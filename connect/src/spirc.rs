@@ -1077,6 +1077,9 @@ impl SpircTask {
                         update_context.context.uri,
                         self.connect_state.context_uri()
                     )
+                } else if ConnectState::is_placeholder_uri(self.connect_state.context_uri()) {
+                    // its tracks came with the play or transfer; resolving would replace them
+                    debug!("ignoring context update for tracks played without a context")
                 } else {
                     self.context_resolver.add(ResolveContext::from_context(
                         update_context.context,
@@ -1096,19 +1099,8 @@ impl SpircTask {
                     self.handle_activate()
                 }
 
-                let context = match play.context.uri {
-                    Some(s) => PlayContext::Uri(s),
-                    None if !play.context.pages.is_empty() => PlayContext::Tracks(
-                        play.context
-                            .pages
-                            .iter()
-                            .cloned()
-                            .flat_map(|p| p.tracks)
-                            .flat_map(|t| t.uri)
-                            .collect(),
-                    ),
-                    None => Err(SpircError::NoUri("context"))?,
-                };
+                let context = PlayContext::try_from(&play.context)
+                    .map_err(|()| SpircError::NoUri("context"))?;
 
                 let context_options = play
                     .options
@@ -1189,7 +1181,7 @@ impl SpircTask {
         let mut ctx_uri = match transfer.current_session.context.uri {
             None => Err(SpircError::NoUri("transfer context"))?,
             // can apparently happen when a state is transferred and was started with "uris" via the api
-            Some(ref uri) if uri == "-" || uri.is_empty() => None,
+            Some(ref uri) if ConnectState::is_placeholder_uri(uri) => None,
             Some(ref uri) => Some(uri.clone()),
         };
 
@@ -1274,34 +1266,30 @@ impl SpircTask {
         let is_playing = !transfer.playback.is_paused();
 
         if self.connect_state.current_track(|t| t.is_autoplay()) || autoplay {
-            if let Some(ctx_uri) = ctx_uri {
-                debug!("currently in autoplay context, async resolving autoplay for {ctx_uri}");
-                self.context_resolver.add(ResolveContext::from_uri(
-                    ctx_uri,
-                    fallback,
-                    ContextType::Autoplay,
-                    ContextAction::Replace,
-                ))
-            } else {
-                warn!("couldn't resolve autoplay context without a context uri");
-            }
+            // without a context uri, the tracks came with the transfer,
+            // and autoplay resolves from the current track
+            let ctx_uri = ctx_uri.unwrap_or_else(|| self.connect_state.context_uri().clone());
+            debug!("currently in autoplay context, async resolving autoplay for {ctx_uri}");
+            self.context_resolver.add(ResolveContext::from_uri(
+                ctx_uri,
+                fallback,
+                ContextType::Autoplay,
+                ContextAction::Replace,
+            ))
         }
 
-        if load_from_context_uri {
+        if load_from_context_uri || autoplay {
+            self.transfer_state = Some(transfer);
+        } else if let Err(why) = self.connect_state.get_context(ContextType::Default) {
+            warn!("continuing transfer in an unknown state. {why}");
             self.transfer_state = Some(transfer);
         } else {
-            match self.connect_state.get_context(ContextType::Default) {
-                Err(why) => {
-                    warn!("continuing transfer in an unknown state. {why}");
-                    self.transfer_state = Some(transfer);
-                }
-                Ok(ctx) => {
-                    let idx = ConnectState::find_index_in_context(ctx, |pt| {
-                        self.connect_state.current_track(|t| pt.uri == t.uri)
-                    })?;
-                    self.connect_state.reset_playback_to_position(Some(idx))?;
-                }
+            // the transfer brought its tracks, so finish it as a resolved one is
+            if let Err(why) = self.connect_state.finish_transfer(transfer) {
+                error!("setup of state failed: {why}")
             }
+            self.add_autoplay_resolving_when_required();
+            self.emit_set_queue_event();
         }
 
         self.load_track(is_playing, position.try_into()?)
@@ -1515,19 +1503,9 @@ impl SpircTask {
     }
 
     fn load_context_from_tracks(&mut self, tracks: impl Into<ContextPage>) -> Result<(), Error> {
-        const WEB_API_URI: &str = "spotify:web-api";
-        let ctx = Context {
-            // by providing values for uri/url the player in the official client's isn't frozen
-            uri: Some(WEB_API_URI.into()),
-            url: Some(format!("context://{WEB_API_URI}")),
-            pages: vec![tracks.into()],
-            ..Default::default()
-        };
-
-        let _ = self
-            .connect_state
-            .update_context(ctx, ContextType::Default)?;
-
+        // what still resolves for the previous context would replace these tracks
+        self.context_resolver.clear();
+        self.connect_state.update_context_from_tracks(tracks)?;
         self.emit_set_queue_event();
 
         Ok(())
@@ -1955,5 +1933,311 @@ impl SpircTask {
 impl Drop for SpircTask {
     fn drop(&mut self) {
         debug!("drop Spirc[{}]", self.spirc_id);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        playback::{
+            audio_backend::{Sink, SinkResult},
+            config::PlayerConfig,
+            convert::Converter,
+            decoder::AudioPacket,
+            mixer::MixerConfig,
+        },
+        protocol::context_track::ContextTrack,
+    };
+
+    // local files that aren't on disk, so the player fails to load them without going online
+    const TRACKS: [&str; 3] = [
+        "spotify:local:Artist:Album:One:180",
+        "spotify:local:Artist:Album:Two:180",
+        "spotify:local:Artist:Album:Three:180",
+    ];
+
+    struct TestMixer;
+
+    impl Mixer for TestMixer {
+        fn open(_: MixerConfig) -> Result<Self, Error> {
+            Ok(Self)
+        }
+
+        fn volume(&self) -> u16 {
+            u16::MAX
+        }
+
+        fn set_volume(&self, _: u16) {}
+    }
+
+    struct TestSink;
+
+    impl Sink for TestSink {
+        fn write(&mut self, _: AudioPacket, _: &mut Converter) -> SinkResult<()> {
+            Ok(())
+        }
+    }
+
+    /// A Spirc task with a real player, which needs no connection to Spotify.
+    fn task() -> SpircTask {
+        let session = Session::new(Default::default(), None);
+        let mixer: Arc<dyn Mixer> = Arc::new(TestMixer);
+        let player = Player::new(
+            PlayerConfig::default(),
+            session.clone(),
+            mixer.get_soft_volume(),
+            || Box::new(TestSink),
+        );
+        SpircTask {
+            player,
+            mixer,
+            connect_state: ConnectState::new(ConnectConfig::default(), &session),
+            connect_established: true,
+            play_request_id: None,
+            play_status: SpircPlayStatus::Stopped,
+            connection_id_update: futures_util::stream::pending().boxed(),
+            connect_state_update: futures_util::stream::pending().boxed(),
+            connect_state_volume_update: futures_util::stream::pending().boxed(),
+            connect_state_logout_request: futures_util::stream::pending().boxed(),
+            playlist_update: futures_util::stream::pending().boxed(),
+            session_update: futures_util::stream::pending().boxed(),
+            connect_state_command: futures_util::stream::pending().boxed(),
+            user_attributes_update: futures_util::stream::pending().boxed(),
+            user_attributes_mutation: futures_util::stream::pending().boxed(),
+            commands: None,
+            player_events: None,
+            context_resolver: ContextResolver::new(session.clone()),
+            emit_set_queue_events: false,
+            shutdown: false,
+            session,
+            transfer_state: None,
+            update_volume: false,
+            update_state: false,
+            spirc_id: 0,
+        }
+    }
+
+    fn context_track(uri: &str) -> ContextTrack {
+        ContextTrack {
+            uri: Some(uri.into()),
+            uid: Some(format!("uid-{uri}")),
+            ..Default::default()
+        }
+    }
+
+    /// A transfer of a Web API play of `TRACKS`, paused at `current`
+    fn web_api_transfer(current: ContextTrack) -> TransferState {
+        let mut transfer = TransferState::default();
+        transfer.current_session.mut_or_insert_default().context = MessageField::some(Context {
+            uri: Some("spotify:webapi".into()),
+            pages: vec![ContextPage {
+                tracks: TRACKS.map(context_track).to_vec(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        });
+        let playback = transfer.playback.mut_or_insert_default();
+        playback.current_track = MessageField::some(current);
+        playback.is_paused = Some(true);
+        transfer
+    }
+
+    fn current_uri(task: &SpircTask) -> String {
+        task.connect_state.current_track(|t| t.uri.clone())
+    }
+
+    fn next_uris(task: &SpircTask) -> Vec<&str> {
+        let next = &task.connect_state.player().next_tracks;
+        next.iter().map(|t| t.uri.as_str()).collect()
+    }
+
+    #[tokio::test]
+    async fn a_web_api_transfer_plays_its_current_track() {
+        let mut task = task();
+        let mut player_events = task.player.get_player_event_channel();
+        // not among the transferred tracks
+        let current = "spotify:local:Artist:Album:Elsewhere:180";
+
+        task.handle_transfer(web_api_transfer(context_track(current)))
+            .unwrap();
+
+        let loaded = loop {
+            let event = tokio::time::timeout(Duration::from_secs(5), player_events.recv())
+                .await
+                .expect("the player loads a track")
+                .unwrap();
+            if let PlayerEvent::Loading { track_id, .. } = event {
+                break track_id.to_uri();
+            }
+        };
+        assert_eq!(loaded, current);
+        assert_eq!(
+            current_uri(&task),
+            current,
+            "the state shows the track heard"
+        );
+        assert_eq!(next_uris(&task), TRACKS, "the tracks follow from the first");
+    }
+
+    #[tokio::test]
+    async fn a_queued_track_stays_current_through_a_shuffled_transfer() {
+        let mut task = task();
+        let queued = "spotify:local:Artist:Album:Queued:180";
+        let mut transfer = web_api_transfer(context_track(queued));
+        transfer.options.mut_or_insert_default().shuffling_context = Some(true);
+        let queue = transfer.queue.mut_or_insert_default();
+        queue.tracks = vec![context_track(queued)];
+        queue.is_playing_queue = Some(true);
+
+        task.handle_transfer(transfer).unwrap();
+
+        assert!(task.connect_state.shuffling_context());
+        assert_eq!(current_uri(&task), queued);
+        let next = next_uris(&task);
+        assert!(next.len() == TRACKS.len() && TRACKS.iter().all(|t| next.contains(t)));
+    }
+
+    #[tokio::test]
+    async fn a_track_queued_before_the_first_one_leaves_it_next() {
+        let mut task = task();
+        let queued = "spotify:local:Artist:Album:Queued:180";
+        let mut transfer = web_api_transfer(context_track(queued));
+        // the context track the queue plays before
+        transfer.current_session.mut_or_insert_default().current_uid = context_track(TRACKS[0]).uid;
+        let queue = transfer.queue.mut_or_insert_default();
+        queue.tracks = vec![context_track(queued)];
+        queue.is_playing_queue = Some(true);
+
+        task.handle_transfer(transfer).unwrap();
+
+        assert_eq!(current_uri(&task), queued);
+        assert_eq!(next_uris(&task), TRACKS);
+    }
+
+    #[tokio::test]
+    async fn a_queued_track_also_in_the_context_stays_the_queued_one() {
+        let mut task = task();
+        let mut queued = context_track(TRACKS[0]);
+        queued.uid = Some("q0".into());
+        let mut transfer = web_api_transfer(queued.clone());
+        transfer.options.mut_or_insert_default().shuffling_context = Some(true);
+        transfer.current_session.mut_or_insert_default().current_uid = context_track(TRACKS[1]).uid;
+        let queue = transfer.queue.mut_or_insert_default();
+        queue.tracks = vec![queued];
+        queue.is_playing_queue = Some(true);
+
+        task.handle_transfer(transfer).unwrap();
+
+        assert!(task.connect_state.current_track(|t| t.is_queue()));
+    }
+
+    #[tokio::test]
+    async fn a_transfer_replaces_the_queue_left_from_before() {
+        let mut task = task();
+        let queued = "spotify:local:Artist:Album:Queued:180";
+        let left = ProvidedTrack {
+            uri: queued.into(),
+            ..Default::default()
+        };
+        task.connect_state.add_to_queue(left, false);
+        let mut transfer = web_api_transfer(context_track(TRACKS[0]));
+        transfer.queue.mut_or_insert_default().tracks = vec![context_track(queued)];
+
+        task.handle_transfer(transfer).unwrap();
+
+        let next = next_uris(&task);
+        assert_eq!(next.iter().filter(|&&uri| uri == queued).count(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_transfer_from_autoplay_is_finished_once_autoplay_resolves() {
+        let mut task = task();
+        let current = "spotify:local:Artist:Album:Recommended:180";
+        let mut track = context_track(current);
+        track
+            .metadata
+            .insert("autoplay.is_autoplay".into(), "true".into());
+
+        task.handle_transfer(web_api_transfer(track)).unwrap();
+
+        assert!(task.transfer_state.is_some());
+        assert!(task.context_resolver.has_next());
+        let autoplay = Context {
+            uri: Some(current.into()),
+            pages: vec![ContextPage {
+                tracks: TRACKS.map(context_track).to_vec(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        assert!(task.handle_next_context(Ok(autoplay)));
+        assert!(task.transfer_state.is_none());
+        assert_eq!(current_uri(&task), current);
+        assert_eq!(next_uris(&task), TRACKS);
+        let next = &task.connect_state.player().next_tracks;
+        assert!(next.iter().all(IsProvider::is_autoplay));
+    }
+
+    #[tokio::test]
+    async fn a_shuffled_transfer_from_autoplay_continues_with_autoplay() {
+        let mut task = task();
+        let current = "spotify:local:Artist:Album:Recommended:180";
+        let mut track = context_track(current);
+        track
+            .metadata
+            .insert("autoplay.is_autoplay".into(), "true".into());
+        let mut transfer = web_api_transfer(track);
+        transfer.options.mut_or_insert_default().shuffling_context = Some(true);
+        task.handle_transfer(transfer).unwrap();
+
+        let suggested = ["spotify:local:Artist:Album:Suggested:180"];
+        let autoplay = Context {
+            uri: Some(current.into()),
+            pages: vec![ContextPage {
+                tracks: suggested.map(context_track).to_vec(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        assert!(task.handle_next_context(Ok(autoplay)));
+        assert_eq!(next_uris(&task), suggested);
+    }
+
+    #[tokio::test]
+    async fn a_saved_shuffle_resumes_after_the_transferred_track() {
+        let mut task = task();
+        let current = TRACKS[1];
+        let mut transfer = web_api_transfer(context_track(current));
+        transfer.options.mut_or_insert_default().shuffling_context = Some(true);
+        // as librespot saves a shuffle in its context
+        let context = &mut transfer.current_session.mut_or_insert_default().context;
+        let metadata = &mut context.mut_or_insert_default().metadata;
+        metadata.insert("shuffle_seed".into(), "123456789012".into());
+        metadata.insert("initial_track".into(), TRACKS[0].into());
+
+        task.handle_transfer(transfer).unwrap();
+
+        let next = next_uris(&task);
+        assert!(
+            !next.contains(&current) && !next.contains(&TRACKS[0]),
+            "{next:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn tracks_played_by_uri_drop_what_resolves_for_the_previous_context() {
+        let mut task = task();
+        task.context_resolver.add(ResolveContext::from_uri(
+            "spotify:album:previous",
+            TRACKS[0],
+            ContextType::Autoplay,
+            ContextAction::Replace,
+        ));
+
+        task.load_context_from_tracks(TRACKS.map(String::from).to_vec())
+            .unwrap();
+
+        assert!(!task.context_resolver.has_next());
     }
 }
