@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [connect] `Spirc::add_to_queue` also queues local files (`spotify:local:` URIs), which play from `PlayerConfig::local_file_directories` as they do in a context
 - [connect] Add method `clear_queue` to `Spirc` to remove all manually queued tracks
 - [playback] Add `SetQueue` player event, emitting when the queue changes (context loaded, track added to queue, or queue set via Spotify Connect). Gated behind `ConnectConfig::emit_set_queue_events`
+- [playback] Add `normalisation_report` field to `PlayerConfig` to receive the normalisation factor of each track as it starts playing (breaking)
 - [examples] Obtain an access token via OAuth to establish a new session and retrieve the stored credentials
 - [playback] Add track's artists to playback loading verbose logs
 

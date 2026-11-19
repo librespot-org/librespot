@@ -1,4 +1,10 @@
-use std::{mem, path::PathBuf, str::FromStr, time::Duration};
+use std::{
+    mem,
+    path::PathBuf,
+    str::FromStr,
+    sync::{Arc, atomic::AtomicU64},
+    time::Duration,
+};
 
 pub use crate::dither::{DithererBuilder, TriangularDitherer, mk_ditherer};
 use crate::{convert::i24, player::duration_to_coefficient};
@@ -110,6 +116,11 @@ pub struct PlayerConfig {
     pub normalisation: bool,
     pub normalisation_type: NormalisationType,
     pub normalisation_method: NormalisationMethod,
+    /// Receives the normalisation factor of each track as it starts playing,
+    /// stored as the bits of an `f64` (see [`f64::to_bits`]), or `1.0` while
+    /// normalisation is disabled. An application that taps the audio after
+    /// normalisation, for a visualiser for example, can use it to undo the gain.
+    pub normalisation_report: Option<Arc<AtomicU64>>,
     pub normalisation_pregain_db: f64,
     pub normalisation_threshold_dbfs: f64,
     pub normalisation_attack_cf: f64,
@@ -134,6 +145,7 @@ impl Default for PlayerConfig {
             normalisation: false,
             normalisation_type: NormalisationType::default(),
             normalisation_method: NormalisationMethod::default(),
+            normalisation_report: None,
             normalisation_pregain_db: 0.0,
             normalisation_threshold_dbfs: -2.0,
             normalisation_attack_cf: duration_to_coefficient(Duration::from_millis(5)),

@@ -1925,6 +1925,9 @@ impl PlayerInternal {
         };
         let normalisation_factor =
             NormalisationData::get_factor(&config, loaded_track.normalisation_data);
+        if let Some(report) = &config.normalisation_report {
+            report.store(normalisation_factor.to_bits(), Ordering::Relaxed);
+        }
 
         if start_playback {
             self.ensure_sink_running();
