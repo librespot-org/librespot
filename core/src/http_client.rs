@@ -28,7 +28,7 @@ use hyper_tls::HttpsConnector;
 
 use crate::{
     Error,
-    config::{OS, os_version},
+    config::{os, os_version},
     date::Date,
     version::{FALLBACK_USER_AGENT, VERSION_STRING, spotify_version},
 };
@@ -108,7 +108,7 @@ impl HttpClient {
         let zero_str = String::from("0");
         let os_version = os_version();
 
-        let (spotify_platform, os_version) = match OS {
+        let (spotify_platform, os_version) = match os() {
             "android" => ("Android", os_version),
             "ios" => ("iOS", os_version),
             "macos" => ("OSX", zero_str),

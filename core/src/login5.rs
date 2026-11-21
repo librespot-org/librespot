@@ -1,4 +1,4 @@
-use crate::config::OS;
+use crate::config::os;
 use crate::spclient::CLIENT_TOKEN;
 use crate::token::Token;
 use crate::{Error, SessionConfig, util};
@@ -73,7 +73,7 @@ impl Login5Manager {
     }
 
     async fn login5_request(&self, login: Login_method) -> Result<LoginOk, Error> {
-        let client_id = match OS {
+        let client_id = match os() {
             "macos" | "windows" => self.session().client_id(),
             // StoredCredential is used to get an access_token from Session credentials.
             // Using the session client_id allows user to use Keymaster on Android/IOS
@@ -138,7 +138,7 @@ impl Login5Manager {
         id: impl Into<String>,
         password: impl Into<String>,
     ) -> Result<(Token, Vec<u8>), Error> {
-        if !matches!(OS, "android" | "ios") {
+        if !matches!(os(), "android" | "ios") {
             // by manipulating the user-agent and client-id it can be also used/tested on desktop
             return Err(Login5Error::OnlyForMobile.into());
         }
