@@ -196,6 +196,9 @@ impl SpotifyUri {
     /// where `{type}` is an arbitrary string and `{id}` is a 22-character long, base62 encoded
     /// Spotify ID.
     ///
+    /// For local files, `{id}` is instead `{artist}:{album_title}:{track_title}:{duration}`, with
+    /// the duration in seconds.
+    ///
     /// If the `SpotifyUri` has an associated type unrecognized by the library, `{type}` will
     /// be encoded as `unknown`.
     ///
@@ -223,7 +226,7 @@ impl SpotifyUri {
     ///
     /// Deprecated: not all IDs can be represented in Base62, so this function has been renamed to
     /// [SpotifyUri::to_id], which this implementation forwards to.
-    #[deprecated(since = "0.8.0", note = "use to_name instead")]
+    #[deprecated(since = "0.8.0", note = "use to_id instead")]
     pub fn to_base62(&self) -> String {
         self.to_id()
     }
