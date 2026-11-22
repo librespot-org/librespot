@@ -162,6 +162,13 @@ impl<'ct> ConnectState {
         Ok(Some(self.player().index.track))
     }
 
+    /// Whether [Self::next_track] would find a track to move to
+    pub fn has_playable_next_track(&self) -> bool {
+        self.next_tracks()
+            .iter()
+            .any(|t| !t.uid.starts_with(IDENTIFIER_DELIMITER) && !t.is_unavailable())
+    }
+
     /// Move to the prev track
     ///
     /// Updates the current track to the prev track. Adds the old track
@@ -446,5 +453,61 @@ impl<'ct> ConnectState {
             self.update_queue_revision();
         }
         self.update_restrictions();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        core::Session,
+        protocol::{context::Context, context_page::ContextPage, context_track::ContextTrack},
+    };
+
+    fn track(uri: &str, provider: Provider) -> ProvidedTrack {
+        let mut track = ProvidedTrack {
+            uri: uri.to_string(),
+            uid: uri.to_string(),
+            ..Default::default()
+        };
+        track.set_provider(provider);
+        track
+    }
+
+    #[tokio::test]
+    async fn has_playable_next_track_skips_what_next_track_skips() {
+        let mut state =
+            ConnectState::new(Default::default(), &Session::new(Default::default(), None));
+        let context = Context {
+            uri: Some("spotify:playlist:test".to_string()),
+            pages: vec![ContextPage {
+                tracks: vec![ContextTrack {
+                    uri: Some("spotify:track:0000000000000000000000".to_string()),
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        state.update_context(context, ContextType::Default).unwrap();
+
+        let unavailable = track(
+            "spotify:track:0000000000000000000001",
+            Provider::Unavailable,
+        );
+        let queued = track("spotify:track:0000000000000000000002", Provider::Queue);
+
+        state.set_next_tracks(vec![ConnectState::new_delimiter(0), unavailable.clone()]);
+        assert!(!state.has_playable_next_track());
+        assert_eq!(state.next_track().unwrap(), None);
+
+        state.set_next_tracks(vec![
+            ConnectState::new_delimiter(0),
+            unavailable,
+            queued.clone(),
+        ]);
+        assert!(state.has_playable_next_track());
+        state.next_track().unwrap();
+        assert_eq!(state.current_track(|t| t.uri.clone()), queued.uri);
     }
 }
