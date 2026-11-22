@@ -84,7 +84,6 @@ impl Playlist {
     }
 }
 
-#[async_trait]
 impl Metadata for Playlist {
     type Message = protocol::playlist4_external::SelectedListContent;
 

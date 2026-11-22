@@ -167,7 +167,6 @@ impl Artist {
     }
 }
 
-#[async_trait]
 impl Metadata for Artist {
     type Message = protocol::metadata::Artist;
 

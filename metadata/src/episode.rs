@@ -53,7 +53,6 @@ pub struct Episodes(pub Vec<SpotifyUri>);
 
 impl_deref_wrapped!(Episodes, Vec<SpotifyUri>);
 
-#[async_trait]
 impl Metadata for Episode {
     type Message = protocol::metadata::Episode;
 

@@ -1,10 +1,8 @@
 #[macro_use]
 extern crate log;
 
-#[macro_use]
-extern crate async_trait;
-
 use protobuf::Message;
+use std::future::Future;
 
 use librespot_core::{Error, Session, SpotifyUri};
 
@@ -39,20 +37,34 @@ pub use playlist::Playlist;
 pub use show::Show;
 pub use track::Track;
 
-#[async_trait]
 pub trait Metadata: Send + Sized + 'static {
-    type Message: protobuf::Message + std::fmt::Debug;
+    type Message: Message + std::fmt::Debug;
 
     // Request a protobuf
-    async fn request(session: &Session, id: &SpotifyUri) -> RequestResult;
+    fn request(
+        session: &Session,
+        id: &SpotifyUri,
+    ) -> impl Future<Output = RequestResult> + Send + Sized;
 
     // Request a metadata struct
-    async fn get(session: &Session, id: &SpotifyUri) -> Result<Self, Error> {
-        let response = Self::request(session, id).await?;
-        let msg = Self::Message::parse_from_bytes(&response)?;
-        trace!("Received metadata: {msg:#?}");
-        Self::parse(&msg, id)
+    fn get(
+        session: &Session,
+        id: &SpotifyUri,
+    ) -> impl Future<Output = Result<Self, Error>> + Send + Sized {
+        map_request_to_message(Self::request(session, id), id)
     }
 
     fn parse(msg: &Self::Message, _: &SpotifyUri) -> Result<Self, Error>;
+}
+
+async fn map_request_to_message<M, P, F>(response: F, uri: &SpotifyUri) -> Result<M, Error>
+where
+    P: Message + std::fmt::Debug,
+    M: Metadata<Message = P>,
+    F: Future<Output = RequestResult> + Send + Sized,
+{
+    let response = response.await?;
+    let msg = P::parse_from_bytes(&response)?;
+    trace!("Received metadata: {msg:#?}");
+    M::parse(&msg, uri)
 }

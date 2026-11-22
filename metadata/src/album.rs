@@ -70,7 +70,6 @@ impl Album {
     }
 }
 
-#[async_trait]
 impl Metadata for Album {
     type Message = protocol::metadata::Album;
 

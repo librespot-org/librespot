@@ -32,7 +32,6 @@ pub struct Show {
     pub is_audiobook: bool,
 }
 
-#[async_trait]
 impl Metadata for Show {
     type Message = protocol::metadata::Show;
 
