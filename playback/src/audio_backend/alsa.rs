@@ -354,6 +354,11 @@ fn open_device(dev_name: &str, format: AudioFormat) -> SinkResult<(PCM, usize)> 
 
             trace!("You may experience higher than normal CPU usage and/or audio issues.");
 
+            // Still try to constrain the buffer size. Some devices default to
+            // very large buffers (e.g. 1M+ frames) which delays playback start
+            // (due to start_threshold) and blocks track changes (due to drain).
+            let _ = hwp_clone.set_buffer_size_near(MAX_BUFFER);
+
             pcm.hw_params(&hwp_clone).map_err(AlsaError::Pcm)?;
         } else {
             pcm.hw_params(&hwp).map_err(AlsaError::Pcm)?;
@@ -368,7 +373,11 @@ fn open_device(dev_name: &str, format: AudioFormat) -> SinkResult<(PCM, usize)> 
 
         let swp = pcm.sw_params_current().map_err(AlsaError::Pcm)?;
 
-        swp.set_start_threshold(frames_per_buffer - frames_per_period)
+        // Cap start_threshold so that playback begins promptly even if the
+        // device ended up with a large buffer (e.g. after the fallback path).
+        // One second of latency is a reasonable upper bound.
+        let start_threshold = (frames_per_buffer - frames_per_period).min(SAMPLE_RATE as Frames);
+        swp.set_start_threshold(start_threshold)
             .map_err(AlsaError::SwParams)?;
 
         pcm.sw_params(&swp).map_err(AlsaError::Pcm)?;
