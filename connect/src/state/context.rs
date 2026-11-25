@@ -20,6 +20,10 @@ use uuid::Uuid;
 
 const LOCAL_FILES_IDENTIFIER: &str = "spotify:local-files";
 const SEARCH_IDENTIFIER: &str = "spotify:search";
+// The context the Web API gives a play of bare track uris ("uris": [...]). The
+// context-resolve endpoint answers 400 Bad Request for it; the tracks come in the
+// play command's page instead.
+const WEBAPI_IDENTIFIER: &str = "spotify:webapi:";
 
 #[derive(Debug)]
 pub struct StateContext {
@@ -138,7 +142,10 @@ impl ConnectState {
     }
 
     pub fn valid_resolve_uri(uri: &str) -> Option<&str> {
-        if uri.is_empty() || uri.starts_with(SEARCH_IDENTIFIER) {
+        if uri.is_empty()
+            || uri.starts_with(SEARCH_IDENTIFIER)
+            || uri.starts_with(WEBAPI_IDENTIFIER)
+        {
             None
         } else {
             Some(uri)
@@ -516,5 +523,45 @@ impl ConnectState {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use librespot_protocol::context_page::ContextPage;
+    use librespot_protocol::context_track::ContextTrack;
+
+    fn page_of(uri: &str) -> ContextPage {
+        ContextPage {
+            tracks: vec![ContextTrack {
+                uri: Some(uri.to_string()),
+                ..Default::default()
+            }],
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn webapi_context_is_resolved_from_its_first_track() {
+        const WEBAPI: &str = "spotify:webapi:6ZiGbhzFpulbOi1LTrTK54";
+        let track = "spotify:track:63T7DJ1AFDD6Bn8VzG6JE8";
+        let page = page_of(track);
+        assert_eq!(ConnectState::valid_resolve_uri(WEBAPI), None);
+        assert_eq!(
+            ConnectState::find_valid_uri(Some(WEBAPI), Some(&page)),
+            Some(track)
+        );
+    }
+
+    #[test]
+    fn other_contexts_are_resolved_as_they_are() {
+        let album = "spotify:album:0FgZKfoU2Br5sHOfvZKTI9";
+        assert_eq!(ConnectState::valid_resolve_uri(album), Some(album));
+        assert_eq!(
+            ConnectState::valid_resolve_uri("spotify:search:never+gonna"),
+            None
+        );
+        assert_eq!(ConnectState::valid_resolve_uri(""), None);
     }
 }

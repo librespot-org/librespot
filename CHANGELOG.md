@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- [connect] A play of bare track uris from the Web API plays: its `spotify:webapi:` context is not resolved, which context-resolve answers with 400 Bad Request, but taken from the first track of the play command, as a search context is
 - [connect] Picking a track in a list plays that track: an empty `track_uri` (or `track_uid`) sent next to the one that identifies the track is ignored, instead of failing to resolve and playing the first track of the context
 
 ### Added
